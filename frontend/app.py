@@ -707,11 +707,14 @@ with st.sidebar:
             st.success("RealSoft ERP: Live")
         else:
             st.info("RealSoft ERP: Simulation")
-        # AI extraction provider (sidecar | mock)
-        if health.get("ai_provider") == "sidecar":
+        # AI extraction provider (gateway | sidecar | mock)
+        _prov = health.get("ai_provider")
+        if _prov == "gateway":
+            st.success(f"AI: Gateway · {health.get('ai_model', 'printo-gateway')}")
+        elif _prov == "sidecar":
             st.success(f"AI: Sidecar · {health.get('ai_mode','?')} · {health.get('ai_model','')}")
         else:
-            st.info("AI: Mock (demo data) — sidecar offline")
+            st.info("AI: Mock (demo data) — gateway/sidecar offline")
         c1, c2 = st.columns(2)
         c1.metric("Total", health.get("total_drawings", 0))
         c2.metric("Done", health.get("completed", 0))

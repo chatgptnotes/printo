@@ -27,6 +27,7 @@ from report_generator import (generate_report, generate_project_report,
                               html_to_pdf_bytes)
 from auth import (verify_login, create_token, require_auth,
                   is_locked, record_failure, clear_failures)
+from ai_provider import gateway_erp_map
 import base64
 import preprocess
 
@@ -335,8 +336,17 @@ async def run_pipeline(file_path: Path, file_name: str, drawing_id: int,
     yield event("🗺️ ", "ERP Mapping", "Converting extracted data to RealSoft ERP format...", "info")
     avg_conf = average_confidence(extracted)
     realsoft_payload = map_to_realsoft(extracted, drawing_id, file_name, verd, avg_conf)
-    yield event("✅", "Mapping Complete",
-                f"JSON payload ready — module: {realsoft_payload.get('module', 'DrawingMaster')}", "success")
+    # Gateway-primary mapping: use the VPS ERP_MAP when reachable, else keep local.
+    gw_data = gateway_erp_map(extracted)
+    if gw_data:
+        realsoft_payload["data"] = gw_data
+        realsoft_payload["metadata"]["mapping_source"] = "gateway"
+        yield event("✅", "ERP Mapping (Gateway)",
+                    "Mapped via Printo Gateway (ERP_MAP)", "success")
+    else:
+        realsoft_payload["metadata"]["mapping_source"] = "local"
+        yield event("✅", "Mapping Complete",
+                    f"JSON payload ready — module: {realsoft_payload.get('module', 'DrawingMaster')}", "success")
 
     # ── ERP Push (or simulation) ─────────────────────────────────────────
     erp_status = "simulated"

@@ -21,3 +21,8 @@ xhtml2pdf==0.2.16           # pure-Python HTML→PDF for the improvement doc
 # ── Auth ───────────────────────────────────────────────────────────────
 bcrypt==4.2.0               # password hashing
 pyjwt==2.9.0                # signed JWT access tokens
+
+# ── Printo Gateway (Hostinger VPS sidecar) ───────────────────────────────
+# printo_gateway_client     # provided by Coral — `pip install <name-or-git-url>`;
+#                             set PRINTO_GATEWAY_URL / PRINTO_GATEWAY_KEY in .env.
+#                             Optional: app falls back to local sidecar/mock without it.
