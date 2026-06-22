@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Environment
+.env
+
+# Database
+*.db
+*.sqlite3
+
+# Logs
+logs/
+
+# Generated reports and storage (uploaded files)
+# Uncomment below if you want to exclude generated output:
+# reports/
+# storage/
