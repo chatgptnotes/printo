@@ -14,7 +14,10 @@ __pycache__/
 # Logs
 logs/
 
-# Generated reports and storage (uploaded files)
-# Uncomment below if you want to exclude generated output:
-# reports/
-# storage/
+# Generated reports and uploaded files (runtime artifacts)
+reports/
+storage/
+
+# Local verification screenshots
+_shots/
+_*.py

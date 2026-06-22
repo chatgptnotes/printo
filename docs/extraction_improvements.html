@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Improving Feature Extraction from Construction Drawings — Printo</title>
+<style>
+  @page { size: A4; margin: 1.6cm 1.5cm; }
+  body { font-family: Helvetica, Arial, sans-serif; font-size: 10.5pt; color: #1e293b; line-height: 1.5; }
+  h1 { font-size: 21pt; color: #1a2744; margin: 0 0 2pt; }
+  h2 { font-size: 14pt; color: #1a2744; border-bottom: 2px solid #F7941D; padding-bottom: 3pt; margin: 18pt 0 8pt; }
+  h3 { font-size: 11.5pt; color: #1a2744; margin: 12pt 0 4pt; }
+  p  { margin: 0 0 7pt; }
+  .sub { color: #64748b; font-size: 10pt; margin-bottom: 2pt; }
+  .cover { background-color: #1a2744; color: #ffffff; padding: 22pt 20pt; margin-bottom: 16pt; }
+  .cover h1 { color: #ffffff; }
+  .cover .accent { color: #F7941D; }
+  .cover .meta { color: #cbd5e1; font-size: 9.5pt; margin-top: 8pt; }
+  .badge { background-color: #F7941D; color: #1a2744; font-size: 8pt; font-weight: bold;
+           padding: 2pt 7pt; }
+  table { width: 100%; border-collapse: collapse; margin: 6pt 0 10pt; }
+  th { background-color: #eef2f7; color: #334155; text-align: left; font-size: 9pt;
+       padding: 5pt 7pt; border: 1px solid #d8e0ea; }
+  td { padding: 5pt 7pt; border: 1px solid #e2e8f0; font-size: 9.5pt; vertical-align: top; }
+  .tier1 { color: #166534; font-weight: bold; }
+  .tier2 { color: #b45309; font-weight: bold; }
+  .tier3 { color: #6b7280; font-weight: bold; }
+  code { font-family: Courier, monospace; background-color: #f1f5f9; font-size: 9pt; padding: 0 2pt; }
+  .note { background-color: #fff7ed; border-left: 3px solid #F7941D; padding: 7pt 10pt; margin: 8pt 0; font-size: 9.5pt; }
+  ul { margin: 0 0 8pt 0; padding-left: 16pt; }
+  li { margin-bottom: 2pt; }
+  .footer { color: #94a3b8; font-size: 8pt; text-align: center; margin-top: 16pt;
+            border-top: 1px solid #e2e8f0; padding-top: 6pt; }
+</style>
+</head>
+<body>
+
+<div class="cover">
+  <span class="badge">TECHNICAL STRATEGY</span>
+  <h1 style="margin-top:8pt;">Improving Feature Extraction<br>from Construction Drawings</h1>
+  <div class="sub" style="color:#cbd5e1;">PRIN<span class="accent">TO</span> — AI Drawing-to-ERP Platform</div>
+  <div class="meta">Coral Business Solutions &nbsp;|&nbsp; RealSoft ERP &nbsp;|&nbsp; June 2026 &nbsp;|&nbsp; Phase 2</div>
+</div>
+
+<h2>1. Executive Summary</h2>
+<p>Printo reads construction drawings and extracts ~26 structured fields (title block, room
+schedule, dimensions, materials), validates them against 18 rules, and pushes them to RealSoft
+ERP. This document explains <strong>how we improve extraction accuracy</strong> and which
+improvements are <strong>now integrated</strong> into the pipeline.</p>
+<p>Two architectural decisions shape this phase: (1) all AI inference is routed through a
+<strong>pluggable AI sidecar</strong> (the Pratyaya / Ampris AI-aaS pattern) rather than calling a
+model API directly from Printo; and (2) every improvement is made <strong>measurable</strong> by a
+field-level benchmark harness so gains are provable, not assumed.</p>
+
+<h2>2. Current Pipeline &amp; Gaps Addressed</h2>
+<p>The original pipeline sent the whole file to a vision model with a free-text JSON prompt and
+trusted the model's self-reported confidence. Three concrete gaps were found and fixed:</p>
+<table>
+  <tr><th>Gap</th><th>Impact</th><th>Fix</th></tr>
+  <tr><td>Deterministic prepass disabled (<code>pdfplumber</code> not installed)</td>
+      <td>Free, reliable title-block text was never used</td>
+      <td>Dependency added; prepass active + expanded</td></tr>
+  <tr><td><code>quantities</code> validated (R10/R18) but never extracted</td>
+      <td>Rules always warned; field always blank</td>
+      <td>Added to schema, prompt, and prepass regex</td></tr>
+  <tr><td>Raw self-reported confidence</td>
+      <td>Unreliable; confidence rules (R12–R15) noisy</td>
+      <td>Replaced with a calibrated score (Section 5)</td></tr>
+</table>
+
+<h2>3. The Improvement Levers</h2>
+<p>Fifteen techniques, grouped by where they plug into the pipeline. The Tier column marks what is
+integrated now (<span class="tier1">Tier&nbsp;1</span>, <span class="tier2">Tier&nbsp;2</span>)
+versus the roadmap (<span class="tier3">Tier&nbsp;3</span>, Section 7).</p>
+
+<h3>A. Give the model a better image</h3>
+<table>
+  <tr><th>#</th><th>Technique</th><th>Why it helps</th><th>Tier</th></tr>
+  <tr><td>1</td><td>Render PDF pages to high-DPI PNG</td><td>Small title-block text becomes legible vs. a raw PDF stream</td><td class="tier1">1</td></tr>
+  <tr><td>2</td><td>Title-block crop pass (zoomed bottom / bottom-right)</td><td>Title blocks are tiny corners; a zoomed crop reads far better</td><td class="tier1">1</td></tr>
+  <tr><td>3</td><td>Image cleanup: deskew, CLAHE contrast, upscale, denoise</td><td>Rescues scans and phone photos of drawings</td><td class="tier2">2</td></tr>
+  <tr><td>4</td><td>Tiling large sheets into regions</td><td>Beats resolution limits for dense counts / schedules</td><td class="tier2">2</td></tr>
+</table>
+
+<h3>B. Strengthen the deterministic prepass (free, reliable)</h3>
+<table>
+  <tr><th>#</th><th>Technique</th><th>Why it helps</th><th>Tier</th></tr>
+  <tr><td>5</td><td>PDF text-layer extraction + expanded regex</td><td>Exact title-block values with no model cost or error</td><td class="tier1">1</td></tr>
+  <tr><td>6</td><td>OCR fallback (Tesseract) for scanned sheets</td><td>Recovers text when there is no PDF text layer</td><td class="tier2">2</td></tr>
+</table>
+
+<h3>C. Use the model better</h3>
+<table>
+  <tr><th>#</th><th>Technique</th><th>Why it helps</th><th>Tier</th></tr>
+  <tr><td>7</td><td>Structured output + schema validation (Pydantic)</td><td>No JSON-parse failures; typed, repaired, retryable</td><td class="tier1">1</td></tr>
+  <tr><td>8</td><td>Multi-pass (title-block pass + full-plan pass)</td><td>Each pass specialises; merged for best of both</td><td class="tier2">2</td></tr>
+  <tr><td>9</td><td>Few-shot / golden title-block templates</td><td>Anchors the model to known layouts</td><td class="tier3">3</td></tr>
+  <tr><td>10</td><td>Drawing-type routing (plan / section / elevation)</td><td>Type-specific field sets and prompts</td><td class="tier3">3</td></tr>
+</table>
+
+<h3>D. Reliability &amp; trustworthy confidence</h3>
+<table>
+  <tr><th>#</th><th>Technique</th><th>Why it helps</th><th>Tier</th></tr>
+  <tr><td>11</td><td>Confidence calibration (multi-signal)</td><td>Confidence reflects reality, driving rules R12–R15</td><td class="tier2">2</td></tr>
+  <tr><td>12</td><td>Self-consistency voting (run N×, reconcile)</td><td>Stabilises uncertain fields</td><td class="tier3">3</td></tr>
+  <tr><td>13</td><td>Cross-sheet aggregation of project-level fields</td><td>Project / client agree across a sheet set</td><td class="tier3">3</td></tr>
+</table>
+
+<h3>E. Close the loop &amp; prove it</h3>
+<table>
+  <tr><th>#</th><th>Technique</th><th>Why it helps</th><th>Tier</th></tr>
+  <tr><td>14</td><td>Human-in-the-loop from the <code>corrections</code> table</td><td>Real corrections become examples / tuning data</td><td class="tier3">3</td></tr>
+  <tr><td>15</td><td>Benchmark harness (field-level accuracy)</td><td>Every change is measured before/after</td><td class="tier1">1</td></tr>
+</table>
+
+<h2>4. What We Integrated (Tier 1 + Tier 2)</h2>
+<table>
+  <tr><th>Capability</th><th>Module / file</th></tr>
+  <tr><td>PDF→PNG render, title-block crop, image cleanup, tiling</td><td><code>backend/preprocess.py</code></td></tr>
+  <tr><td>Text-layer + OCR prepass, expanded regex, <code>quantities</code></td><td><code>backend/prepass.py</code></td></tr>
+  <tr><td>Structured output, schema validation &amp; repair</td><td><code>backend/schema.py</code></td></tr>
+  <tr><td>Pluggable AI provider (mock / sidecar; vision &amp; text)</td><td><code>backend/ai_provider.py</code></td></tr>
+  <tr><td>Orchestration, multi-pass, confidence calibration</td><td><code>backend/extractor.py</code></td></tr>
+  <tr><td>Accuracy benchmark + ground truth</td><td><code>backend/benchmark.py</code>, <code>test_drawings/ground_truth.json</code></td></tr>
+  <tr><td>Local test sidecar (contract reference)</td><td><code>tools/mock_sidecar.py</code></td></tr>
+</table>
+
+<h2>5. Confidence Calibration</h2>
+<p>Self-reported confidence is unreliable, so Printo computes a calibrated per-field score by
+combining independent signals:</p>
+<ul>
+  <li><strong>Prepass agreement</strong> — a deterministic text-layer/OCR match sets the field to near-certain (0.97).</li>
+  <li><strong>Format validity</strong> — drawing-number pattern, revision pattern, <code>1:NN</code> scale: small boost if valid, penalty if not.</li>
+  <li><strong>Cross-field consistency</strong> — e.g. <code>sheet_number &le; total_sheets</code>; violations lower both scores.</li>
+  <li><strong>Coverage floor</strong> — every populated field gets a sensible minimum so the UI always shows a score.</li>
+</ul>
+
+<h2>6. Sidecar Architecture</h2>
+<p>Printo never embeds a model key. <code>ai_provider.py</code> routes inference to a local sidecar
+(<code>SIDECAR_URL</code>, default <code>http://localhost:8787</code>) and falls back to built-in
+mock data when the sidecar is unreachable (<code>AI_PROVIDER=auto</code>). It supports a
+<strong>vision</strong> mode (sends the rendered image) and a <strong>text</strong> mode (sends OCR
+text), auto-selected from the sidecar's advertised capability.</p>
+<table>
+  <tr><th>Endpoint</th><th>Contract</th></tr>
+  <tr><td><code>GET /health</code></td><td><code>{ "status":"ok", "vision": true|false, "model": "..." }</code></td></tr>
+  <tr><td><code>POST /v1/extract</code></td><td>body <code>{ prompt, schema, image?{media_type,data(b64)}, text? }</code> &rarr; <code>{ "data": { fields..., confidence } }</code></td></tr>
+</table>
+<div class="note"><strong>Swap-in ready:</strong> point <code>SIDECAR_URL</code> at the real
+Pratyaya AI-aaS (or any service implementing this contract) for genuine vision extraction — no
+Printo code change required. <code>tools/mock_sidecar.py</code> documents and stubs the contract.</div>
+
+<h2>7. Benchmark Methodology &amp; Roadmap</h2>
+<p><code>benchmark.py</code> runs the pipeline over the sample drawings and scores each field against
+<code>ground_truth.json</code> (bools by equality, lists by overlap, strings normalised with
+substring tolerance), printing per-file and overall accuracy. Run it before and after a change, or
+across providers, to quantify impact. Example: the mock provider scores 100% on the filename-aware
+samples; a fixed stub sidecar scores ~81%, correctly flagging the floor mismatches — demonstrating
+the harness detects real differences.</p>
+<p><strong>Tier-3 roadmap (next phase):</strong> golden-template matching, drawing-type routing,
+self-consistency voting, cross-sheet aggregation, and a human-in-the-loop feedback loop fed by the
+existing <code>corrections</code> table. Real accuracy figures require pointing the sidecar at a live
+vision model.</p>
+
+<div class="footer">
+  Printo — Feature Extraction Improvement &nbsp;|&nbsp; Coral Business Solutions &nbsp;|&nbsp;
+  Confidential &nbsp;|&nbsp; June 2026
+</div>
+
+</body>
+</html>

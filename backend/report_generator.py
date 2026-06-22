@@ -1,11 +1,21 @@
 """
-Generates a professional printable HTML summary report for a processed drawing.
+Summary report generation.
+
+Produces a polished, print-friendly HTML report for a single drawing and a
+project-level aggregate report. The HTML is intentionally **table-based** (no
+flexbox / gradients / CSS variables) so the same markup renders correctly both
+in the browser and through xhtml2pdf (`html_to_pdf_bytes`).
+
+Sections (per-drawing): exec summary + quality score, drawing thumbnail,
+extracted fields, room schedule, confidence chart, validation, corrections
+audit trail, ERP payload.
 """
 
 import datetime
 
 
-def _conf_badge(conf: float | None) -> str:
+# ── small helpers ─────────────────────────────────────────────────────────────
+def _conf_badge(conf):
     if conf is None:
         return '<span class="badge badge-gray">N/A</span>'
     if conf >= 0.85:
@@ -15,42 +25,38 @@ def _conf_badge(conf: float | None) -> str:
     return f'<span class="badge badge-red">{conf:.0%}</span>'
 
 
-def _verdict_style(verdict: str) -> tuple[str, str, str]:
+def _conf_color(conf):
+    if conf is None:
+        return "#cbd5e1"
+    if conf >= 0.85:
+        return "#16a34a"
+    if conf >= 0.60:
+        return "#d97706"
+    return "#dc2626"
+
+
+def _verdict_style(verdict):
     if verdict == "PASSED":
-        return "#16a34a", "✅", "ALL RULES PASSED"
+        return "#16a34a", "PASS", "ALL RULES PASSED"
     if verdict == "WARNING":
-        return "#d97706", "⚠️", "PASSED WITH WARNINGS"
-    return "#dc2626", "❌", "VALIDATION FAILED"
+        return "#d97706", "WARN", "PASSED WITH WARNINGS"
+    return "#dc2626", "FAIL", "VALIDATION FAILED"
 
 
 FIELD_LABELS = {
-    "drawing_number":   "Drawing Number",
-    "drawing_title":    "Drawing Title",
-    "project_name":     "Project Name",
-    "project_location": "Project Location",
-    "client_name":      "Client Name",
-    "contractor_name":  "Contractor / Consultant",
-    "drawn_by":         "Drawn By",
-    "checked_by":       "Checked By",
-    "approved_by":      "Approved By",
-    "date_of_issue":    "Date of Issue",
-    "revision_number":  "Revision Number",
-    "sheet_number":     "Sheet Number",
-    "total_sheets":     "Total Sheets",
-    "scale":            "Scale",
-    "floor_level":      "Floor Level",
-    "total_floor_area": "Total Floor Area",
-    "building_type":    "Building Type",
-    "number_of_rooms":  "Number of Rooms",
-    "door_count":       "Door Count",
-    "window_count":     "Window Count",
-    "structural_notes": "Structural Notes",
-    "materials":        "Materials",
-    "dimensions":       "Overall Dimensions",
-    "approval_stamp":   "Approval Stamp",
-    "north_arrow":      "North Arrow",
-    "grid_lines":       "Grid Lines",
-    "additional_notes": "Additional Notes",
+    "drawing_number": "Drawing Number", "drawing_title": "Drawing Title",
+    "project_name": "Project Name", "project_location": "Project Location",
+    "client_name": "Client Name", "contractor_name": "Contractor / Consultant",
+    "drawn_by": "Drawn By", "checked_by": "Checked By", "approved_by": "Approved By",
+    "date_of_issue": "Date of Issue", "revision_number": "Revision Number",
+    "sheet_number": "Sheet Number", "total_sheets": "Total Sheets", "scale": "Scale",
+    "floor_level": "Floor Level", "total_floor_area": "Total Floor Area",
+    "building_type": "Building Type", "number_of_rooms": "Number of Rooms",
+    "door_count": "Door Count", "window_count": "Window Count",
+    "structural_notes": "Structural Notes", "materials": "Materials",
+    "quantities": "Quantities", "dimensions": "Overall Dimensions",
+    "approval_stamp": "Approval Stamp", "north_arrow": "North Arrow",
+    "grid_lines": "Grid Lines", "additional_notes": "Additional Notes",
 }
 
 FIELD_GROUPS = {
@@ -60,314 +66,376 @@ FIELD_GROUPS = {
     "Floor Plan Info": ["floor_level", "total_floor_area", "building_type", "number_of_rooms",
                         "door_count", "window_count", "dimensions"],
     "Participants": ["drawn_by", "checked_by", "approved_by"],
-    "Technical": ["structural_notes", "materials", "approval_stamp", "north_arrow",
-                  "grid_lines", "additional_notes"],
+    "Technical": ["structural_notes", "materials", "quantities", "approval_stamp",
+                  "north_arrow", "grid_lines", "additional_notes"],
 }
 
+# Fields that meaningfully count toward "completeness" of an extraction.
+KEY_FIELDS = [
+    "drawing_number", "drawing_title", "project_name", "scale", "revision_number",
+    "sheet_number", "floor_level", "total_floor_area", "building_type",
+    "dimensions", "materials", "quantities", "approval_stamp", "drawn_by",
+]
 
-def generate_report(
-    drawing_meta: dict,
-    extracted: dict,
-    rule_results: list,
-    verdict: str,
-    elapsed: float,
-    erp_payload: dict,
-) -> str:
-    conf = extracted.get("confidence", {})
-    verdict_color, verdict_icon, verdict_text = _verdict_style(verdict)
+
+def quality_score(extracted: dict, rule_results: list) -> tuple[int, str, str]:
+    """Composite extraction-quality score 0–100.
+
+    Blends field completeness (key fields populated), average calibrated
+    confidence, and rule pass-rate. Returns (score, label, color).
+    """
+    conf = extracted.get("confidence", {}) or {}
+
+    def populated(k):
+        return extracted.get(k) not in (None, "", [], False)
+
+    completeness = sum(1 for k in KEY_FIELDS if populated(k)) / len(KEY_FIELDS)
+    conf_vals = [v for v in conf.values() if v is not None]
+    avg_conf = sum(conf_vals) / len(conf_vals) if conf_vals else 0.0
+    total = len(rule_results) or 1
+    pass_rate = sum(1 for r in rule_results if r.passed) / total
+
+    score = round(100 * (0.30 * completeness + 0.40 * avg_conf + 0.30 * pass_rate))
+    if score >= 85:
+        return score, "Excellent", "#16a34a"
+    if score >= 70:
+        return score, "Good", "#16a34a"
+    if score >= 50:
+        return score, "Fair", "#d97706"
+    return score, "Needs Review", "#dc2626"
+
+
+def _display_val(val):
+    if val is None:
+        return "—"
+    if isinstance(val, bool):
+        return "Yes" if val else "—"
+    if isinstance(val, list):
+        return ", ".join(str(x) for x in val) if val else "—"
+    return str(val)
+
+
+def _confidence_chart_html(extracted: dict, limit: int = 14) -> str:
+    """Horizontal confidence bars (weakest first) — two-cell tables, PDF-safe."""
+    conf = extracted.get("confidence", {}) or {}
+    items = [(k, c) for k, c in conf.items()
+             if c is not None and extracted.get(k) not in (None, "", [], False)]
+    if not items:
+        return ""
+    items.sort(key=lambda kv: kv[1])          # weakest at top
+    rows = ""
+    for k, c in items[:limit]:
+        label = FIELD_LABELS.get(k, k)
+        pct = max(2, int(round(c * 100)))
+        color = _conf_color(c)
+        rows += f"""
+        <tr>
+          <td class="bar-label">{label}</td>
+          <td class="bar-cell">
+            <table class="bar"><tr>
+              <td style="width:{pct}%;background-color:{color};">&nbsp;</td>
+              <td style="width:{100 - pct}%;background-color:#edf1f7;">&nbsp;</td>
+            </tr></table>
+          </td>
+          <td class="bar-pct">{c:.0%}</td>
+        </tr>"""
+    return f"""
+      <div class="section">
+        <h2 class="section-title">Confidence by Field <span class="muted">(lowest first)</span></h2>
+        <table class="bars">{rows}</table>
+      </div>"""
+
+
+def _corrections_html(corrections: list) -> str:
+    if not corrections:
+        return ""
+    rows = ""
+    for c in corrections:
+        rows += f"""
+          <tr>
+            <td>{FIELD_LABELS.get(c.get('field'), c.get('field', '—'))}</td>
+            <td class="muted">{_display_val(c.get('original'))}</td>
+            <td><strong>{_display_val(c.get('corrected'))}</strong></td>
+            <td>{c.get('by', '—')}</td>
+            <td class="muted">{str(c.get('at', '—'))[:16]}</td>
+          </tr>"""
+    return f"""
+      <div class="section">
+        <h2 class="section-title">Human Corrections — Audit Trail</h2>
+        <table class="data-table">
+          <thead><tr><th>Field</th><th>Original (AI)</th><th>Corrected</th>
+            <th>By</th><th>When</th></tr></thead>
+          <tbody>{rows}</tbody>
+        </table>
+      </div>"""
+
+
+_BASE_CSS = """
+  @page { size: A4; margin: 1.4cm 1.3cm; }
+  * { box-sizing: border-box; }
+  body { font-family: Helvetica, Arial, sans-serif; font-size: 11px; color: #1e293b; }
+  .page { max-width: 980px; margin: 0 auto; background: #ffffff; }
+  .header { background-color: #1a2744; color: #ffffff; padding: 18px 24px; }
+  .brand { font-size: 20px; font-weight: bold; }
+  .brand span { color: #F7941D; }
+  .report-label { font-size: 10px; color: #94a3b8; }
+  .header-meta { font-size: 10px; color: #cbd5e1; }
+  .verdict-bar { color: #ffffff; padding: 9px 24px; font-size: 13px; font-weight: bold; }
+  .section { padding: 16px 24px; border-bottom: 1px solid #e2e8f0; }
+  .section-title { font-size: 13px; font-weight: bold; color: #1a2744;
+     border-bottom: 2px solid #F7941D; padding-bottom: 4px; margin: 0 0 10px; }
+  .muted { color: #94a3b8; font-weight: normal; }
+  table { border-collapse: collapse; width: 100%; }
+  .data-table th { background-color: #f1f5f9; text-align: left; padding: 6px 9px;
+     font-size: 9.5px; color: #475569; border: 1px solid #e2e8f0; }
+  .data-table td { padding: 6px 9px; border: 1px solid #eef2f7; font-size: 10.5px; }
+  .field-name { color: #475569; width: 38%; }
+  .field-conf { width: 70px; text-align: center; }
+  .group-header td { background-color: #eef4ff; font-weight: bold; color: #1d4ed8;
+     font-size: 9.5px; padding: 5px 9px; }
+  .badge { padding: 1px 7px; border-radius: 9px; font-size: 9.5px; font-weight: bold; }
+  .badge-green { background-color: #dcfce7; color: #16a34a; }
+  .badge-amber { background-color: #fef3c7; color: #d97706; }
+  .badge-red { background-color: #fee2e2; color: #dc2626; }
+  .badge-gray { background-color: #f1f5f9; color: #64748b; }
+  .row-pass td { color: #166534; }
+  .row-warn td { background-color: #fffbeb; color: #92400e; }
+  .row-error td { background-color: #fff1f2; color: #991b1b; }
+  code { font-family: Courier, monospace; background-color: #f1f5f9; font-size: 9.5px; }
+  .bars td { padding: 3px 4px; font-size: 10px; vertical-align: middle; }
+  .bar-label { width: 32%; color: #475569; }
+  .bar-pct { width: 44px; text-align: right; font-weight: bold; }
+  .bar { width: 100%; height: 11px; }
+  .bar td { padding: 0; height: 11px; }
+  .stat td { text-align: center; padding: 12px 6px; border: 1px solid #e2e8f0; }
+  .stat .v { font-size: 22px; font-weight: bold; color: #1a2744; }
+  .stat .l { font-size: 9px; color: #64748b; }
+  .summary { font-size: 11.5px; color: #334155; }
+  .thumb { border: 1px solid #e2e8f0; padding: 4px; }
+  .footer { padding: 12px 24px; text-align: center; font-size: 9px; color: #94a3b8; }
+"""
+
+
+def generate_report(drawing_meta, extracted, rule_results, verdict, elapsed,
+                    erp_payload, corrections=None, thumbnail_uri=None):
+    conf = extracted.get("confidence", {}) or {}
+    vcolor, vtag, vtext = _verdict_style(verdict)
     generated_at = datetime.datetime.now().strftime("%d %b %Y, %H:%M")
 
-    field_count = sum(
-        1 for k, v in extracted.items()
-        if k not in ("confidence",) and v not in (None, [], "", False)
-    )
+    field_count = sum(1 for k, v in extracted.items()
+                      if k != "confidence" and v not in (None, [], "", False))
     conf_values = [v for v in conf.values() if v is not None]
     avg_conf = sum(conf_values) / len(conf_values) if conf_values else 0.0
     passed_rules = sum(1 for r in rule_results if r.passed)
     total_rules = len(rule_results)
     error_count = sum(1 for r in rule_results if not r.passed and r.severity == "ERROR")
     warn_count = sum(1 for r in rule_results if not r.passed and r.severity == "WARNING")
+    score, score_label, score_color = quality_score(extracted, rule_results)
 
-    floor_cat = drawing_meta.get("floor_category", "—")
     file_name = drawing_meta.get("file_name", "—")
     drawing_id = drawing_meta.get("drawing_id", "—")
+    floor_cat = drawing_meta.get("floor_category", "—")
 
-    # ── Field group rows ──────────────────────────────────────────────────────
+    # plain-language exec summary
+    summary = (
+        f"This {floor_cat.lower() if floor_cat else ''} drawing "
+        f"(<strong>{extracted.get('drawing_number') or 'no number'}</strong>"
+        f"{', ' + extracted.get('drawing_title') if extracted.get('drawing_title') else ''}) "
+        f"for project <strong>{extracted.get('project_name') or '—'}</strong> yielded "
+        f"<strong>{field_count}</strong> populated fields at <strong>{avg_conf:.0%}</strong> "
+        f"average confidence. {passed_rules} of {total_rules} validation rules passed "
+        f"({error_count} error(s), {warn_count} warning(s)). Overall extraction quality is "
+        f"rated <strong style=\"color:{score_color}\">{score_label} ({score}/100)</strong>."
+    )
+
+    # field group rows
     field_sections_html = ""
     for group_name, fields in FIELD_GROUPS.items():
-        rows = ""
-        has_data = False
+        rows, has = "", False
         for key in fields:
             val = extracted.get(key)
-            if val is None:
+            if val in (None, "", []):
                 continue
-            has_data = True
-            label = FIELD_LABELS.get(key, key)
-            if isinstance(val, list):
-                display = ", ".join(str(x) for x in val) if val else "—"
-            elif isinstance(val, bool):
-                display = "✅ Yes" if val else "—"
-            else:
-                display = str(val)
-            badge = _conf_badge(conf.get(key))
-            rows += f"""
-            <tr>
-              <td class="field-name">{label}</td>
-              <td class="field-value">{display}</td>
-              <td class="field-conf">{badge}</td>
-            </tr>"""
-        if has_data:
-            field_sections_html += f"""
-          <tr class="group-header"><td colspan="3">{group_name}</td></tr>
-          {rows}"""
+            has = True
+            rows += f"""<tr><td class="field-name">{FIELD_LABELS.get(key, key)}</td>
+              <td>{_display_val(val)}</td>
+              <td class="field-conf">{_conf_badge(conf.get(key))}</td></tr>"""
+        if has:
+            field_sections_html += (f'<tr class="group-header"><td colspan="3">{group_name}</td></tr>{rows}')
 
-    # ── Room schedule ─────────────────────────────────────────────────────────
+    # room schedule
     room_schedule = extracted.get("room_schedule") or []
-    room_table_html = ""
+    room_html = ""
     if room_schedule:
-        room_rows = "".join(
-            f'<tr><td>{r.get("name","—")}</td><td>{r.get("area","—")}</td></tr>'
-            for r in room_schedule
-        )
-        room_table_html = f"""
-      <div class="section">
-        <h2 class="section-title">Room Schedule</h2>
-        <table class="data-table">
-          <thead><tr><th>Room</th><th>Area</th></tr></thead>
-          <tbody>{room_rows}</tbody>
-        </table>
-      </div>"""
+        rr = "".join(f'<tr><td>{r.get("name","—")}</td><td>{r.get("area","—")}</td></tr>'
+                     for r in room_schedule)
+        room_html = f"""<div class="section"><h2 class="section-title">Room Schedule</h2>
+          <table class="data-table"><thead><tr><th>Room</th><th>Area</th></tr></thead>
+          <tbody>{rr}</tbody></table></div>"""
 
-    # ── Validation rows ───────────────────────────────────────────────────────
+    # validation rows
     val_rows = ""
     for r in rule_results:
         if r.passed:
-            icon, cls = "✅", "row-pass"
+            tag, cls = "PASS", "row-pass"
         elif r.severity == "ERROR":
-            icon, cls = "❌", "row-error"
+            tag, cls = "ERROR", "row-error"
         else:
-            icon, cls = "⚠️", "row-warn"
-        val_rows += f"""
-          <tr class="{cls}">
-            <td>{icon}</td>
-            <td><code>{r.rule_id}</code></td>
-            <td>{r.field_name}</td>
-            <td>{r.message}</td>
-            <td>{r.severity if not r.passed else "PASS"}</td>
-          </tr>"""
+            tag, cls = "WARN", "row-warn"
+        val_rows += f"""<tr class="{cls}"><td><code>{r.rule_id}</code></td>
+          <td>{r.field_name}</td><td>{r.message}</td><td>{tag}</td></tr>"""
 
-    # ── ERP simulation ────────────────────────────────────────────────────────
+    # erp payload
     erp_rows = ""
     if erp_payload:
         data_block = erp_payload.get("data", erp_payload)
         for k, v in list(data_block.items())[:12]:
             erp_rows += f"<tr><td>{k}</td><td>{v}</td></tr>"
 
-    html = f"""<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Printo — Drawing Extraction Report</title>
-<style>
-  * {{ box-sizing: border-box; margin: 0; padding: 0; }}
-  body {{ font-family: system-ui, -apple-system, sans-serif; font-size: 13px;
-          color: #1e293b; background: #f8fafc; }}
-  .page {{ max-width: 960px; margin: 0 auto; background: #fff;
-           box-shadow: 0 1px 8px rgba(0,0,0,.12); }}
+    thumb_html = ""
+    if thumbnail_uri:
+        thumb_html = f"""<div class="section"><h2 class="section-title">Source Drawing</h2>
+          <img class="thumb" src="{thumbnail_uri}" style="max-width:100%;" /></div>"""
 
-  /* Header */
-  .header {{ background: #1a2744; color: #fff; padding: 28px 36px 20px; }}
-  .header-top {{ display: flex; justify-content: space-between; align-items: flex-start; }}
-  .brand {{ font-size: 22px; font-weight: 700; letter-spacing: .5px; }}
-  .brand span {{ color: #60a5fa; }}
-  .report-label {{ font-size: 11px; color: #94a3b8; margin-top: 2px; }}
-  .header-meta {{ font-size: 11px; color: #94a3b8; text-align: right; }}
-  .header-meta strong {{ color: #e2e8f0; display: block; font-size: 13px; }}
-  .meta-row {{ display: flex; gap: 32px; margin-top: 16px; flex-wrap: wrap; }}
-  .meta-item {{ font-size: 12px; color: #94a3b8; }}
-  .meta-item strong {{ color: #fff; display: block; font-size: 13px; margin-bottom: 2px; }}
+    html = f"""<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8">
+<title>Printo — Drawing Extraction Report #{drawing_id}</title>
+<style>{_BASE_CSS}</style></head><body><div class="page">
 
-  /* Verdict */
-  .verdict-bar {{ background: {verdict_color}; color: #fff;
-                  padding: 14px 36px; display: flex; align-items: center;
-                  gap: 12px; font-size: 15px; font-weight: 700; }}
-  .stats-row {{ display: flex; gap: 0; border-bottom: 1px solid #e2e8f0; }}
-  .stat-box {{ flex: 1; padding: 16px 20px; border-right: 1px solid #e2e8f0;
-               text-align: center; }}
-  .stat-box:last-child {{ border-right: none; }}
-  .stat-val {{ font-size: 26px; font-weight: 700; color: #1a2744; }}
-  .stat-label {{ font-size: 11px; color: #64748b; margin-top: 2px; }}
-
-  /* Sections */
-  .section {{ padding: 24px 36px; border-bottom: 1px solid #e2e8f0; }}
-  .section:last-child {{ border-bottom: none; }}
-  .section-title {{ font-size: 14px; font-weight: 700; color: #1a2744;
-                    margin-bottom: 14px; padding-bottom: 6px;
-                    border-bottom: 2px solid #2563eb; display: inline-block; }}
-
-  /* Tables */
-  .data-table {{ width: 100%; border-collapse: collapse; }}
-  .data-table th {{ background: #f1f5f9; text-align: left; padding: 8px 10px;
-                    font-size: 11px; font-weight: 600; color: #475569;
-                    text-transform: uppercase; letter-spacing: .4px; }}
-  .data-table td {{ padding: 7px 10px; border-bottom: 1px solid #f1f5f9; }}
-  .data-table tr:last-child td {{ border-bottom: none; }}
-  .field-name {{ font-weight: 500; color: #374151; width: 220px; }}
-  .field-value {{ color: #111827; }}
-  .field-conf {{ width: 80px; text-align: center; }}
-  .group-header td {{ background: #eff6ff; font-weight: 700; font-size: 11px;
-                       color: #1d4ed8; text-transform: uppercase; letter-spacing: .5px;
-                       padding: 6px 10px; }}
-
-  /* Badges */
-  .badge {{ display: inline-block; padding: 2px 8px; border-radius: 10px;
-            font-size: 11px; font-weight: 600; }}
-  .badge-green {{ background: #dcfce7; color: #16a34a; }}
-  .badge-amber {{ background: #fef3c7; color: #d97706; }}
-  .badge-red   {{ background: #fee2e2; color: #dc2626; }}
-  .badge-gray  {{ background: #f1f5f9; color: #64748b; }}
-
-  /* Validation rows */
-  .row-pass td {{ color: #166534; }}
-  .row-warn td {{ color: #92400e; background: #fffbeb; }}
-  .row-error td {{ color: #991b1b; background: #fff1f2; }}
-  .row-pass td, .row-warn td, .row-error td {{ padding: 7px 10px;
-    border-bottom: 1px solid #f1f5f9; }}
-  code {{ background: #f1f5f9; padding: 1px 5px; border-radius: 3px;
-          font-size: 11px; font-family: monospace; }}
-
-  /* Footer */
-  .footer {{ background: #f8fafc; padding: 16px 36px; text-align: center;
-             font-size: 11px; color: #94a3b8; border-top: 1px solid #e2e8f0; }}
-
-  @media print {{
-    body {{ background: #fff; }}
-    .page {{ box-shadow: none; }}
-    .no-print {{ display: none; }}
-  }}
-</style>
-</head>
-<body>
-<div class="page">
-
-  <!-- Header -->
   <div class="header">
-    <div class="header-top">
-      <div>
-        <div class="brand">PRIN<span>TO</span></div>
-        <div class="report-label">Drawing Extraction Report</div>
-      </div>
-      <div class="header-meta">
-        <strong>Generated {generated_at}</strong>
-        Drawing ID: #{drawing_id} &nbsp;|&nbsp; File: {file_name}
-      </div>
-    </div>
-    <div class="meta-row">
-      <div class="meta-item">
-        <strong>{extracted.get("project_name") or "—"}</strong>Project Name
-      </div>
-      <div class="meta-item">
-        <strong>{extracted.get("drawing_number") or "—"}</strong>Drawing Number
-      </div>
-      <div class="meta-item">
-        <strong>{floor_cat}</strong>Category
-      </div>
-      <div class="meta-item">
-        <strong>{extracted.get("floor_level") or "—"}</strong>Floor Level
-      </div>
-      <div class="meta-item">
-        <strong>{elapsed}s</strong>Processing Time
-      </div>
-    </div>
+    <table><tr>
+      <td><div class="brand">PRIN<span>TO</span></div>
+          <div class="report-label">Drawing Extraction Report</div></td>
+      <td style="text-align:right;" class="header-meta">
+        Generated {generated_at}<br>Drawing #{drawing_id} &nbsp;|&nbsp; {file_name}</td>
+    </tr></table>
   </div>
 
-  <!-- Verdict -->
-  <div class="verdict-bar">
-    {verdict_icon} &nbsp; EXTRACTION {verdict_text}
+  <div class="verdict-bar" style="background-color:{vcolor};">[{vtag}] EXTRACTION {vtext}
+    &nbsp;|&nbsp; {elapsed}s</div>
+
+  <!-- Exec summary + quality score -->
+  <div class="section">
+    <h2 class="section-title">Executive Summary</h2>
+    <table><tr>
+      <td style="width:74%;vertical-align:top;"><p class="summary">{summary}</p></td>
+      <td style="width:26%;text-align:center;vertical-align:middle;">
+        <div style="font-size:40px;font-weight:bold;color:{score_color};">{score}</div>
+        <div style="font-size:10px;color:#64748b;">QUALITY SCORE</div>
+        <div style="font-size:11px;font-weight:bold;color:{score_color};">{score_label}</div>
+      </td>
+    </tr></table>
+    <table style="margin-top:10px;"><tr class="stat">
+      <td><div class="v">{field_count}</div><div class="l">FIELDS</div></td>
+      <td><div class="v">{avg_conf:.0%}</div><div class="l">AVG CONFIDENCE</div></td>
+      <td><div class="v">{passed_rules}/{total_rules}</div><div class="l">RULES PASSED</div></td>
+      <td><div class="v" style="color:#dc2626;">{error_count}</div><div class="l">ERRORS</div></td>
+      <td><div class="v" style="color:#d97706;">{warn_count}</div><div class="l">WARNINGS</div></td>
+    </tr></table>
   </div>
 
-  <!-- Stats -->
-  <div class="stats-row">
-    <div class="stat-box">
-      <div class="stat-val">{field_count}</div>
-      <div class="stat-label">Fields Extracted</div>
-    </div>
-    <div class="stat-box">
-      <div class="stat-val">{avg_conf:.0%}</div>
-      <div class="stat-label">Avg Confidence</div>
-    </div>
-    <div class="stat-box">
-      <div class="stat-val">{passed_rules}/{total_rules}</div>
-      <div class="stat-label">Rules Passed</div>
-    </div>
-    <div class="stat-box">
-      <div class="stat-val" style="color:#dc2626">{error_count}</div>
-      <div class="stat-label">Errors</div>
-    </div>
-    <div class="stat-box">
-      <div class="stat-val" style="color:#d97706">{warn_count}</div>
-      <div class="stat-label">Warnings</div>
-    </div>
-  </div>
+  {thumb_html}
 
-  <!-- Extracted Fields -->
   <div class="section">
     <h2 class="section-title">Extracted Fields</h2>
-    <table class="data-table">
-      <thead>
-        <tr>
-          <th>Field</th>
-          <th>Extracted Value</th>
-          <th>Confidence</th>
-        </tr>
-      </thead>
-      <tbody>{field_sections_html}</tbody>
-    </table>
+    <table class="data-table"><thead><tr><th>Field</th><th>Value</th><th>Conf.</th></tr></thead>
+      <tbody>{field_sections_html}</tbody></table>
   </div>
 
-  <!-- Room Schedule -->
-  {room_table_html}
+  {room_html}
+  {_confidence_chart_html(extracted)}
 
-  <!-- Validation -->
   <div class="section">
     <h2 class="section-title">Validation Results</h2>
-    <table class="data-table">
-      <thead>
-        <tr>
-          <th style="width:32px"></th>
-          <th style="width:80px">Rule</th>
-          <th style="width:140px">Field</th>
-          <th>Message</th>
-          <th style="width:80px">Severity</th>
-        </tr>
-      </thead>
-      <tbody>{val_rows}</tbody>
-    </table>
+    <table class="data-table"><thead><tr><th style="width:70px">Rule</th>
+      <th style="width:130px">Field</th><th>Message</th><th style="width:64px">Status</th></tr></thead>
+      <tbody>{val_rows}</tbody></table>
   </div>
 
-  <!-- ERP Simulation -->
+  {_corrections_html(corrections)}
+
   <div class="section">
-    <h2 class="section-title">ERP Simulation — RealSoft Data</h2>
-    <p style="font-size:12px;color:#64748b;margin-bottom:12px;">
-      Data ready to push to RealSoft ERP via RealData Hub once credentials are configured.
-    </p>
-    <table class="data-table">
-      <thead><tr><th>ERP Field</th><th>Value</th></tr></thead>
-      <tbody>{erp_rows}</tbody>
-    </table>
+    <h2 class="section-title">ERP Payload — RealSoft (simulation)</h2>
+    <table class="data-table"><thead><tr><th>ERP Field</th><th>Value</th></tr></thead>
+      <tbody>{erp_rows}</tbody></table>
   </div>
 
-  <!-- Footer -->
-  <div class="footer">
-    Generated by <strong>Printo AI</strong> &nbsp;|&nbsp;
-    Powered by <strong>Claude Vision (Anthropic)</strong> &nbsp;|&nbsp;
-    <strong>Coral Business Solutions</strong> &nbsp;|&nbsp;
-    {generated_at}
-  </div>
-
-</div>
-</body>
-</html>"""
-
+  <div class="footer">Generated by Printo AI &nbsp;|&nbsp; Coral Business Solutions
+    &nbsp;|&nbsp; {generated_at}</div>
+</div></body></html>"""
     return html
+
+
+def generate_project_report(drawings: list) -> str:
+    """Project-level aggregate across all processed drawings (POC milestone M5)."""
+    generated_at = datetime.datetime.now().strftime("%d %b %Y, %H:%M")
+    total = len(drawings)
+    done = sum(1 for d in drawings if d.get("status") == "done")
+    errors = sum(1 for d in drawings if d.get("status") == "error")
+    confs = [d["avg_conf"] for d in drawings if d.get("avg_conf") is not None]
+    avg_conf = sum(confs) / len(confs) if confs else 0.0
+
+    # group by project
+    by_project = {}
+    for d in drawings:
+        by_project.setdefault(d.get("project_name") or "Unassigned", []).append(d)
+
+    proj_html = ""
+    for pname, items in by_project.items():
+        rows = ""
+        for d in items:
+            badge = _conf_badge(d.get("avg_conf"))
+            status = d.get("status", "—")
+            scolor = {"done": "#16a34a", "error": "#dc2626"}.get(status, "#64748b")
+            rows += f"""<tr>
+              <td>#{d.get('id')}</td>
+              <td>{d.get('drawing_number') or '—'}</td>
+              <td>{d.get('drawing_title') or '—'}</td>
+              <td>{d.get('floor_category') or '—'}</td>
+              <td style="color:{scolor};font-weight:bold;">{status}</td>
+              <td style="text-align:center;">{badge}</td></tr>"""
+        proj_html += f"""<div class="section">
+          <h2 class="section-title">{pname} <span class="muted">({len(items)} drawing(s))</span></h2>
+          <table class="data-table"><thead><tr><th>ID</th><th>Drawing No.</th><th>Title</th>
+            <th>Floor</th><th>Status</th><th>Avg Conf.</th></tr></thead>
+          <tbody>{rows}</tbody></table></div>"""
+
+    html = f"""<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8">
+<title>Printo — Project Summary Report</title><style>{_BASE_CSS}</style></head>
+<body><div class="page">
+  <div class="header">
+    <table><tr>
+      <td><div class="brand">PRIN<span>TO</span></div>
+          <div class="report-label">Project Summary Report</div></td>
+      <td style="text-align:right;" class="header-meta">Generated {generated_at}<br>
+        {len(by_project)} project(s) &nbsp;|&nbsp; {total} drawing(s)</td>
+    </tr></table>
+  </div>
+  <div class="section">
+    <h2 class="section-title">Portfolio Overview</h2>
+    <table><tr class="stat">
+      <td><div class="v">{total}</div><div class="l">TOTAL DRAWINGS</div></td>
+      <td><div class="v" style="color:#16a34a;">{done}</div><div class="l">COMPLETED</div></td>
+      <td><div class="v" style="color:#dc2626;">{errors}</div><div class="l">ERRORS</div></td>
+      <td><div class="v">{avg_conf:.0%}</div><div class="l">AVG CONFIDENCE</div></td>
+      <td><div class="v">{len(by_project)}</div><div class="l">PROJECTS</div></td>
+    </tr></table>
+  </div>
+  {proj_html}
+  <div class="footer">Generated by Printo AI &nbsp;|&nbsp; Coral Business Solutions
+    &nbsp;|&nbsp; {generated_at}</div>
+</div></body></html>"""
+    return html
+
+
+def html_to_pdf_bytes(html: str) -> bytes | None:
+    """Convert report HTML to PDF bytes via xhtml2pdf. Returns None on failure."""
+    try:
+        import io
+        from xhtml2pdf import pisa
+        buf = io.BytesIO()
+        result = pisa.CreatePDF(html, dest=buf, encoding="utf-8")
+        if result.err:
+            return None
+        return buf.getvalue()
+    except Exception:
+        return None

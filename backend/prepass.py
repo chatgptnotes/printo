@@ -1,8 +1,14 @@
 """
-Pre-pass: extract text from PDF text layer + regex-pull common title block fields.
-Runs BEFORE Claude Vision — extracted facts are injected into the AI prompt as ground truth.
+Pre-pass: pull common title-block fields deterministically (free, reliable) BEFORE
+the AI step. Two sources of text:
+  1. a PDF text layer (pdfplumber), or
+  2. OCR of the rendered/scanned image (pytesseract) when there is no text layer.
+Matched fields are injected into the AI prompt as ground truth and override the
+model for those fields.
 """
 
+import io
+import os
 import re
 from pathlib import Path
 
@@ -20,6 +26,25 @@ def extract_pdf_text(file_path: str) -> str | None:
                 if t:
                     pages_text.append(t)
         text = "\n".join(pages_text).strip()
+        return text if text else None
+    except Exception:
+        return None
+
+
+def ocr_text(image_bytes: bytes) -> str | None:
+    """OCR an image to text (Tier-2 fallback for scanned PDFs / image uploads).
+
+    Requires the Tesseract binary on PATH. Returns None — never raises — if OCR is
+    disabled (OCR_ENABLED=false) or Tesseract / pytesseract is unavailable.
+    """
+    if (os.getenv("OCR_ENABLED", "true") or "true").lower() == "false":
+        return None
+    try:
+        import pytesseract
+        from PIL import Image
+        img = Image.open(io.BytesIO(image_bytes))
+        text = pytesseract.image_to_string(img)
+        text = (text or "").strip()
         return text if text else None
     except Exception:
         return None
@@ -95,19 +120,42 @@ def prepass_extract(text: str) -> dict:
             result["client_name"] = val
 
     # Drawn by
-    drawn_m = re.search(r'(?:DRAWN\s*BY|DRWN\s*BY)\s*[:\-]?\s*([A-Za-z\s\.]{2,30})', text, re.IGNORECASE)
+    drawn_m = re.search(r'(?:DRAWN\s*BY|DRWN\s*BY)\s*[:\-]?\s*([A-Za-z .]{2,30})', text, re.IGNORECASE)
     if drawn_m:
         result["drawn_by"] = drawn_m.group(1).strip()
 
     # Checked by
-    checked_m = re.search(r'(?:CHECKED?\s*BY|CHK\s*BY)\s*[:\-]?\s*([A-Za-z\s\.]{2,30})', text, re.IGNORECASE)
+    checked_m = re.search(r'(?:CHECKED?\s*BY|CHK\s*BY)\s*[:\-]?\s*([A-Za-z .]{2,30})', text, re.IGNORECASE)
     if checked_m:
         result["checked_by"] = checked_m.group(1).strip()
 
     # Approved by
-    approved_m = re.search(r'(?:APPROVED?\s*BY|APPRVD?\s*BY)\s*[:\-]?\s*([A-Za-z\s\.]{2,30})', text, re.IGNORECASE)
+    approved_m = re.search(r'(?:APPROVED?\s*BY|APPRVD?\s*BY)\s*[:\-]?\s*([A-Za-z .]{2,30})', text, re.IGNORECASE)
     if approved_m:
         result["approved_by"] = approved_m.group(1).strip()
+
+    # Drawing title — TITLE: GROUND FLOOR PLAN
+    title_m = re.search(r'(?:DRAWING\s*TITLE|TITLE)\s*[:\-]\s*(.+)', text, re.IGNORECASE)
+    if title_m:
+        val = title_m.group(1).strip()[:80]
+        if len(val) > 2:
+            result["drawing_title"] = val
+
+    # Total floor / built-up area — 420 sq.m, 4500 sqft, 410 m2
+    area_m = re.search(
+        r'(?:BUILT[\-\s]?UP\s*AREA|FLOOR\s*AREA|TOTAL\s*AREA|AREA)\s*[:\-]?\s*'
+        r'([\d,]+(?:\.\d+)?\s*(?:sq\.?\s*m|sqm|m2|m²|sq\.?\s*ft|sft))',
+        text, re.IGNORECASE,
+    )
+    if area_m:
+        result["total_floor_area"] = re.sub(r'\s+', ' ', area_m.group(1).strip())
+
+    # Quantities — QTY: ... / QUANTITY: ... (R10/R18 validate this)
+    qty_m = re.search(r'(?:QUANTITIES|QUANTITY|QTY)\s*[:\-]\s*(.+)', text, re.IGNORECASE)
+    if qty_m:
+        val = qty_m.group(1).strip()[:80]
+        if len(val) > 1:
+            result["quantities"] = val
 
     return result
 

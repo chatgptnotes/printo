@@ -1,0 +1,30 @@
+{
+  "_comment": "Ground-truth field values per sample drawing, used by backend/benchmark.py to score extraction accuracy. Fill these with the TRUE values of each drawing. Only listed fields are scored. Strings match case-insensitively and tolerate substrings; lists score by overlap; bools by equality.",
+  "ground_floor_plan.png": {
+    "floor_level": "Ground Floor",
+    "drawing_title": "GROUND FLOOR PLAN",
+    "project_name": "CORAL TOWERS RESIDENTIAL COMPLEX",
+    "building_type": "Residential",
+    "scale": "1:100",
+    "approval_stamp": true,
+    "materials": ["RCC", "AAC Block"]
+  },
+  "first_floor_plan.png": {
+    "floor_level": "First Floor",
+    "drawing_title": "FIRST FLOOR PLAN",
+    "project_name": "CORAL TOWERS RESIDENTIAL COMPLEX",
+    "building_type": "Residential",
+    "scale": "1:100",
+    "approval_stamp": true,
+    "materials": ["RCC", "AAC Block"]
+  },
+  "basement_plan.png": {
+    "floor_level": "Basement",
+    "drawing_title": "BASEMENT PLAN",
+    "project_name": "CORAL TOWERS RESIDENTIAL COMPLEX",
+    "building_type": "Residential",
+    "scale": "1:100",
+    "approval_stamp": true,
+    "materials": ["RCC"]
+  }
+}

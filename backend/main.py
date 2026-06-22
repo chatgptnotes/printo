@@ -18,10 +18,14 @@ load_dotenv()
 
 from database        import init_db, get_conn, DB_PATH
 from extractor       import extract_drawing_with_prepass
+from ai_provider     import provider_status
 from rules           import run_all_rules, verdict
 from realsoft_mapper import map_to_realsoft, average_confidence
 from realsoft_client import push_to_realsoft, ping_realsoft, RealSoftAPIError
-from report_generator import generate_report
+from report_generator import (generate_report, generate_project_report,
+                              html_to_pdf_bytes)
+import base64
+import preprocess
 
 STORAGE_DIR = Path(__file__).parent.parent / "storage"
 STORAGE_DIR.mkdir(exist_ok=True)
@@ -119,10 +123,78 @@ def save_erp_push(drawing_id: int, payload: dict, status: str, response: str):
     conn.commit()
     conn.close()
 
-def _store_report(drawing_id: int, html: str):
-    report_dir = Path(__file__).parent.parent / "reports"
-    report_dir.mkdir(exist_ok=True)
-    (report_dir / f"{drawing_id}.html").write_text(html, encoding="utf-8")
+REPORT_DIR = Path(__file__).parent.parent / "reports"
+
+
+def _store_report_data(drawing_id: int, payload: dict):
+    """Persist the data needed to regenerate the report on demand (so it can reflect
+    later human corrections and render to HTML or PDF)."""
+    REPORT_DIR.mkdir(exist_ok=True)
+    (REPORT_DIR / f"{drawing_id}.json").write_text(
+        json.dumps(payload, default=str), encoding="utf-8")
+
+
+def _load_report_data(drawing_id: int) -> dict | None:
+    path = REPORT_DIR / f"{drawing_id}.json"
+    if not path.exists():
+        return None
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return None
+
+
+def _corrections_for(drawing_id: int) -> list:
+    conn = get_conn()
+    rows = conn.execute(
+        "SELECT field_name, original_value, corrected_value, corrected_by, corrected_at "
+        "FROM corrections WHERE drawing_id=? ORDER BY corrected_at DESC", (drawing_id,)
+    ).fetchall()
+    conn.close()
+    return [{"field": r[0], "original": r[1], "corrected": r[2], "by": r[3], "at": r[4]}
+            for r in rows]
+
+
+def _thumbnail_data_uri(file_path: str, max_w: int = 1000) -> str | None:
+    """Render/downscale the source drawing to a base64 PNG data URI for embedding."""
+    try:
+        img_set = preprocess.build_images(file_path, dpi=150)
+        raw = img_set.get("full")
+        if not raw:
+            return None
+        from PIL import Image
+        import io as _io
+        img = Image.open(_io.BytesIO(raw)).convert("RGB")
+        if img.width > max_w:
+            img = img.resize((max_w, int(img.height * max_w / img.width)), Image.LANCZOS)
+        buf = _io.BytesIO()
+        img.save(buf, format="PNG")
+        return "data:image/png;base64," + base64.standard_b64encode(buf.getvalue()).decode()
+    except Exception:
+        return None
+
+
+def _rebuild_report_html(drawing_id: int) -> str | None:
+    """Regenerate the per-drawing report from stored data + latest corrections."""
+    data = _load_report_data(drawing_id)
+    if not data:
+        return None
+    extracted = dict(data.get("extracted") or {})
+    corrections = _corrections_for(drawing_id)
+    # apply the latest correction per field so the report reflects human edits
+    latest = {}
+    for c in corrections:                       # newest-first; keep first seen
+        latest.setdefault(c["field"], c["corrected"])
+    for field, value in latest.items():
+        extracted[field] = value
+    rule_results = run_all_rules(extracted)
+    verd = verdict(rule_results)
+    thumb = _thumbnail_data_uri(data.get("file_path", ""))
+    return generate_report(
+        data.get("drawing_meta", {"drawing_id": drawing_id}), extracted, rule_results,
+        verd, data.get("elapsed", 0), data.get("erp_payload", {}),
+        corrections=corrections, thumbnail_uri=thumb,
+    )
 
 
 # ── Main SSE Pipeline ─────────────────────────────────────────────────────
@@ -172,7 +244,10 @@ async def run_pipeline(file_path: Path, file_name: str, drawing_id: int,
     try:
         extracted, prepass_hints = await asyncio.wait_for(
             asyncio.get_event_loop().run_in_executor(
-                None, extract_drawing_with_prepass, str(file_path)
+                None,
+                lambda: extract_drawing_with_prepass(
+                    str(file_path), floor_category, file_name
+                ),
             ),
             timeout=55.0
         )
@@ -254,8 +329,14 @@ async def run_pipeline(file_path: Path, file_name: str, drawing_id: int,
         "floor_category": floor_category,
         "uploaded_at":    datetime.datetime.now().isoformat(),
     }
-    html_report = generate_report(drawing_meta, extracted, rule_results, verd, elapsed, realsoft_payload)
-    _store_report(drawing_id, html_report)
+    _store_report_data(drawing_id, {
+        "drawing_meta":  drawing_meta,
+        "extracted":     extracted,
+        "verdict":       verd,
+        "elapsed":       elapsed,
+        "erp_payload":   realsoft_payload,
+        "file_path":     str(file_path),
+    })
     yield event("✅", "Report Ready", f"Summary report generated — view at /report/{drawing_id}", "success")
 
     # ── Save final status ────────────────────────────────────────────────
@@ -396,12 +477,60 @@ def save_correction(drawing_id: int, body: dict):
     return {"message": f"Correction saved for {field_name}"}
 
 
+def _all_drawings_for_project_report() -> list:
+    """Gather drawings + per-drawing average confidence for the aggregate report."""
+    conn = get_conn()
+    rows = conn.execute(
+        "SELECT id, drawing_number, drawing_title, project_name, floor_category, status "
+        "FROM drawings ORDER BY id"
+    ).fetchall()
+    out = []
+    for r in rows:
+        avg = conn.execute(
+            "SELECT AVG(confidence) FROM extractions WHERE drawing_id=? AND confidence IS NOT NULL",
+            (r[0],)
+        ).fetchone()[0]
+        out.append({"id": r[0], "drawing_number": r[1], "drawing_title": r[2],
+                    "project_name": r[3], "floor_category": r[4], "status": r[5],
+                    "avg_conf": avg})
+    conn.close()
+    return out
+
+
+@app.get("/report/project", response_class=HTMLResponse)
+def get_project_report():
+    return HTMLResponse(content=generate_project_report(_all_drawings_for_project_report()))
+
+
+@app.get("/report/project/pdf")
+def get_project_report_pdf():
+    pdf = html_to_pdf_bytes(generate_project_report(_all_drawings_for_project_report()))
+    if not pdf:
+        raise HTTPException(500, "PDF generation failed")
+    return StreamingResponse(
+        io.BytesIO(pdf), media_type="application/pdf",
+        headers={"Content-Disposition": 'attachment; filename="printo_project_report.pdf"'})
+
+
 @app.get("/report/{drawing_id}", response_class=HTMLResponse)
 def get_report(drawing_id: int):
-    report_path = Path(__file__).parent.parent / "reports" / f"{drawing_id}.html"
-    if not report_path.exists():
+    html = _rebuild_report_html(drawing_id)
+    if html is None:
         raise HTTPException(404, "Report not yet generated — process the drawing first")
-    return HTMLResponse(content=report_path.read_text(encoding="utf-8"))
+    return HTMLResponse(content=html)
+
+
+@app.get("/report/{drawing_id}/pdf")
+def get_report_pdf(drawing_id: int):
+    html = _rebuild_report_html(drawing_id)
+    if html is None:
+        raise HTTPException(404, "Report not yet generated — process the drawing first")
+    pdf = html_to_pdf_bytes(html)
+    if not pdf:
+        raise HTTPException(500, "PDF generation failed")
+    return StreamingResponse(
+        io.BytesIO(pdf), media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="printo_report_{drawing_id}.pdf"'})
 
 
 @app.get("/export/{drawing_id}/excel")
@@ -501,13 +630,20 @@ def health():
     total = conn.execute("SELECT COUNT(*) FROM drawings").fetchone()[0]
     done  = conn.execute("SELECT COUNT(*) FROM drawings WHERE status='done'").fetchone()[0]
     conn.close()
+
+    ai = provider_status()   # {ai_provider, sidecar_reachable, mode, model, ...}
     return {
         "status":             "ok",
-        "version":            "2.0.0",
+        "version":            "2.1.0",
         "total_drawings":     total,
         "completed":          done,
         "erp_mode":           "live" if _erp_configured else "simulation",
-        "mock_extraction":    not bool(os.getenv("ANTHROPIC_API_KEY","").strip().startswith("sk-ant-")),
+        # AI extraction provider (sidecar | mock)
+        "ai_provider":        ai.get("ai_provider"),
+        "ai_mode":            ai.get("mode"),
+        "ai_model":           ai.get("model"),
+        "sidecar_reachable":  ai.get("sidecar_reachable"),
+        "mock_extraction":    ai.get("ai_provider") == "mock",
         "realsoft_reachable": realsoft_reachable,
         "realsoft_url":       os.getenv("REALSOFT_BASE_URL", "not configured"),
     }

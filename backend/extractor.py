@@ -1,41 +1,66 @@
-import base64
 import json
 import os
+import re
 from pathlib import Path
 
-from prepass import extract_pdf_text, prepass_extract, build_known_facts_block
-
-_api_key = os.getenv("ANTHROPIC_API_KEY", "")
-_mock_mode = not _api_key or _api_key.startswith("sk-ant-test") or _api_key == "demo"
-
-if not _mock_mode:
-    import anthropic
-    client = anthropic.Anthropic(api_key=_api_key)
-else:
-    client = None
+import preprocess
+from prepass import (extract_pdf_text, prepass_extract,
+                     build_known_facts_block, ocr_text)
+from schema import validate_and_repair, extraction_json_schema
+from ai_provider import resolve_provider, ExtractRequest, SidecarError
 
 
-def _mock_extract(file_path: str) -> dict:
-    """Return realistic dummy data for demo/testing without API key."""
-    name = Path(file_path).stem.lower()
-    if "ground" in name or "gf" in name:
+def _env_bool(name: str, default: bool = False) -> bool:
+    return (os.getenv(name, str(default)) or "").strip().lower() in ("1", "true", "yes", "on")
+
+
+def _env_int(name: str, default: int) -> int:
+    try:
+        return int(os.getenv(name, str(default)))
+    except (TypeError, ValueError):
+        return default
+
+
+def _mock_extract(file_path: str, floor_category: str = None,
+                  original_name: str = None) -> dict:
+    """Return realistic dummy data for demo/testing without API key.
+
+    The user-selected category drives the floor first: uploads are stored under
+    a random UUID filename, so the path is not a reliable hint. The original
+    filename is only a fallback.
+    """
+    name = (original_name or Path(file_path).name).lower()
+    cat = (floor_category or "").strip()
+    if cat and cat.lower() != "other":
+        floor = cat
+    elif "ground" in name or "gf" in name:
         floor = "Ground Floor"
-        sheet = "1"
-    elif "first" in name or "ff" in name or "1" in name:
+    elif "first" in name or "ff" in name:
         floor = "First Floor"
-        sheet = "2"
+    elif "second" in name:
+        floor = "Second Floor"
+    elif "third" in name:
+        floor = "Third Floor"
     elif "basement" in name or "b1" in name:
         floor = "Basement"
-        sheet = "3"
     elif "kitchen" in name:
-        floor = "Ground Floor"
-        sheet = "4"
+        floor = "Kitchen"
     else:
         floor = "Ground Floor"
-        sheet = "1"
+
+    sheet = {
+        "Ground Floor": "1", "First Floor": "2", "Second Floor": "3",
+        "Third Floor": "4", "Fourth Floor": "5", "Basement": "B1",
+        "Terrace / Roof": "6", "Kitchen": "K1",
+    }.get(floor, "1")
+    code = {
+        "Ground Floor": "GF", "First Floor": "01", "Second Floor": "02",
+        "Third Floor": "03", "Fourth Floor": "04", "Basement": "B1",
+        "Terrace / Roof": "RF", "Kitchen": "KT",
+    }.get(floor, "GF")
 
     return {
-        "drawing_number":    f"CT-A-{sheet.zfill(3)}",
+        "drawing_number":    f"CT-A-{code}",
         "drawing_title":     f"{floor.upper()} PLAN",
         "project_name":      "CORAL TOWERS RESIDENTIAL COMPLEX",
         "project_location":  "Plot No. 14, Nagpur, Maharashtra",
@@ -66,6 +91,7 @@ def _mock_extract(file_path: str) -> dict:
         "structural_notes": "RCC framed structure. Column grid 4.5m x 4.5m. Slab thickness 150mm.",
         "materials":       ["RCC", "AAC Block", "Ceramic Tiles", "UPVC Windows", "Teak Wood Doors"],
         "dimensions":      "22m x 19m",
+        "quantities":      "Doors: 8 nos | Windows: 12 nos | Columns: 16 nos",
         "approval_stamp":  True,
         "north_arrow":     True,
         "grid_lines":      True,
@@ -123,6 +149,7 @@ Return ONLY this exact JSON structure (null for any field not visible):
   "structural_notes":  "any structural specifications or notes visible or null",
   "materials":         ["Concrete", "Brick", ...] or [],
   "dimensions":        "overall building dimensions e.g. 20m x 15m or null",
+  "quantities":        "e.g. Doors: 8 nos | Windows: 12 nos, or null",
   "approval_stamp":    true or false,
   "north_arrow":       true or false,
   "grid_lines":        true or false,
@@ -155,129 +182,177 @@ EXTRACTION INSTRUCTIONS:
 7. Return null for any field not visible — do NOT guess or fabricate values"""
 
 
-def _encode_file(file_path: str) -> tuple[str, str]:
-    suffix = Path(file_path).suffix.lower()
-    media_map = {
-        ".pdf":  "application/pdf",
-        ".jpg":  "image/jpeg",
-        ".jpeg": "image/jpeg",
-        ".png":  "image/png",
-        ".tiff": "image/tiff",
-        ".tif":  "image/tiff",
-    }
-    media_type = media_map.get(suffix, "image/jpeg")
-    with open(file_path, "rb") as f:
-        data = base64.standard_b64encode(f.read()).decode("utf-8")
-    return data, media_type
-
-
 def _repair_json(raw: str) -> str:
-    """Strip markdown fences and find the JSON object."""
+    """Strip markdown fences and isolate the JSON object (last-resort parser)."""
     raw = raw.strip()
     if raw.startswith("```"):
-        parts = raw.split("```")
-        for part in parts:
+        for part in raw.split("```"):
             part = part.strip()
             if part.startswith("json"):
                 part = part[4:].strip()
             if part.startswith("{"):
                 return part
-    start = raw.find("{")
-    end = raw.rfind("}")
+    start, end = raw.find("{"), raw.rfind("}")
     if start != -1 and end != -1:
-        return raw[start:end+1]
+        return raw[start:end + 1]
     return raw
 
 
-def extract_drawing(file_path: str, prepass_hints: dict = None) -> dict:
-    """Send drawing to Claude Vision and return extracted fields as dict."""
-    if _mock_mode:
-        result = _mock_extract(file_path)
-        if prepass_hints:
-            conf = result.get("confidence", {})
-            for k, v in prepass_hints.items():
-                result[k] = v
-                conf[k] = 0.97
-            result["confidence"] = conf
-        return result
+# Fields a deterministic prepass (text layer / OCR) can confirm as ground truth.
+PREPASS_GROUND_TRUTH = [
+    "drawing_number", "drawing_title", "scale", "date_of_issue", "revision_number",
+    "sheet_number", "total_sheets", "project_name", "client_name",
+    "drawn_by", "checked_by", "approved_by", "total_floor_area", "quantities",
+]
 
-    data, media_type = _encode_file(file_path)
+# Fields owned by the title-block crop pass during multi-pass extraction.
+TITLE_BLOCK_KEYS = [
+    "drawing_number", "drawing_title", "project_name", "project_location",
+    "client_name", "contractor_name", "drawn_by", "checked_by", "approved_by",
+    "date_of_issue", "revision_number", "sheet_number", "total_sheets", "scale",
+]
 
-    known_facts_section = ""
+
+def _build_prompt(prepass_hints: dict) -> str:
+    known = ""
     if prepass_hints:
         block = build_known_facts_block(prepass_hints)
         if block:
-            known_facts_section = (
-                "The following fields were pre-extracted from the PDF text layer with high confidence. "
-                "Use these as ground truth — do not override them unless you see a clear contradiction:\n\n"
-                + block + "\n"
+            known = (
+                "The following fields were pre-extracted deterministically (text layer / OCR) "
+                "with high confidence. Treat them as ground truth — do not override unless the "
+                "drawing clearly contradicts them:\n\n" + block + "\n"
             )
-
-    prompt = EXTRACTION_PROMPT_TEMPLATE.format(
-        known_facts_section=known_facts_section
-    )
-
-    response = client.messages.create(
-        model="claude-sonnet-4-6",
-        max_tokens=4096,
-        system=SYSTEM_PROMPT,
-        messages=[
-            {
-                "role": "user",
-                "content": [
-                    {
-                        "type": "image",
-                        "source": {
-                            "type": "base64",
-                            "media_type": media_type,
-                            "data": data,
-                        },
-                    },
-                    {"type": "text", "text": prompt},
-                ],
-            }
-        ],
-    )
-
-    raw = response.content[0].text
-    return json.loads(_repair_json(raw))
+    return EXTRACTION_PROMPT_TEMPLATE.format(known_facts_section=known)
 
 
-def extract_drawing_with_prepass(file_path: str) -> tuple[dict, dict]:
+def _coerce_raw(raw) -> dict:
+    """Normalise a provider return into a dict (handles text/JSON-string responses)."""
+    if isinstance(raw, dict):
+        return raw
+    if isinstance(raw, str):
+        try:
+            return json.loads(_repair_json(raw))
+        except Exception:
+            return {}
+    return {}
+
+
+def calibrate_confidence(extracted: dict, prepass_hints: dict) -> dict:
+    """Replace raw self-reported confidence with a calibrated per-field score.
+
+    Signals: prepass agreement → near-certain; format validity (drawing no./
+    revision/scale) → small boost/penalty; cross-field consistency (sheet ≤
+    total_sheets) → penalty; every populated field gets a floor so the UI shows a score.
     """
-    Full two-step extraction:
-    1. Extract PDF text layer (free) → regex pre-pass
-    2. Call Claude Vision with pre-pass hints injected
-    3. Merge: pre-pass wins for fields it found (more reliable than OCR)
+    conf = dict(extracted.get("confidence") or {})
+    prepass_hints = prepass_hints or {}
 
-    Returns (extracted_dict, prepass_hints_dict)
+    def populated(key):
+        return extracted.get(key) not in (None, "", [], False)
+
+    # 1) deterministic prepass = ground truth
+    for k in prepass_hints:
+        if prepass_hints.get(k) and extracted.get(k):
+            conf[k] = 0.97
+
+    # 2) format checks
+    dn = extracted.get("drawing_number")
+    if dn:
+        base = conf.get("drawing_number", 0.8)
+        conf["drawing_number"] = (min(1.0, base + 0.05)
+                                  if re.match(r'^[A-Za-z0-9\-/]+$', str(dn))
+                                  else max(0.3, base - 0.2))
+    rev = extracted.get("revision_number")
+    if rev and not re.match(r'^(\d+|[Rr][Ee][Vv][-\s]?\w+|[A-Za-z]|\d+[A-Za-z]?)$', str(rev).strip()):
+        conf["revision_number"] = max(0.3, conf.get("revision_number", 0.8) - 0.2)
+    scale = extracted.get("scale")
+    if scale and not re.search(r'1\s*:\s*\d+', str(scale)):
+        conf["scale"] = max(0.3, conf.get("scale", 0.8) - 0.15)
+
+    # 3) cross-field consistency: sheet number must not exceed total sheets
+    try:
+        if int(str(extracted.get("sheet_number"))) > int(str(extracted.get("total_sheets"))):
+            conf["sheet_number"] = min(conf.get("sheet_number", 0.8), 0.5)
+            conf["total_sheets"] = min(conf.get("total_sheets", 0.8), 0.5)
+    except (TypeError, ValueError):
+        pass
+
+    # 4) confidence floor for any populated field lacking a score
+    for k in list(extracted.keys()):
+        if k != "confidence" and populated(k) and k not in conf:
+            conf[k] = 0.7
+
+    extracted["confidence"] = {k: max(0.0, min(1.0, float(v))) for k, v in conf.items()}
+    return extracted
+
+
+def _merge_prepass_ground_truth(extracted: dict, prepass_hints: dict) -> dict:
+    """Prepass-matched fields override the model output (deterministic wins)."""
+    for key in PREPASS_GROUND_TRUTH:
+        if prepass_hints.get(key):
+            extracted[key] = prepass_hints[key]
+    return extracted
+
+
+def extract_drawing_with_prepass(file_path: str, floor_category: str = None,
+                                 original_name: str = None) -> tuple[dict, dict]:
     """
+    Full extraction pipeline (Phase 2):
+      1. preprocess — render PDF→image, clean, title-block crop
+      2. prepass    — PDF text layer OR OCR → regex (deterministic ground truth)
+      3. provider   — sidecar (vision|text) or mock; optional multi-pass
+      4. validate   — coerce into the canonical schema
+      5. merge      — prepass overrides the model for matched fields
+      6. calibrate  — trustworthy per-field confidence
+
+    Returns (extracted_dict, prepass_hints_dict).
+    """
+    dpi = _env_int("RENDER_DPI", 220)
+    img_set = preprocess.build_images(file_path, dpi=dpi)
+    full_image = img_set.get("full")
+    crops = img_set.get("crops") or []
+
+    # ── prepass: text layer, else OCR of the rendered image ──
     prepass_hints = {}
     pdf_text = extract_pdf_text(file_path)
+    if not pdf_text and full_image:
+        pdf_text = ocr_text(full_image)
     if pdf_text:
         prepass_hints = prepass_extract(pdf_text)
 
-    extracted = extract_drawing(file_path, prepass_hints if prepass_hints else None)
+    # ── provider ──
+    provider, _status = resolve_provider()
+    prompt = _build_prompt(prepass_hints)
+    schema = extraction_json_schema()
 
-    # Pre-pass results override AI for matched fields (text layer is ground truth)
-    field_map = {
-        "drawing_number": "drawing_number",
-        "scale":          "scale",
-        "date_of_issue":  "date_of_issue",
-        "revision_number":"revision_number",
-        "sheet_number":   "sheet_number",
-        "total_sheets":   "total_sheets",
-        "project_name":   "project_name",
-        "client_name":    "client_name",
-        "drawn_by":       "drawn_by",
-        "checked_by":     "checked_by",
-        "approved_by":    "approved_by",
-    }
-    conf = extracted.get("confidence", {})
-    for prepass_key, extracted_key in field_map.items():
-        if prepass_hints.get(prepass_key):
-            extracted[extracted_key] = prepass_hints[prepass_key]
-            conf[extracted_key] = 0.97  # text layer = near-certain
+    def _call(image):
+        req = ExtractRequest(
+            prompt=prompt, schema=schema, image=image,
+            media_type=img_set.get("media_type", "image/png"),
+            text=pdf_text, file_path=file_path,
+            floor_category=floor_category, original_name=original_name,
+        )
+        try:
+            return _coerce_raw(provider.extract(req))
+        except SidecarError:
+            # sidecar failed mid-run → degrade to mock so the demo never dies
+            from ai_provider import MockProvider
+            return _coerce_raw(MockProvider().extract(req))
 
-    extracted["confidence"] = conf
+    multipass = _env_bool("MULTIPASS", False)
+    if (multipass and getattr(provider, "name", "") == "sidecar"
+            and getattr(provider, "mode", "") == "vision" and crops):
+        raw = _call(full_image)
+        raw_crop = _call(crops[0])               # dedicated title-block pass
+        for k in TITLE_BLOCK_KEYS:
+            if raw_crop.get(k):
+                raw[k] = raw_crop[k]
+    else:
+        raw = _call(full_image)
+
+    # ── validate → merge ground truth → calibrate ──
+    extracted = validate_and_repair(raw)
+    extracted = _merge_prepass_ground_truth(extracted, prepass_hints)
+    extracted = calibrate_confidence(extracted, prepass_hints)
     return extracted, prepass_hints
