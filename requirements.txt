@@ -17,3 +17,7 @@ pymupdf>=1.27               # render PDF pages to high-DPI images (fitz); 1.24.x
 pytesseract==0.3.13         # OCR fallback for scanned PDFs / images (needs Tesseract binary)
 opencv-python-headless==4.10.0.84  # image cleanup: deskew, contrast, denoise
 xhtml2pdf==0.2.16           # pure-Python HTML→PDF for the improvement doc
+
+# ── Auth ───────────────────────────────────────────────────────────────
+bcrypt==4.2.0               # password hashing
+pyjwt==2.9.0                # signed JWT access tokens

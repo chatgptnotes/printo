@@ -1,6 +1,9 @@
 import json
+import re
+import time
 from pathlib import Path
 
+import jwt
 import requests
 import streamlit as st
 import streamlit.components.v1 as components
@@ -213,6 +216,9 @@ for key, default in [
     ("nav_stack", []),
     ("form_dirty", False),     # unsaved edits on the current page
     ("confirm_back", False),   # showing "discard changes?" confirmation
+    ("auth_token", None),      # JWT held server-side in session (not browser localStorage)
+    ("auth_user", None),       # {username, email, role}
+    ("login_error", None),
 ]:
     if key not in st.session_state:
         st.session_state[key] = default
@@ -280,6 +286,124 @@ def render_back_bar():
                 st.rerun()
             else:
                 go_back()
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Authentication
+#   The JWT lives in st.session_state — server-side, per-session, NOT in browser
+#   localStorage and not reachable by page JS (so it can't be stolen via XSS), the
+#   Streamlit-native equivalent of an HttpOnly cookie. The FastAPI API independently
+#   enforces the token on every protected route; this gate is the UX layer.
+# ══════════════════════════════════════════════════════════════════════════════
+EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+
+
+def api_headers() -> dict:
+    """Authorization header for authenticated API calls (empty if logged out)."""
+    tok = st.session_state.get("auth_token")
+    return {"Authorization": f"Bearer {tok}"} if tok else {}
+
+
+def report_url(path: str) -> str:
+    """Build a report/export URL that carries the token as a query param, so links
+    opened in a new BROWSER tab (which has no access to the server-side session) are
+    still authenticated. Tokens are short-lived; production should prefer cookies."""
+    tok = st.session_state.get("auth_token") or ""
+    sep = "&" if "?" in path else "?"
+    return f"{API_URL}{path}{sep}token={tok}"
+
+
+def _token_valid(tok: str) -> bool:
+    """Locally check token presence + expiry (no signature check — the API verifies
+    the signature). Avoids a network round-trip on every Streamlit rerun."""
+    if not tok:
+        return False
+    try:
+        claims = jwt.decode(tok, options={"verify_signature": False})
+        return float(claims.get("exp", 0)) > time.time()
+    except Exception:
+        return False
+
+
+def do_logout():
+    for k in ("auth_token", "auth_user"):
+        st.session_state[k] = None
+    st.session_state.nav_stack = []
+    st.session_state.active_tab = "Upload"
+    st.rerun()
+
+
+def render_login():
+    """Centered login card. Gate: nothing else renders until authenticated."""
+    st.markdown("""
+    <div style="text-align:center;margin:6vh 0 0;">
+      <div style="font-size:30px;font-weight:900;color:#fff;letter-spacing:.5px;">
+        PRIN<span style="color:#F7941D">TO</span></div>
+      <div style="color:#94a3b8;font-size:13px;margin-top:2px;">
+        AI Drawing Intelligence — please sign in</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    _, mid, _ = st.columns([1, 1.3, 1])
+    with mid:
+        with st.container(border=True):
+            # Show/Hide toggle lives OUTSIDE the form so it toggles immediately
+            # (in-form widgets only update on submit).
+            show_pw = st.checkbox("Show password", key="login_show")
+
+            with st.form("login_form", clear_on_submit=False):
+                identifier = st.text_input("User ID or Email", key="login_id",
+                                           placeholder="Admin")
+                password = st.text_input(
+                    "Password", key="login_pw",
+                    type="default" if show_pw else "password",
+                    placeholder="••••••••")
+                cc1, cc2 = st.columns([1, 1])
+                remember = cc1.checkbox("Remember me", key="login_remember")
+                cc2.markdown(
+                    "<div style='text-align:right;font-size:12px;margin-top:6px;'>"
+                    "<a href='#' style='color:#60a5fa;text-decoration:none;'>Forgot password?</a></div>",
+                    unsafe_allow_html=True)
+                submitted = st.form_submit_button("🔐  Sign In", type="primary",
+                                                  use_container_width=True)
+
+            if submitted:
+                ident = (identifier or "").strip()
+                # ── client-side validation ──
+                if not ident or not password:
+                    st.session_state.login_error = "Please enter both your ID/email and password."
+                elif "@" in ident and not EMAIL_RE.match(ident):
+                    st.session_state.login_error = "That doesn't look like a valid email address."
+                else:
+                    with st.spinner("Signing in…"):
+                        try:
+                            r = requests.post(
+                                f"{API_URL}/auth/login",
+                                json={"identifier": ident, "password": password,
+                                      "remember": bool(remember)},
+                                timeout=10)
+                        except Exception as e:
+                            r = None
+                            st.session_state.login_error = f"Cannot reach server: {e}"
+                    if r is not None:
+                        if r.status_code == 200:
+                            data = r.json()
+                            st.session_state.auth_token = data["token"]
+                            st.session_state.auth_user = data["user"]
+                            st.session_state.login_error = None
+                            st.toast(f"Welcome, {data['user']['username']}!", icon="✅")
+                            st.rerun()
+                        elif r.status_code == 429:
+                            st.session_state.login_error = r.json().get("detail", "Too many attempts.")
+                        else:
+                            st.session_state.login_error = "Invalid credentials. Please try again."
+
+            if st.session_state.get("login_error"):
+                st.error(st.session_state.login_error)
+                st.toast(st.session_state.login_error, icon="⚠️")
+
+        st.caption("🔒 Secured with bcrypt + JWT. Sessions are held server-side.")
+
 
 # ══════════════════════════════════════════════════════════════════════════════
 # Static data + helpers
@@ -475,6 +599,7 @@ def run_pipeline_ui(file_bytes: bytes, file_name: str, media_type: str,
             f"{API_URL}/upload",
             files={"file": (file_name, file_bytes, media_type)},
             data={"floor_category": floor_cat, "strict": str(strict).lower()},
+            headers=api_headers(),
             stream=True, timeout=120,
         ) as resp:
             for raw_line in resp.iter_lines():
@@ -535,6 +660,15 @@ def start_job(file_bytes: bytes, file_name: str, media_type: str, floor_cat: str
 
 
 # ══════════════════════════════════════════════════════════════════════════════
+# AUTH GATE — nothing below renders until the user is signed in
+# ══════════════════════════════════════════════════════════════════════════════
+if not _token_valid(st.session_state.get("auth_token")):
+    st.session_state.auth_token = None
+    render_login()
+    st.stop()
+
+
+# ══════════════════════════════════════════════════════════════════════════════
 # Header
 # ══════════════════════════════════════════════════════════════════════════════
 st.markdown("""
@@ -556,6 +690,15 @@ st.markdown("""
 # Sidebar
 # ══════════════════════════════════════════════════════════════════════════════
 with st.sidebar:
+    # Signed-in user + logout
+    _u = st.session_state.get("auth_user") or {}
+    st.markdown(f"**👤 {_u.get('username', '—')}** &nbsp;"
+                f"<span style='color:#94a3b8;font-size:11px;'>({_u.get('role', '')})</span>",
+                unsafe_allow_html=True)
+    if st.button("🚪 Logout", use_container_width=True):
+        do_logout()
+    st.divider()
+
     st.markdown("### ⚙️ Dashboard")
     try:
         health = requests.get(f"{API_URL}/health", timeout=3).json()
@@ -842,7 +985,8 @@ elif st.session_state.active_tab == "Results":
                         requests.patch(
                             f"{API_URL}/drawings/{drawing_id}/correction",
                             json={"field_name": field_to_edit, "corrected_value": new_val,
-                                  "corrected_by": "demo_user"}, timeout=5)
+                                  "corrected_by": (st.session_state.get("auth_user") or {}).get("username", "user")},
+                            headers=api_headers(), timeout=5)
                         st.session_state.form_dirty = False   # saved → no longer dirty
                         st.success(f"Saved correction for '{field_to_edit}'")
                     except Exception as e:
@@ -852,17 +996,19 @@ elif st.session_state.active_tab == "Results":
     st.divider()
     ec1, ec2, ec3, ec4 = st.columns(4)
     if drawing_id:
-        ec1.link_button("📄 View Report", f"{API_URL}/report/{drawing_id}",
+        ec1.link_button("📄 View Report", report_url(f"/report/{drawing_id}"),
                         use_container_width=True)
         try:
-            pdf_bytes = requests.get(f"{API_URL}/report/{drawing_id}/pdf", timeout=20).content
+            pdf_bytes = requests.get(f"{API_URL}/report/{drawing_id}/pdf",
+                                     headers=api_headers(), timeout=20).content
             ec2.download_button("⬇️ Download PDF", data=pdf_bytes,
                                 file_name=f"printo_report_{drawing_id}.pdf",
                                 mime="application/pdf", use_container_width=True)
         except Exception:
             ec2.button("⬇️ PDF (unavailable)", disabled=True, use_container_width=True)
         try:
-            excel_bytes = requests.get(f"{API_URL}/export/{drawing_id}/excel", timeout=10).content
+            excel_bytes = requests.get(f"{API_URL}/export/{drawing_id}/excel",
+                                       headers=api_headers(), timeout=10).content
             ec3.download_button("📊 Excel", data=excel_bytes,
                                 file_name=f"printo_drawing_{drawing_id}.xlsx",
                                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -883,10 +1029,11 @@ elif st.session_state.active_tab == "Report":
         st.stop()
 
     rt1, rt2 = st.columns([1, 1])
-    rt1.link_button("🔗 Open Report in New Tab", f"{API_URL}/report/{drawing_id}",
+    rt1.link_button("🔗 Open Report in New Tab", report_url(f"/report/{drawing_id}"),
                     use_container_width=True)
     try:
-        pdf_bytes = requests.get(f"{API_URL}/report/{drawing_id}/pdf", timeout=20).content
+        pdf_bytes = requests.get(f"{API_URL}/report/{drawing_id}/pdf",
+                                 headers=api_headers(), timeout=20).content
         rt2.download_button("⬇️ Download PDF", data=pdf_bytes,
                             file_name=f"printo_report_{drawing_id}.pdf",
                             mime="application/pdf", use_container_width=True)
@@ -894,7 +1041,8 @@ elif st.session_state.active_tab == "Report":
         rt2.button("⬇️ PDF (unavailable)", disabled=True, use_container_width=True)
 
     try:
-        html_report = requests.get(f"{API_URL}/report/{drawing_id}", timeout=10).text
+        html_report = requests.get(f"{API_URL}/report/{drawing_id}",
+                                   headers=api_headers(), timeout=10).text
         components.html(html_report, height=820, scrolling=True)
     except Exception as e:
         st.error(f"Could not load report: {e}")
@@ -909,10 +1057,11 @@ elif st.session_state.active_tab == "History":
     hb1, hb2, hb3 = st.columns([1, 1.4, 1.4])
     if hb1.button("🔄 Refresh", use_container_width=True):
         st.rerun()
-    hb2.link_button("📊 Project Summary Report", f"{API_URL}/report/project",
+    hb2.link_button("📊 Project Summary Report", report_url("/report/project"),
                     use_container_width=True)
     try:
-        proj_pdf = requests.get(f"{API_URL}/report/project/pdf", timeout=25).content
+        proj_pdf = requests.get(f"{API_URL}/report/project/pdf",
+                                headers=api_headers(), timeout=25).content
         hb3.download_button("⬇️ Project PDF", data=proj_pdf,
                             file_name="printo_project_report.pdf",
                             mime="application/pdf", use_container_width=True)
@@ -920,7 +1069,7 @@ elif st.session_state.active_tab == "History":
         hb3.button("⬇️ Project PDF (unavailable)", disabled=True, use_container_width=True)
 
     try:
-        drawings = requests.get(f"{API_URL}/drawings", timeout=5).json()
+        drawings = requests.get(f"{API_URL}/drawings", headers=api_headers(), timeout=5).json()
     except Exception:
         st.error("Backend not reachable.")
         st.stop()
@@ -954,7 +1103,8 @@ elif st.session_state.active_tab == "History":
             hc1, hc2 = st.columns(2)
             if hc1.button("📊 View Results", key=f"res_{d['id']}"):
                 try:
-                    detail = requests.get(f"{API_URL}/drawings/{d['id']}", timeout=5).json()
+                    detail = requests.get(f"{API_URL}/drawings/{d['id']}",
+                                          headers=api_headers(), timeout=5).json()
                     extr = {e["field"]: e["value"] for e in detail.get("extractions", [])}
                     conf_map = {e["field"]: e["confidence"]
                                 for e in detail.get("extractions", [])
@@ -968,4 +1118,4 @@ elif st.session_state.active_tab == "History":
                     go_to("Results")   # remembers History for Back
                 except Exception as e:
                     st.error(str(e))
-            hc2.link_button("📄 Report", f"{API_URL}/report/{d['id']}", use_container_width=True)
+            hc2.link_button("📄 Report", report_url(f"/report/{d['id']}"), use_container_width=True)

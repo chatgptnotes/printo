@@ -64,6 +64,16 @@ def init_db():
             corrected_by    TEXT DEFAULT 'user',
             corrected_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
+
+        CREATE TABLE IF NOT EXISTS users (
+            id            INTEGER PRIMARY KEY AUTOINCREMENT,
+            username      TEXT UNIQUE NOT NULL,
+            email         TEXT UNIQUE,
+            password_hash TEXT NOT NULL,
+            role          TEXT DEFAULT 'user',
+            created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            last_login    TIMESTAMP
+        );
     """)
 
     # Migrate existing drawings table — add new columns if they don't exist
@@ -76,4 +86,24 @@ def init_db():
             conn.execute(f"ALTER TABLE drawings ADD COLUMN {col} {typedef}")
 
     conn.commit()
+    conn.close()
+    _seed_admin()
+
+
+def _seed_admin():
+    """Create the seeded admin account on first run (if no users exist)."""
+    import bcrypt
+    conn = get_conn()
+    count = conn.execute("SELECT COUNT(*) FROM users").fetchone()[0]
+    if count == 0:
+        username = os.getenv("ADMIN_USERNAME", "Admin")
+        email    = os.getenv("ADMIN_EMAIL", "admin@printo.local")
+        password = os.getenv("ADMIN_PASSWORD", "Admin@123")
+        pw_hash  = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+        conn.execute(
+            "INSERT INTO users (username, email, password_hash, role) VALUES (?,?,?,?)",
+            (username, email, pw_hash, "admin"),
+        )
+        conn.commit()
+        print(f"[auth] Seeded admin user '{username}'. CHANGE THE PASSWORD in production.")
     conn.close()

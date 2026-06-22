@@ -9,9 +9,10 @@ import time
 import uuid
 from pathlib import Path
 
-from fastapi import FastAPI, File, Form, UploadFile, HTTPException
+from fastapi import FastAPI, File, Form, UploadFile, HTTPException, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, StreamingResponse
+from pydantic import BaseModel
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -24,6 +25,8 @@ from realsoft_mapper import map_to_realsoft, average_confidence
 from realsoft_client import push_to_realsoft, ping_realsoft, RealSoftAPIError
 from report_generator import (generate_report, generate_project_report,
                               html_to_pdf_bytes)
+from auth import (verify_login, create_token, require_auth,
+                  is_locked, record_failure, clear_failures)
 import base64
 import preprocess
 
@@ -52,6 +55,43 @@ app.add_middleware(
 @app.on_event("startup")
 def startup():
     init_db()
+
+
+# ── Authentication ──────────────────────────────────────────────────────────
+class LoginRequest(BaseModel):
+    identifier: str            # username OR email
+    password: str
+    remember: bool = False
+
+
+@app.post("/auth/login")
+def auth_login(body: LoginRequest):
+    ident = (body.identifier or "").strip()
+    if not ident or not body.password:
+        raise HTTPException(400, "Username and password are required")
+
+    locked = is_locked(ident)
+    if locked:
+        raise HTTPException(429, f"Too many attempts. Try again in {locked}s.")
+
+    user = verify_login(ident, body.password)
+    if not user:
+        record_failure(ident)
+        raise HTTPException(401, "Invalid credentials")   # generic — no enumeration
+
+    clear_failures(ident)
+    token, expires_in = create_token(user["username"], user["role"], body.remember)
+    return {
+        "token": token,
+        "token_type": "bearer",
+        "expires_in": expires_in,
+        "user": {"username": user["username"], "email": user["email"], "role": user["role"]},
+    }
+
+
+@app.get("/auth/me")
+def auth_me(user: dict = Depends(require_auth)):
+    return user
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────
@@ -380,6 +420,7 @@ async def upload_drawing(
     file: UploadFile = File(...),
     floor_category: str = Form(default="Other"),
     strict: bool = False,
+    _user: dict = Depends(require_auth),
 ):
     suffix = Path(file.filename).suffix.lower()
     if suffix not in ALLOWED_EXTENSIONS:
@@ -401,7 +442,7 @@ async def upload_drawing(
 
 
 @app.get("/drawings")
-def list_drawings():
+def list_drawings(_user: dict = Depends(require_auth)):
     conn = get_conn()
     rows = conn.execute(
         "SELECT id, file_name, uploaded_at, status, drawing_number, drawing_title, project_name, floor_category "
@@ -417,7 +458,7 @@ def list_drawings():
 
 
 @app.get("/drawings/{drawing_id}")
-def get_drawing(drawing_id: int):
+def get_drawing(drawing_id: int, _user: dict = Depends(require_auth)):
     conn = get_conn()
     row = conn.execute("SELECT * FROM drawings WHERE id=?", (drawing_id,)).fetchone()
     if not row:
@@ -449,7 +490,7 @@ def get_drawing(drawing_id: int):
 
 
 @app.patch("/drawings/{drawing_id}/correction")
-def save_correction(drawing_id: int, body: dict):
+def save_correction(drawing_id: int, body: dict, _user: dict = Depends(require_auth)):
     field_name      = body.get("field_name")
     corrected_value = body.get("corrected_value")
     corrected_by    = body.get("corrected_by", "user")
@@ -498,12 +539,12 @@ def _all_drawings_for_project_report() -> list:
 
 
 @app.get("/report/project", response_class=HTMLResponse)
-def get_project_report():
+def get_project_report(_user: dict = Depends(require_auth)):
     return HTMLResponse(content=generate_project_report(_all_drawings_for_project_report()))
 
 
 @app.get("/report/project/pdf")
-def get_project_report_pdf():
+def get_project_report_pdf(_user: dict = Depends(require_auth)):
     pdf = html_to_pdf_bytes(generate_project_report(_all_drawings_for_project_report()))
     if not pdf:
         raise HTTPException(500, "PDF generation failed")
@@ -513,7 +554,7 @@ def get_project_report_pdf():
 
 
 @app.get("/report/{drawing_id}", response_class=HTMLResponse)
-def get_report(drawing_id: int):
+def get_report(drawing_id: int, _user: dict = Depends(require_auth)):
     html = _rebuild_report_html(drawing_id)
     if html is None:
         raise HTTPException(404, "Report not yet generated — process the drawing first")
@@ -521,7 +562,7 @@ def get_report(drawing_id: int):
 
 
 @app.get("/report/{drawing_id}/pdf")
-def get_report_pdf(drawing_id: int):
+def get_report_pdf(drawing_id: int, _user: dict = Depends(require_auth)):
     html = _rebuild_report_html(drawing_id)
     if html is None:
         raise HTTPException(404, "Report not yet generated — process the drawing first")
@@ -534,7 +575,7 @@ def get_report_pdf(drawing_id: int):
 
 
 @app.get("/export/{drawing_id}/excel")
-def export_excel(drawing_id: int):
+def export_excel(drawing_id: int, _user: dict = Depends(require_auth)):
     import openpyxl
     from openpyxl.styles import Font, PatternFill, Alignment
 
@@ -602,7 +643,7 @@ def export_excel(drawing_id: int):
 
 
 @app.get("/exceptions")
-def list_exceptions(resolved: bool = False):
+def list_exceptions(resolved: bool = False, _user: dict = Depends(require_auth)):
     conn = get_conn()
     rows = conn.execute(
         "SELECT id, drawing_id, rule_id, field_name, reason, severity, resolved, created_at "
@@ -615,7 +656,8 @@ def list_exceptions(resolved: bool = False):
 
 
 @app.patch("/exceptions/{exc_id}/resolve")
-def resolve_exception(exc_id: int, resolved_by: str = "admin"):
+def resolve_exception(exc_id: int, resolved_by: str = "admin",
+                      _user: dict = Depends(require_auth)):
     conn = get_conn()
     conn.execute("UPDATE exceptions SET resolved=1, resolved_by=? WHERE id=?", (resolved_by, exc_id))
     conn.commit()
