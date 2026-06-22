@@ -36,6 +36,9 @@ STORAGE_DIR.mkdir(exist_ok=True)
 
 ALLOWED_EXTENSIONS = {".pdf", ".jpg", ".jpeg", ".png", ".tiff", ".tif"}
 MAX_FILE_SIZE_MB    = 20
+# Extraction timeout — the gateway runs Claude CLI on the VPS, which is slower
+# than a direct API, so allow more headroom than the original 55s. Configurable.
+EXTRACT_TIMEOUT     = float(os.getenv("EXTRACT_TIMEOUT", "110"))
 
 # ERP simulation mode when credentials are absent or placeholder
 def _is_real_credential(val: str | None) -> bool:
@@ -290,11 +293,11 @@ async def run_pipeline(file_path: Path, file_name: str, drawing_id: int,
                     str(file_path), floor_category, file_name
                 ),
             ),
-            timeout=55.0
+            timeout=EXTRACT_TIMEOUT
         )
         prepass_count = len(prepass_hints)
     except asyncio.TimeoutError:
-        msg = "AI extraction timed out (>55s) — drawing saved, please retry"
+        msg = f"AI extraction timed out (>{int(EXTRACT_TIMEOUT)}s) — drawing saved, please retry"
         yield event("⏱️", "Timeout", msg, "error")
         update_drawing_status(drawing_id, "timeout")
         yield f"data: {json.dumps({'type': 'done', 'verdict': 'TIMEOUT'})}\n\n"

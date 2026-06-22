@@ -600,7 +600,7 @@ def run_pipeline_ui(file_bytes: bytes, file_name: str, media_type: str,
             files={"file": (file_name, file_bytes, media_type)},
             data={"floor_category": floor_cat, "strict": str(strict).lower()},
             headers=api_headers(),
-            stream=True, timeout=120,
+            stream=True, timeout=180,   # gateway (Claude CLI) can take ~60s+
         ) as resp:
             for raw_line in resp.iter_lines():
                 if not raw_line:
