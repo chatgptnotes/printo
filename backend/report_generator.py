@@ -285,12 +285,18 @@ def generate_report(drawing_meta, extracted, rule_results, verdict, elapsed,
         val_rows += f"""<tr class="{cls}"><td><code>{r.rule_id}</code></td>
           <td>{r.field_name}</td><td>{r.message}</td><td>{tag}</td></tr>"""
 
-    # erp payload
-    erp_rows = ""
+    # erp payload (+ low-confidence flags)
+    erp_rows, erp_note = "", ""
     if erp_payload:
         data_block = erp_payload.get("data", erp_payload)
-        for k, v in list(data_block.items())[:12]:
-            erp_rows += f"<tr><td>{k}</td><td>{v}</td></tr>"
+        low_conf_fields = (erp_payload.get("metadata", {}) or {}).get("low_confidence_fields", [])
+        for k, v in data_block.items():
+            flag = ' <span class="badge badge-amber">review</span>' if k in low_conf_fields else ""
+            erp_rows += f"<tr><td>{k}</td><td>{_display_val(v)}{flag}</td></tr>"
+        if low_conf_fields:
+            erp_note = (f'<p class="muted" style="margin-bottom:8px;">'
+                        f'{len(low_conf_fields)} field(s) flagged low-confidence for ERP review: '
+                        f'{", ".join(low_conf_fields)}.</p>')
 
     thumb_html = ""
     if thumbnail_uri:
@@ -355,6 +361,7 @@ def generate_report(drawing_meta, extracted, rule_results, verdict, elapsed,
 
   <div class="section">
     <h2 class="section-title">ERP Payload — RealSoft (simulation)</h2>
+    {erp_note}
     <table class="data-table"><thead><tr><th>ERP Field</th><th>Value</th></tr></thead>
       <tbody>{erp_rows}</tbody></table>
   </div>

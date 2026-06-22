@@ -815,6 +815,14 @@ elif st.session_state.active_tab == "Results":
                         unsafe_allow_html=True)
         erp_payload = result.get("realsoft_payload", {})
         if erp_payload:
+            meta = erp_payload.get("metadata", {}) or {}
+            low_conf = meta.get("low_confidence_fields", [])
+            warns = meta.get("mapping_warnings", [])
+            if low_conf:
+                st.caption(f"⚠️ {len(low_conf)} ERP field(s) flagged low-confidence: "
+                           f"{', '.join(low_conf)}")
+            if warns:
+                st.caption(f"🛠️ {len(warns)} mapping warning(s) — see payload metadata")
             with st.expander("📦 ERP Payload (RealSoft format)"):
                 st.json(erp_payload)
 
