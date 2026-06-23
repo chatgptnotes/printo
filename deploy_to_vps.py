@@ -56,8 +56,8 @@ def main():
                    timeout=20, look_for_keys=False, allow_agent=False)
     print("Connected!")
 
-    # Setup
-    run(client, "apt-get update -y && apt-get install -y python3 python3-pip python3-venv nginx", "Installing system packages")
+    # Setup (tesseract-ocr powers the optional OCR fallback; degrades gracefully if absent)
+    run(client, "apt-get update -y && apt-get install -y python3 python3-pip python3-venv nginx tesseract-ocr", "Installing system packages")
     run(client, f"mkdir -p {REMOTE_DIR}/storage {REMOTE_DIR}/reports {REMOTE_DIR}/logs", "Creating directories")
 
     # Upload files
@@ -65,8 +65,9 @@ def main():
     sftp = client.open_sftp()
     for folder in ["backend", "frontend"]:
         upload_dir(sftp, os.path.join(LOCAL_DIR, folder), f"{REMOTE_DIR}/{folder}")
-    # Upload .env
+    # Upload .env + requirements.txt (the backend's full dependency set)
     sftp.put(os.path.join(LOCAL_DIR, ".env"), f"{REMOTE_DIR}/.env")
+    sftp.put(os.path.join(LOCAL_DIR, "requirements.txt"), f"{REMOTE_DIR}/requirements.txt")
     # Upload .streamlit config
     try:
         sftp.mkdir(f"{REMOTE_DIR}/.streamlit")
@@ -81,9 +82,8 @@ def main():
     run(client,
         f"cd {REMOTE_DIR} && source venv/bin/activate && "
         "pip install --upgrade pip && "
-        "pip install fastapi uvicorn streamlit anthropic python-multipart pydantic "
-        "python-dotenv aiofiles Pillow requests openpyxl pdfplumber",
-        "Installing Python packages (takes 2-3 min)")
+        "pip install -r requirements.txt",
+        "Installing Python packages from requirements.txt (takes 3-5 min)")
 
     # Systemd services
     backend_svc = """[Unit]
