@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Printo - Project Overview</title>
+<style>
+  @page { size: A4; margin: 1.5cm 1.4cm; }
+
+  body { font-family: Helvetica, Arial, sans-serif; color: #1f2937; font-size: 10.5pt; line-height: 1.5; }
+
+  .cover { background-color: #070d1b; color: #ffffff; padding: 24px 26px; }
+  .brand { color: #F7941D; font-size: 13pt; font-weight: bold; letter-spacing: 2px; }
+  .cover h1 { color: #ffffff; font-size: 23pt; margin: 8px 0 4px 0; }
+  .cover .sub { color: #cbd5e1; font-size: 11pt; margin: 0; }
+  .cover .meta { color: #94a3b8; font-size: 9pt; margin-top: 12px; }
+  .accent-rule { background-color: #F7941D; height: 4px; font-size: 1px; line-height: 4px; }
+
+  h2 { color: #070d1b; font-size: 14pt; border-bottom: 2px solid #F7941D; padding-bottom: 4px; margin-top: 22px; margin-bottom: 10px; }
+  h3 { color: #0d1526; font-size: 11pt; margin: 12px 0 4px 0; }
+  p { margin: 6px 0; }
+  ul { margin: 6px 0 6px 0; padding-left: 18px; }
+  li { margin: 3px 0; }
+
+  .lead { background-color: #f1f5f9; border-left: 4px solid #F7941D; padding: 10px 14px; margin: 12px 0; }
+
+  table { border-collapse: collapse; width: 100%; margin: 8px 0; }
+  table.grid th { background-color: #070d1b; color: #ffffff; text-align: left; padding: 7px 9px; font-size: 9.5pt; }
+  table.grid td { padding: 7px 9px; border-bottom: 1px solid #e2e8f0; vertical-align: top; font-size: 9.5pt; }
+  table.grid tr.alt td { background-color: #f8fafc; }
+  .k { color: #475569; font-weight: bold; }
+
+  .check td { padding: 6px 8px; border-bottom: 1px solid #e2e8f0; vertical-align: top; font-size: 9.5pt; }
+  .check td.box { width: 16px; color: #F7941D; font-weight: bold; }
+
+  .pill { font-size: 8pt; font-weight: bold; padding: 1px 6px; }
+  .pill-live { color: #07351f; background-color: #b9f6ca; }
+  .pill-mock { color: #5a3a00; background-color: #ffe0a3; }
+
+  .note { background-color: #f1f5f9; border: 1px solid #d6dbe3; padding: 10px 14px; margin-top: 12px; font-size: 9.5pt; color: #334155; }
+  .footer { margin-top: 18px; border-top: 1px solid #d6dbe3; padding-top: 8px; color: #94a3b8; font-size: 8.5pt; }
+  .mono { font-family: "Courier New", monospace; font-size: 9pt; color: #0d1526; }
+</style>
+</head>
+<body>
+
+<!-- COVER -->
+<div class="cover">
+  <div class="brand">PRINTO</div>
+  <h1>AI Drawing-to-ERP Compliance Gateway</h1>
+  <p class="sub">Read, verify and push construction drawings into RealSoft - automatically</p>
+  <div class="meta">Project Overview &nbsp;|&nbsp; Coral Business Solutions / RealSoft ERP &nbsp;|&nbsp; Prepared by the Printo team</div>
+</div>
+<div class="accent-rule">&nbsp;</div>
+
+<!-- WHAT IS PRINTO -->
+<h2>1. What is Printo</h2>
+<div class="lead">
+  Printo is an AI gateway that turns approved construction drawings into clean, validated ERP
+  records. A user uploads a drawing (PDF or image); Printo reads it with AI, extracts the
+  title-block and floor-plan details, checks them against a rule book, and sends the verified data
+  straight into RealSoft - with a full report and <strong>no manual typing</strong>.
+</div>
+<p>
+  Everything happens live on screen: as the drawing is processed the user watches each step stream
+  in real time, then sees a pass / warning / fail verdict, the extracted fields with confidence
+  scores, and a report with the original drawing <strong>marked up in red where mistakes are
+  found</strong>.
+</p>
+
+<!-- PROBLEMS WE SOLVE -->
+<h2>2. The problems we solve</h2>
+<table class="grid">
+  <tr><th style="width:32%">Problem today</th><th>How Printo solves it</th></tr>
+  <tr>
+    <td class="k">Manual data entry from drawings into the ERP is slow and error-prone</td>
+    <td>AI reads the title block and floor plan and fills the ERP fields automatically.</td>
+  </tr>
+  <tr class="alt">
+    <td class="k">Drawings reach the ERP incomplete or unapproved</td>
+    <td>An 18-rule engine checks required fields, approval stamp, formats and confidence before any push.</td>
+  </tr>
+  <tr>
+    <td class="k">Hard to trust AI output blindly</td>
+    <td>Every field carries a confidence score; low-confidence and failed items are flagged for human review.</td>
+  </tr>
+  <tr class="alt">
+    <td class="k">Reviewers cannot see WHERE a drawing is wrong</td>
+    <td>The report draws red boxes on the drawing at the exact problem locations.</td>
+  </tr>
+  <tr>
+    <td class="k">Unreadable / blurry scans waste time and AI cost</td>
+    <td>A blur gate rejects too-blurry uploads up front with a clear message - no wasted processing.</td>
+  </tr>
+  <tr class="alt">
+    <td class="k">No audit trail or shareable record</td>
+    <td>Every drawing, exception, correction and ERP push is stored; HTML / PDF / Excel reports are generated.</td>
+  </tr>
+</table>
+
+<!-- HOW IT WORKS -->
+<h2>3. How it works (the pipeline)</h2>
+<p>From upload to ERP push, each step streams live to the screen and must complete well under 60 seconds:</p>
+<table class="grid">
+  <tr><th style="width:22%">Step</th><th>What happens</th></tr>
+  <tr><td class="k">1. Upload + checks</td><td>File received and stored; pre-upload rules verify format, size and readability.</td></tr>
+  <tr class="alt"><td class="k">2. Quality gate</td><td>Image sharpness is measured; too-blurry drawings are stopped with a note.</td></tr>
+  <tr><td class="k">3. AI extraction</td><td>Claude Vision reads the title block, floor plan, dimensions, materials and stamps.</td></tr>
+  <tr class="alt"><td class="k">4. Validation</td><td>18 rules (R01-R18) check completeness, confidence and formats; a verdict is produced.</td></tr>
+  <tr><td class="k">5. ERP mapping</td><td>Extracted data is normalised into the RealSoft DrawingMaster format.</td></tr>
+  <tr class="alt"><td class="k">6. ERP push</td><td>The record is sent to RealSoft (or simulated until credentials are provided).</td></tr>
+  <tr><td class="k">7. Report</td><td>A branded report is generated with the red-marked drawing, fields and validation results.</td></tr>
+</table>
+
+<!-- AI INTEGRATIONS -->
+<h2>4. AI integrations in the project</h2>
+<p>Printo never calls a model directly from the app - all inference is routed through a pluggable
+AI provider that prefers a hosted gateway, falls back to a local sidecar, and finally to built-in
+demo data, so the product always runs.</p>
+<table class="grid">
+  <tr><th style="width:30%">AI capability</th><th>What it does</th></tr>
+  <tr>
+    <td class="k">Claude Vision extraction</td>
+    <td>Anthropic Claude reads the drawing image and returns the structured fields + confidence scores + bounding boxes for each field.</td>
+  </tr>
+  <tr class="alt">
+    <td class="k">Printo Gateway (AI-as-a-Service)</td>
+    <td>A hosted sidecar (Hostinger VPS) runs the model server-side and exposes tasks: DRAWING_EXTRACT, DRAWING_ANALYZE, DRAWING_VALIDATE, ERP_MAP, REPORT.</td>
+  </tr>
+  <tr>
+    <td class="k">Deterministic prepass</td>
+    <td>For PDFs with a text layer (or via OCR), fields are read for free before the AI call and treated as high-confidence ground truth.</td>
+  </tr>
+  <tr class="alt">
+    <td class="k">Confidence calibration</td>
+    <td>Raw AI confidence is re-scored using prepass agreement, format validity and cross-field consistency, so the scores can be trusted.</td>
+  </tr>
+  <tr>
+    <td class="k">Blur detection</td>
+    <td>Computer vision (Laplacian-variance sharpness) decides if an image is too blurry to extract reliably.</td>
+  </tr>
+  <tr class="alt">
+    <td class="k">AI red-marking</td>
+    <td>The model returns each field's location; the report draws red boxes on failed / warning fields at those spots.</td>
+  </tr>
+  <tr>
+    <td class="k">ERP value mapping</td>
+    <td>The gateway can also normalise extracted fields into the exact RealSoft field shape (ERP_MAP task).</td>
+  </tr>
+</table>
+
+<!-- PRATYAYA -->
+<h2>5. Features referenced from Pratyaya</h2>
+<p>Pratyaya is our sibling AI compliance-verification product. Printo reuses several of its proven,
+production-tested patterns rather than re-inventing them:</p>
+<table class="grid">
+  <tr><th style="width:32%">From Pratyaya</th><th>How Printo uses it</th></tr>
+  <tr>
+    <td class="k">Dark navy + orange design system</td>
+    <td>The same visual identity (deep navy background, orange accents) across Printo's UI and reports.</td>
+  </tr>
+  <tr class="alt">
+    <td class="k">Red-lining on drawings</td>
+    <td>Coordinate-driven red boxes + labels that mark issues directly on the drawing, by severity.</td>
+  </tr>
+  <tr>
+    <td class="k">AI-as-a-Service gateway pattern</td>
+    <td>Inference runs behind a hosted gateway instead of embedding model keys in the app.</td>
+  </tr>
+  <tr class="alt">
+    <td class="k">Next.js + secure BFF architecture</td>
+    <td>The new web app proxies the backend through its own API layer and keeps the login token in a secure cookie (not in the browser).</td>
+  </tr>
+  <tr>
+    <td class="k">Specialist / findings presentation</td>
+    <td>Clear verdict banners, confidence chips and a findings list, adapted to construction drawings.</td>
+  </tr>
+</table>
+
+<!-- VALIDATION -->
+<h2>6. The validation rule book (R01-R18)</h2>
+<table class="grid">
+  <tr><th style="width:26%">Category</th><th>Checks</th></tr>
+  <tr><td class="k">Pre-upload (R01-R03)</td><td>File type, file size, and that the file is readable / non-empty.</td></tr>
+  <tr class="alt"><td class="k">Required fields (R04-R11)</td><td>Drawing number, project name, revision, approval stamp, dimensions, materials, quantities, author/checker.</td></tr>
+  <tr><td class="k">Confidence (R12-R15)</td><td>Key fields must meet confidence thresholds; very low confidence forces manual review.</td></tr>
+  <tr class="alt"><td class="k">Format / business (R16-R18)</td><td>Drawing-number, revision and quantity values must match expected formats.</td></tr>
+</table>
+<p>A "Strict mode" can treat warnings as errors for stricter sign-off.</p>
+
+<!-- ERP -->
+<h2>7. RealSoft ERP integration</h2>
+<p>Printo sends each verified drawing into the RealSoft <span class="mono">DrawingMaster</span>
+module. Three connection methods are supported (see the separate "RealSoft Integration Options"
+document for details):</p>
+<ul>
+  <li><strong>Live API link</strong> (recommended) - real-time push over a secure web API. Code is built; needs URL + key.</li>
+  <li><strong>Excel / CSV import</strong> via RealData Hub - simple batch fallback; needs the import template.</li>
+  <li><strong>Read-back check</strong> via the Data API - optional, to confirm pushes and avoid duplicates.</li>
+</ul>
+<p>Until RealSoft credentials are provided, Printo runs in a safe <strong>simulation mode</strong> -
+it prepares the exact payload it would send, without sending anything live.</p>
+
+<!-- ARCHITECTURE -->
+<h2>8. Architecture and technology</h2>
+<table class="grid">
+  <tr><th style="width:26%">Layer</th><th>Technology</th></tr>
+  <tr><td class="k">Web app (UI)</td><td>Next.js (React) deployed on Vercel - fast, modern, public URL. <span class="pill pill-live">DEPLOYED</span></td></tr>
+  <tr class="alt"><td class="k">Backend API</td><td>Python FastAPI with live event streaming, on a VPS - runs the AI pipeline, validation and reporting.</td></tr>
+  <tr><td class="k">AI gateway</td><td>Hosted sidecar (Hostinger VPS) running the vision model server-side.</td></tr>
+  <tr class="alt"><td class="k">Data</td><td>SQLite store for drawings, extractions, exceptions, corrections and ERP pushes.</td></tr>
+  <tr><td class="k">Reports</td><td>Branded HTML + PDF + Excel, generated server-side.</td></tr>
+</table>
+
+<!-- SECURITY -->
+<h2>9. Security</h2>
+<ul>
+  <li>Login with signed tokens (JWT) and hashed passwords (bcrypt); brute-force lockout on repeated failures.</li>
+  <li>The web app keeps the login token in a secure, http-only cookie - it is never exposed to browser scripts or URLs.</li>
+  <li>All backend calls go through the app's own server layer, so model and ERP secrets stay on the server.</li>
+  <li>Inputs are validated at every boundary; the AI provider output is treated as untrusted and re-checked.</li>
+</ul>
+
+<!-- WHAT WE NEED FROM CLIENT -->
+<h2>10. What we need from the client</h2>
+<p>To move Printo from simulation to a fully live, production deployment, we need the following from
+Coral / RealSoft:</p>
+<table class="check">
+  <tr><td class="box">[ ]</td><td><strong>RealSoft test environment URL</strong> - the base web address of the RealSoft API.</td></tr>
+  <tr><td class="box">[ ]</td><td><strong>RealSoft API key / token</strong> - so Printo can connect securely.</td></tr>
+  <tr><td class="box">[ ]</td><td><strong>Exact "import" endpoint path</strong> - the address that accepts new drawing records.</td></tr>
+  <tr><td class="box">[ ]</td><td><strong>DrawingMaster field names</strong> - the exact ERP column names so the data maps perfectly.</td></tr>
+  <tr><td class="box">[ ]</td><td><strong>Excel / CSV import template</strong> - only if the Excel route (RealData Hub) is preferred.</td></tr>
+  <tr><td class="box">[ ]</td><td><strong>5-10 sample approved drawings</strong> - real examples to test and tune extraction accuracy.</td></tr>
+  <tr><td class="box">[ ]</td><td><strong>AI provider decision</strong> - confirm using the hosted Printo Gateway, or provide an Anthropic API key.</td></tr>
+  <tr><td class="box">[ ]</td><td><strong>Sign-off on the validation rules and thresholds</strong> - confirm R01-R18 match your approval policy.</td></tr>
+  <tr><td class="box">[ ]</td><td><strong>Production hosting details</strong> - a domain (with HTTPS) for the backend so the live site is fully secured.</td></tr>
+</table>
+
+<!-- STATUS -->
+<h2>11. Current status</h2>
+<ul>
+  <li>Full pipeline working end to end: upload, blur gate, AI extraction, 18-rule validation, ERP mapping, reports with red mistake markings.</li>
+  <li>New Next.js web app <strong>deployed live on Vercel</strong>; the Python backend runs on the VPS.</li>
+  <li>Running in <span class="pill pill-mock">SIMULATION / DEMO</span> AI and ERP mode until RealSoft credentials and a live AI key are provided (see section 10).</li>
+</ul>
+
+<div class="footer">
+  Printo - AI Drawing-to-ERP Compliance Gateway &nbsp;|&nbsp; Project Overview for Coral Business
+  Solutions / RealSoft &nbsp;|&nbsp; Companion document: "RealSoft Integration Options".
+</div>
+
+</body>
+</html>
