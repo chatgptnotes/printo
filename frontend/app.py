@@ -209,6 +209,7 @@ for key, default in [
     ("active_tab", "Upload"),
     ("last_result", {}),
     ("last_drawing_id", None),
+    ("report_view", "drawing"),   # Report tab mode: "drawing" | "project"
     ("last_image_bytes", None),
     ("last_image_type", None),
     ("last_image_name", None),
@@ -302,15 +303,6 @@ def api_headers() -> dict:
     """Authorization header for authenticated API calls (empty if logged out)."""
     tok = st.session_state.get("auth_token")
     return {"Authorization": f"Bearer {tok}"} if tok else {}
-
-
-def report_url(path: str) -> str:
-    """Build a report/export URL that carries the token as a query param, so links
-    opened in a new BROWSER tab (which has no access to the server-side session) are
-    still authenticated. Tokens are short-lived; production should prefer cookies."""
-    tok = st.session_state.get("auth_token") or ""
-    sep = "&" if "?" in path else "?"
-    return f"{API_URL}{path}{sep}token={tok}"
 
 
 def _token_valid(tok: str) -> bool:
@@ -1020,10 +1012,11 @@ elif st.session_state.active_tab == "Results":
 
     # ── Export ────────────────────────────────────────────────────────────────────
     st.divider()
-    ec1, ec2, ec3, ec4 = st.columns(4)
+    ec1, ec2, ec3 = st.columns(3)
     if drawing_id:
-        ec1.link_button("📄 View Report", report_url(f"/report/{drawing_id}"),
-                        use_container_width=True)
+        if ec1.button("📄 View Report", use_container_width=True):
+            st.session_state.report_view = "drawing"
+            go_to("Report")
         try:
             pdf_bytes = requests.get(f"{API_URL}/report/{drawing_id}/pdf",
                                      headers=api_headers(), timeout=20).content
@@ -1041,34 +1034,40 @@ elif st.session_state.active_tab == "Results":
                                 use_container_width=True)
         except Exception:
             ec3.button("📊 Excel (unavailable)", disabled=True, use_container_width=True)
-        if ec4.button("➡️ Open Report Tab", use_container_width=True):
-            go_to("Report")
 
 
 # ══════════════════════════════════════════════════════════════════════════════
 # TAB: REPORT
 # ══════════════════════════════════════════════════════════════════════════════
 elif st.session_state.active_tab == "Report":
+    is_project = st.session_state.get("report_view") == "project"
     drawing_id = st.session_state.get("last_drawing_id")
-    if not drawing_id:
-        st.info("Process a drawing first to view its report.")
-        st.stop()
+
+    if is_project:
+        html_path, pdf_path = "/report/project", "/report/project/pdf"
+        pdf_name = "printo_project_report.pdf"
+    else:
+        if not drawing_id:
+            st.info("Process a drawing first to view its report.")
+            st.stop()
+        html_path, pdf_path = f"/report/{drawing_id}", f"/report/{drawing_id}/pdf"
+        pdf_name = f"printo_report_{drawing_id}.pdf"
 
     rt1, rt2 = st.columns([1, 1])
-    rt1.link_button("🔗 Open Report in New Tab", report_url(f"/report/{drawing_id}"),
-                    use_container_width=True)
+    if rt1.button("🔄 Refresh", use_container_width=True):
+        st.rerun()
     try:
-        pdf_bytes = requests.get(f"{API_URL}/report/{drawing_id}/pdf",
-                                 headers=api_headers(), timeout=20).content
+        pdf_bytes = requests.get(f"{API_URL}{pdf_path}",
+                                 headers=api_headers(), timeout=25).content
         rt2.download_button("⬇️ Download PDF", data=pdf_bytes,
-                            file_name=f"printo_report_{drawing_id}.pdf",
+                            file_name=pdf_name,
                             mime="application/pdf", use_container_width=True)
     except Exception:
         rt2.button("⬇️ PDF (unavailable)", disabled=True, use_container_width=True)
 
     try:
-        html_report = requests.get(f"{API_URL}/report/{drawing_id}",
-                                   headers=api_headers(), timeout=10).text
+        html_report = requests.get(f"{API_URL}{html_path}",
+                                   headers=api_headers(), timeout=15).text
         components.html(html_report, height=820, scrolling=True)
     except Exception as e:
         st.error(f"Could not load report: {e}")
@@ -1083,8 +1082,9 @@ elif st.session_state.active_tab == "History":
     hb1, hb2, hb3 = st.columns([1, 1.4, 1.4])
     if hb1.button("🔄 Refresh", use_container_width=True):
         st.rerun()
-    hb2.link_button("📊 Project Summary Report", report_url("/report/project"),
-                    use_container_width=True)
+    if hb2.button("📊 Project Summary Report", use_container_width=True):
+        st.session_state.report_view = "project"
+        go_to("Report")
     try:
         proj_pdf = requests.get(f"{API_URL}/report/project/pdf",
                                 headers=api_headers(), timeout=25).content
@@ -1145,4 +1145,7 @@ elif st.session_state.active_tab == "History":
                     go_to("Results")   # remembers History for Back
                 except Exception as e:
                     st.error(str(e))
-            hc2.link_button("📄 Report", report_url(f"/report/{d['id']}"), use_container_width=True)
+            if hc2.button("📄 Report", key=f"rep_{d['id']}", use_container_width=True):
+                st.session_state.last_drawing_id = d["id"]
+                st.session_state.report_view = "drawing"
+                go_to("Report")
