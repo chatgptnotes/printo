@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>RealSoft Integration Options - Printo</title>
+<style>
+  @page { size: A4; margin: 1.6cm 1.5cm; }
+
+  body {
+    font-family: Helvetica, Arial, sans-serif;
+    color: #1f2937;
+    font-size: 10.5pt;
+    line-height: 1.5;
+  }
+
+  /* ---- Cover / header ---- */
+  .cover {
+    background-color: #070d1b;
+    color: #ffffff;
+    padding: 22px 24px;
+  }
+  .brand {
+    color: #F7941D;
+    font-size: 13pt;
+    font-weight: bold;
+    letter-spacing: 2px;
+  }
+  .cover h1 {
+    color: #ffffff;
+    font-size: 22pt;
+    margin: 8px 0 4px 0;
+  }
+  .cover .sub {
+    color: #cbd5e1;
+    font-size: 11pt;
+    margin: 0;
+  }
+  .cover .meta {
+    color: #94a3b8;
+    font-size: 9pt;
+    margin-top: 12px;
+  }
+
+  .accent-rule {
+    background-color: #F7941D;
+    height: 4px;
+    font-size: 1px;
+    line-height: 4px;
+  }
+
+  /* ---- Sections ---- */
+  h2 {
+    color: #070d1b;
+    font-size: 14pt;
+    border-bottom: 2px solid #F7941D;
+    padding-bottom: 4px;
+    margin-top: 22px;
+    margin-bottom: 10px;
+  }
+  h3 { color: #070d1b; font-size: 11.5pt; margin: 4px 0; }
+  p  { margin: 6px 0; }
+
+  .lead {
+    background-color: #f1f5f9;
+    border-left: 4px solid #F7941D;
+    padding: 10px 14px;
+    margin: 12px 0;
+  }
+
+  /* ---- Option cards (table-based for xhtml2pdf) ---- */
+  .card {
+    border: 1px solid #d6dbe3;
+    margin: 12px 0;
+  }
+  .card-head {
+    background-color: #0d1526;
+    color: #ffffff;
+    padding: 9px 14px;
+    font-size: 12pt;
+    font-weight: bold;
+  }
+  .card-head .tag {
+    color: #070d1b;
+    background-color: #F7941D;
+    font-size: 8pt;
+    font-weight: bold;
+    padding: 2px 7px;
+  }
+  .card-head .tag-soft {
+    color: #cbd5e1;
+    background-color: #334155;
+    font-size: 8pt;
+    font-weight: bold;
+    padding: 2px 7px;
+  }
+  .card-body { padding: 10px 14px; }
+
+  table { border-collapse: collapse; width: 100%; }
+
+  .kv td {
+    vertical-align: top;
+    padding: 3px 6px;
+    border-bottom: 1px solid #eef1f5;
+  }
+  .kv td.k {
+    width: 26%;
+    color: #475569;
+    font-weight: bold;
+  }
+
+  /* ---- Comparison + checklist tables ---- */
+  table.grid { margin: 10px 0; }
+  table.grid th {
+    background-color: #070d1b;
+    color: #ffffff;
+    text-align: left;
+    padding: 7px 9px;
+    font-size: 9.5pt;
+  }
+  table.grid td {
+    padding: 7px 9px;
+    border-bottom: 1px solid #e2e8f0;
+    vertical-align: top;
+  }
+  table.grid tr.alt td { background-color: #f8fafc; }
+
+  .pill-green  { color: #15803d; font-weight: bold; }
+  .pill-amber  { color: #b45309; font-weight: bold; }
+  .pill-gray   { color: #64748b; font-weight: bold; }
+
+  .check td { padding: 6px 8px; border-bottom: 1px solid #e2e8f0; vertical-align: top; }
+  .check td.box { width: 18px; color: #F7941D; font-weight: bold; }
+
+  .note {
+    background-color: #f1f5f9;
+    border: 1px solid #d6dbe3;
+    padding: 10px 14px;
+    margin-top: 12px;
+    font-size: 9.5pt;
+    color: #334155;
+  }
+
+  .footer {
+    margin-top: 18px;
+    border-top: 1px solid #d6dbe3;
+    padding-top: 8px;
+    color: #94a3b8;
+    font-size: 8.5pt;
+  }
+  .small { font-size: 9pt; color: #64748b; }
+  .mono  { font-family: "Courier New", monospace; font-size: 9pt; color: #0d1526; }
+</style>
+</head>
+<body>
+
+<!-- ================= COVER ================= -->
+<div class="cover">
+  <div class="brand">PRINTO</div>
+  <h1>Connecting Printo to RealSoft</h1>
+  <p class="sub">The ways we can send drawing data into your RealSoft ERP</p>
+  <!-- dashes kept ASCII for reliable xhtml2pdf font rendering -->
+  <div class="meta">Prepared for: Coral Business Solutions &nbsp;|&nbsp; RealSoft ERP &nbsp;|&nbsp; A simple, non-technical guide</div>
+</div>
+<div class="accent-rule">&nbsp;</div>
+
+<!-- ================= WHAT PRINTO DOES ================= -->
+<h2>In one line: what Printo does</h2>
+<div class="lead">
+  Printo reads your approved construction drawings using AI, automatically pulls out the
+  title-block details (drawing number, project name, revision, sheet, scale, and more),
+  checks them for mistakes, and then sends that clean data straight into RealSoft  - 
+  <strong>with no manual typing</strong>.
+</div>
+<p>
+  The only open question is <strong>how</strong> the data travels from Printo into RealSoft.
+  There are three practical ways to do this. This document explains each one in plain language
+  so you can pick the one that suits RealSoft best.
+</p>
+
+<!-- ================= THE THREE OPTIONS ================= -->
+<h2>The three ways to connect</h2>
+
+<!-- OPTION A -->
+<div class="card">
+  <table>
+    <tr>
+      <td class="card-head">Option A - Live API Link
+        <span class="tag">RECOMMENDED</span>
+      </td>
+    </tr>
+  </table>
+  <div class="card-body">
+    <p><strong>What it is:</strong> Printo sends each drawing's data to RealSoft
+       <strong>instantly</strong> over a secure internet link (an "API"), using a private key
+       that RealSoft gives us.</p>
+    <table class="kv">
+      <tr><td class="k">How it feels</td><td>A drawing is processed and, seconds later, the record already exists in RealSoft. Fully automatic.</td></tr>
+      <tr><td class="k">Good because</td><td>Real-time, no files to move by hand, and every send is logged so nothing gets lost.</td></tr>
+      <tr><td class="k">Things to note</td><td>RealSoft needs to expose a web address (endpoint) that accepts the data.</td></tr>
+      <tr><td class="k">What we need</td><td>A web address (base URL) and a security key from RealSoft / Coral.</td></tr>
+      <tr><td class="k">Status</td><td><span class="pill-green">Already built in Printo</span> - we only need the address and key to switch it on.</td></tr>
+    </table>
+  </div>
+</div>
+
+<!-- OPTION B -->
+<div class="card">
+  <table>
+    <tr>
+      <td class="card-head">Option B - Excel / CSV File Import
+        <span class="tag-soft">SIMPLE FALLBACK</span>
+      </td>
+    </tr>
+  </table>
+  <div class="card-body">
+    <p><strong>What it is:</strong> Printo creates a RealSoft-ready spreadsheet (Excel or CSV)
+       of the drawing data. That file is then loaded into RealSoft through RealData Hub  - 
+       either by a person or on a schedule.</p>
+    <table class="kv">
+      <tr><td class="k">How it feels</td><td>Like handing RealSoft a perfectly formatted spreadsheet, ready to import in one click.</td></tr>
+      <tr><td class="k">Good because</td><td>Very simple, no live connection required, and it uses RealData Hub which already exists.</td></tr>
+      <tr><td class="k">Things to note</td><td>It works in batches, so it is not instant. The spreadsheet must match RealSoft's import template exactly.</td></tr>
+      <tr><td class="k">What we need</td><td>The Excel / CSV import template (the exact column names) from RealSoft / Coral.</td></tr>
+      <tr><td class="k">Status</td><td><span class="pill-amber">Quick to add</span> once we have the template.</td></tr>
+    </table>
+  </div>
+</div>
+
+<!-- OPTION C -->
+<div class="card">
+  <table>
+    <tr>
+      <td class="card-head">Option C - Read-Back Check
+        <span class="tag-soft">OPTIONAL / LATER</span>
+      </td>
+    </tr>
+  </table>
+  <div class="card-body">
+    <p><strong>What it is:</strong> Printo can also <strong>read</strong> records back from
+       RealSoft - for example, to confirm a drawing was saved, or to avoid creating the
+       same record twice.</p>
+    <table class="kv">
+      <tr><td class="k">How it feels</td><td>A safety net that double-checks RealSoft after sending data.</td></tr>
+      <tr><td class="k">Good because</td><td>Prevents duplicates and gives extra confidence the data landed correctly.</td></tr>
+      <tr><td class="k">Things to note</td><td>This is a "nice to have" for later, not needed to go live.</td></tr>
+      <tr><td class="k">What we need</td><td>Read access to RealSoft's Data Portal.</td></tr>
+      <tr><td class="k">Status</td><td><span class="pill-gray">Optional</span> - can be added after the main connection works.</td></tr>
+    </table>
+  </div>
+</div>
+
+<div class="note">
+  <strong>One method we will NOT use:</strong> automatic "push" alerts from RealSoft
+  (webhooks / event callbacks). RealSoft does not offer these, so our design does not depend
+  on them. No action needed from your side.
+</div>
+
+<!-- ================= COMPARISON ================= -->
+<h2>Side-by-side comparison</h2>
+<table class="grid">
+  <tr>
+    <th>Method</th>
+    <th>Speed</th>
+    <th>Setup effort</th>
+    <th>Best for</th>
+    <th>Status in Printo</th>
+  </tr>
+  <tr>
+    <td><strong>A. Live API Link</strong></td>
+    <td>Instant (real-time)</td>
+    <td>Low - needs URL + key</td>
+    <td>Day-to-day automatic flow</td>
+    <td class="pill-green">Built - awaiting key</td>
+  </tr>
+  <tr class="alt">
+    <td><strong>B. Excel / CSV Import</strong></td>
+    <td>Batch (not instant)</td>
+    <td>Low - needs template</td>
+    <td>Simple start / offline fallback</td>
+    <td class="pill-amber">Quick to add</td>
+  </tr>
+  <tr>
+    <td><strong>C. Read-Back Check</strong></td>
+    <td>On demand</td>
+    <td>Optional</td>
+    <td>Duplicate prevention later</td>
+    <td class="pill-gray">Optional add-on</td>
+  </tr>
+</table>
+
+<!-- ================= RECOMMENDATION ================= -->
+<h2>Our recommendation</h2>
+<div class="lead">
+  <strong>Start with Option A (the Live API Link).</strong> It is real-time, fully automatic,
+  and the code is already built in Printo - we only need a web address and a security key
+  from your side. We suggest keeping <strong>Option B (Excel / CSV)</strong> ready as a simple
+  fallback, and adding <strong>Option C (Read-Back)</strong> later for extra safety.
+</div>
+
+<!-- ================= WHAT WE NEED FROM CORAL ================= -->
+<h2>What we need from RealSoft / Coral to go live</h2>
+<table class="check">
+  <tr><td class="box">[ ]</td><td><strong>RealSoft web address (base URL)</strong> for the test environment.</td></tr>
+  <tr><td class="box">[ ]</td><td><strong>Security key (API key / token)</strong> so Printo can connect safely.</td></tr>
+  <tr><td class="box">[ ]</td><td><strong>Exact "import" address</strong> (the endpoint that accepts new drawing records).</td></tr>
+  <tr><td class="box">[ ]</td><td><strong>The exact field names</strong> RealSoft expects (the DrawingMaster columns), so the data matches perfectly.</td></tr>
+  <tr><td class="box">[ ]</td><td><strong>The Excel / CSV import template</strong> - only if you prefer Option B.</td></tr>
+  <tr><td class="box">[ ]</td><td><strong>5-10 sample approved drawings</strong> so we can test accuracy end-to-end.</td></tr>
+</table>
+
+<!-- ================= SECURITY ================= -->
+<h2>Is it secure?</h2>
+<p>
+  Yes. Every connection uses a private security key (a "Bearer token") that only RealSoft and
+  Printo know. Until RealSoft provides the real key, Printo runs in a safe
+  <strong>simulation mode</strong> - it prepares the exact data it would send, but does not
+  send anything live. This lets us test everything safely before connecting to your real system.
+</p>
+
+<div class="footer">
+  Printo - AI Drawing-to-ERP Platform &nbsp;|&nbsp; Prepared for Coral Business Solutions /
+  RealSoft &nbsp;|&nbsp; This is a non-technical summary; full technical details are available on request.
+</div>
+
+</body>
+</html>
