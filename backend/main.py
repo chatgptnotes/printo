@@ -48,9 +48,17 @@ _erp_configured = _is_real_credential(os.getenv("REALSOFT_BASE_URL")) and \
                   _is_real_credential(os.getenv("REALSOFT_API_KEY"))
 
 app = FastAPI(title="Printo API", version="2.0.0")
+
+# Browser CORS. The Next.js frontend talks to this API server-side (BFF proxy), so
+# the browser normally never calls it cross-origin. Keep this configurable for any
+# direct browser access: set ALLOWED_ORIGINS to a comma-separated list of origins
+# (e.g. "https://printo.vercel.app,http://localhost:3000") to lock it down in prod.
+_origins_env = os.getenv("ALLOWED_ORIGINS", "*").strip()
+_allow_origins = ["*"] if _origins_env == "*" else [o.strip() for o in _origins_env.split(",") if o.strip()]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=_allow_origins,
+    allow_credentials=_origins_env != "*",
     allow_methods=["*"],
     allow_headers=["*"],
 )

@@ -6,11 +6,16 @@ import paramiko
 import os
 import sys
 
-VPS_IP       = "76.13.244.21"
-VPS_USER     = "root"
-VPS_PASSWORD = "Nagpur@260526"
-LOCAL_DIR    = r"C:\Users\ACER\Documents\Printo"
+# Credentials come from the environment — never hard-code secrets in source.
+#   set VPS_IP, VPS_USER, VPS_PASSWORD (or prefer key-based auth) before running.
+VPS_IP       = os.getenv("VPS_IP", "")
+VPS_USER     = os.getenv("VPS_USER", "root")
+VPS_PASSWORD = os.getenv("VPS_PASSWORD", "")
+LOCAL_DIR    = os.getenv("PRINTO_LOCAL_DIR", os.path.dirname(os.path.abspath(__file__)))
 REMOTE_DIR   = "/opt/printo"
+
+if not VPS_IP or not VPS_PASSWORD:
+    sys.exit("Set VPS_IP and VPS_PASSWORD (or use SSH keys) in the environment before deploying.")
 
 SKIP = {
     "printo.db", "__pycache__", ".git", "test_drawings",
