@@ -63,6 +63,10 @@ class DrawingExtraction(BaseModel):
     # ── Per-field self-reported confidence (0..1) ──
     confidence: dict[str, float] = Field(default_factory=dict)
 
+    # ── Per-field bounding boxes on the FULL sheet, normalised 0..1 [x1,y1,x2,y2] ──
+    # Used to draw red "mistake" markings on the report image (Pratyaya-style).
+    field_locations: dict[str, list[float]] = Field(default_factory=dict)
+
     @field_validator(
         "drawing_number", "drawing_title", "project_name", "project_location",
         "client_name", "contractor_name", "drawn_by", "checked_by", "approved_by",
@@ -107,6 +111,23 @@ class DrawingExtraction(BaseModel):
                 out[str(k)] = max(0.0, min(1.0, float(val)))
             except (TypeError, ValueError):
                 continue
+        return out
+
+    @field_validator("field_locations", mode="before")
+    @classmethod
+    def _coerce_field_locations(cls, v):
+        """Keep only well-formed boxes: 4 finite numbers clamped to 0..1."""
+        if not isinstance(v, dict):
+            return {}
+        out = {}
+        for k, box in v.items():
+            if not isinstance(box, (list, tuple)) or len(box) != 4:
+                continue
+            try:
+                coords = [max(0.0, min(1.0, float(c))) for c in box]
+            except (TypeError, ValueError):
+                continue
+            out[str(k)] = coords
         return out
 
 

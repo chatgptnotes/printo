@@ -870,6 +870,14 @@ elif st.session_state.active_tab == "Results":
     prepass_count = result.get("prepass_count", 0)
     conf = extracted.get("confidence", {})
 
+    # Blur block: image too blurry → no report was generated. Show a clear note and stop.
+    if any("too blurry" in str(e).lower() for e in errors):
+        st.markdown('<div class="verdict verdict-fail">🌫️ IMAGE TOO BLURRY — REPORT NOT GENERATED</div>',
+                    unsafe_allow_html=True)
+        st.warning("The uploaded image is too blurry for report generation. "
+                   "No report was generated. Please re-upload a clearer scan or photo.")
+        st.stop()
+
     # Verdict banner
     if verdict == "PASSED":
         st.markdown(f'<div class="verdict verdict-pass">✅ EXTRACTION COMPLETE — ALL RULES PASSED '
@@ -1101,6 +1109,7 @@ elif st.session_state.active_tab == "History":
         badge = {
             "done": '<span class="status-done">✅ Done</span>',
             "error": '<span class="status-error">❌ Error</span>',
+            "blurred": '<span class="status-error">🌫️ Too Blurry</span>',
             "processing": '<span class="status-processing">⏳ Processing</span>',
         }.get(status, f'<span class="status-other">{status}</span>')
 

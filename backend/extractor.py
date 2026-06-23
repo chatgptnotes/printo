@@ -103,7 +103,7 @@ def _mock_extract(file_path: str, floor_category: str = None,
             "floor_level":      0.98,
             "total_floor_area": 0.82,
             "scale":            0.96,
-            "revision_number":  0.94,
+            "revision_number":  0.71,   # demo: trips R14 low-confidence warning → red mark
             "approval_stamp":   0.91,
             "dimensions":       0.85,
             "materials":        0.78,
@@ -111,6 +111,19 @@ def _mock_extract(file_path: str, floor_category: str = None,
             "building_type":    0.95,
             "client_name":      0.92,
             "date_of_issue":    0.97,
+        },
+        # Normalised [x1,y1,x2,y2] (0..1) on the full sheet — drives red mistake
+        # markings on the report image. (Mock guesses the usual title-block layout;
+        # a live vision model returns boxes matched to the actual drawing.)
+        "field_locations": {
+            "project_name":    [0.72, 0.74, 0.97, 0.80],
+            "drawing_title":   [0.72, 0.80, 0.97, 0.855],
+            "drawing_number":  [0.72, 0.86, 0.86, 0.915],
+            "revision_number": [0.72, 0.92, 0.82, 0.975],
+            "scale":           [0.83, 0.92, 0.97, 0.975],
+            "date_of_issue":   [0.87, 0.86, 0.97, 0.915],
+            "approval_stamp":  [0.55, 0.85, 0.70, 0.98],
+            "dimensions":      [0.10, 0.04, 0.60, 0.11],
         },
     }
 
@@ -169,6 +182,11 @@ Return ONLY this exact JSON structure (null for any field not visible):
     "building_type":    0.0,
     "client_name":      0.0,
     "date_of_issue":    0.0
+  }},
+  "field_locations": {{
+    "drawing_number":  [0.0, 0.0, 0.0, 0.0],
+    "project_name":    [0.0, 0.0, 0.0, 0.0],
+    "...":             "one box per field you can locate"
   }}
 }}
 
@@ -179,7 +197,8 @@ EXTRACTION INSTRUCTIONS:
 4. APPROVAL STAMP: any circular or rectangular stamp with signature = true
 5. MATERIALS: look for material callouts, hatching legends, specification notes
 6. CONFIDENCE: set 1.0 if you read the exact text clearly, 0.8 if likely correct, 0.6 if uncertain, 0.3 if guessed
-7. Return null for any field not visible — do NOT guess or fabricate values"""
+7. Return null for any field not visible — do NOT guess or fabricate values
+8. FIELD_LOCATIONS: for every field you actually read, give its bounding box on the FULL drawing image as normalised coordinates [x1, y1, x2, y2], each 0.0–1.0 (x = left→right, y = top→bottom; top-left origin). Omit any field you cannot locate. These boxes are used to highlight problem fields on the drawing."""
 
 
 def _repair_json(raw: str) -> str:

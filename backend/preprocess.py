@@ -212,6 +212,35 @@ def build_images(file_path: str, dpi: int = 220, clean: bool = True) -> dict:
             "page_count": page_count, "is_pdf": is_pdf}
 
 
+def sharpness_score(file_path: str) -> float | None:
+    """Laplacian-variance sharpness of the RAW primary raster (higher = sharper).
+
+    Measured on the *un-cleaned* image (cleaning denoises/upscales and would skew
+    the metric). For PDFs the first rendered page is used. Returns None if OpenCV
+    is unavailable or the image can't be decoded — the caller then skips the gate.
+    """
+    if not _HAS_CV2:
+        return None
+    try:
+        suffix = Path(file_path).suffix.lower()
+        if suffix == ".pdf":
+            pages = render_pdf_to_images(file_path, dpi=150, max_pages=1)
+            raw = pages[0] if pages else None
+        elif suffix in IMAGE_SUFFIXES:
+            raw = Path(file_path).read_bytes()
+        else:
+            raw = None
+        if not raw:
+            return None
+        arr = np.frombuffer(raw, dtype=np.uint8)
+        gray = cv2.imdecode(arr, cv2.IMREAD_GRAYSCALE)
+        if gray is None:
+            return None
+        return float(cv2.Laplacian(gray, cv2.CV_64F).var())
+    except Exception:
+        return None
+
+
 def capabilities() -> dict:
     """What preprocessing is actually available in this environment."""
     return {"pdf_render": _HAS_FITZ, "image_clean": _HAS_CV2}

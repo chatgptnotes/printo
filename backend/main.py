@@ -199,8 +199,90 @@ def _corrections_for(drawing_id: int) -> list:
             for r in rows]
 
 
-def _thumbnail_data_uri(file_path: str, max_w: int = 1000) -> str | None:
-    """Render/downscale the source drawing to a base64 PNG data URI for embedding."""
+_MARK_RED = (217, 25, 25)          # Pratyaya-style mistake red (#D91919)
+
+
+def _failing_fields(rule_results) -> list[tuple]:
+    """(rule_id, field_name, message) for failed ERROR/WARNING rules. Robust to
+    RuleResult objects or plain dicts."""
+    out = []
+    for r in rule_results or []:
+        passed   = getattr(r, "passed", None) if not isinstance(r, dict) else r.get("passed")
+        severity = getattr(r, "severity", "") if not isinstance(r, dict) else r.get("severity", "")
+        field    = getattr(r, "field_name", "") if not isinstance(r, dict) else r.get("field_name", "")
+        rule_id  = getattr(r, "rule_id", "") if not isinstance(r, dict) else r.get("rule_id", "")
+        message  = getattr(r, "message", "") if not isinstance(r, dict) else r.get("message", "")
+        if not passed and severity in ("ERROR", "WARNING"):
+            out.append((rule_id, field, message))
+    return out
+
+
+def _load_font(size: int):
+    from PIL import ImageFont
+    for name in ("arialbd.ttf", "arial.ttf", "DejaVuSans-Bold.ttf", "DejaVuSans.ttf"):
+        try:
+            return ImageFont.truetype(name, size)
+        except Exception:
+            continue
+    return ImageFont.load_default()
+
+
+def _annotate_mistakes(img, extracted: dict, rule_results) -> None:
+    """Draw red boxes (Pratyaya-style) on `img` for failed ERROR/WARNING fields.
+    Boxes use normalised field_locations; failures without a location are stacked
+    as red notes top-left. Mutates `img` in place; never raises to the caller."""
+    from PIL import ImageDraw
+    failing = _failing_fields(rule_results)
+    if not failing:
+        return
+    locations = (extracted or {}).get("field_locations") or {}
+    w, h = img.size
+    lw = max(2, round(w / 350))
+    font = _load_font(max(13, w // 70))
+    draw = ImageDraw.Draw(img)
+
+    def text_wh(s):
+        l, t, r, b = draw.textbbox((0, 0), s, font=font)
+        return r - l, b - t
+
+    # group rule_ids per field so one box can carry several findings
+    by_field: dict[str, list[str]] = {}
+    unlocated: list[tuple] = []
+    for rule_id, field, message in failing:
+        box = locations.get(field)
+        if box and len(box) == 4:
+            by_field.setdefault(field, []).append(rule_id)
+        else:
+            unlocated.append((rule_id, field, message))
+
+    # located boxes
+    for field, rule_ids in by_field.items():
+        x1, y1, x2, y2 = locations[field]
+        px = [int(x1 * w), int(y1 * h), int(x2 * w), int(y2 * h)]
+        px = [min(max(0, px[0]), w - 1), min(max(0, px[1]), h - 1),
+              min(max(1, px[2]), w),     min(max(1, px[3]), h)]
+        draw.rectangle(px, outline=_MARK_RED, width=lw)
+        label = ",".join(dict.fromkeys(rule_ids))          # unique, order-kept
+        tw, th = text_wh(label)
+        tx1, ty1 = px[0], max(0, px[1] - th - 6)
+        draw.rectangle([tx1, ty1, tx1 + tw + 8, ty1 + th + 6], fill=_MARK_RED)
+        draw.text((tx1 + 4, ty1 + 3), label, fill="white", font=font)
+
+    # unlocated findings → stacked red notes, top-left
+    y = 10
+    for rule_id, field, message in unlocated:
+        note = f"{rule_id} {field}: {message}"[:90]
+        tw, th = text_wh(note)
+        draw.rectangle([10, y, 10 + tw + 8, y + th + 6], fill=_MARK_RED)
+        draw.text((14, y + 3), note, fill="white", font=font)
+        y += th + 10
+
+
+def _thumbnail_data_uri(file_path: str, extracted: dict = None,
+                        rule_results=None, max_w: int = 1000) -> str | None:
+    """Render/downscale the source drawing to a base64 PNG data URI for embedding.
+    When `extracted` + `rule_results` are supplied, draw red markings on the
+    locations of failed ERROR/WARNING fields (Pratyaya-style)."""
     try:
         img_set = preprocess.build_images(file_path, dpi=150)
         raw = img_set.get("full")
@@ -211,6 +293,10 @@ def _thumbnail_data_uri(file_path: str, max_w: int = 1000) -> str | None:
         img = Image.open(_io.BytesIO(raw)).convert("RGB")
         if img.width > max_w:
             img = img.resize((max_w, int(img.height * max_w / img.width)), Image.LANCZOS)
+        try:
+            _annotate_mistakes(img, extracted, rule_results)
+        except Exception:
+            pass                                            # plain image on any draw failure
         buf = _io.BytesIO()
         img.save(buf, format="PNG")
         return "data:image/png;base64," + base64.standard_b64encode(buf.getvalue()).decode()
@@ -233,7 +319,7 @@ def _rebuild_report_html(drawing_id: int) -> str | None:
         extracted[field] = value
     rule_results = run_all_rules(extracted)
     verd = verdict(rule_results)
-    thumb = _thumbnail_data_uri(data.get("file_path", ""))
+    thumb = _thumbnail_data_uri(data.get("file_path", ""), extracted, rule_results)
     return generate_report(
         data.get("drawing_meta", {"drawing_id": drawing_id}), extracted, rule_results,
         verd, data.get("elapsed", 0), data.get("erp_payload", {}),
@@ -275,6 +361,21 @@ async def run_pipeline(file_path: Path, file_name: str, drawing_id: int,
         return
     yield event("✅", "R02 PASSED", f"File size OK — {file_size_mb:.1f}MB (limit: {MAX_FILE_SIZE_MB}MB)", "success")
     yield event("✅", "R03 PASSED", "File readable and non-empty", "success")
+
+    # ── Image quality (blur) check ───────────────────────────────────────
+    score = preprocess.sharpness_score(str(file_path))
+    threshold = float(os.getenv("BLUR_THRESHOLD", "100"))
+    if score is not None and score < threshold:
+        msg = ("Uploaded image is too blurry for report generation — "
+               "please re-upload a clearer scan or photo.")
+        yield event("❌", "BLUR CHECK FAILED",
+                    f"{msg} (sharpness {score:.0f} < {threshold:.0f})", "error")
+        errors.append(msg)
+        yield _end_failed(errors, warnings, {}, {}, drawing_id, start, status="blurred")
+        return
+    yield event("✅", "Blur Check",
+                f"Image sharp enough (sharpness {score:.0f})" if score is not None
+                else "Blur check skipped (OpenCV unavailable)", "success")
 
     # ── Pre-pass (PDF text layer) ────────────────────────────────────────
     if suffix == ".pdf":
@@ -420,8 +521,8 @@ async def run_pipeline(file_path: Path, file_name: str, drawing_id: int,
     }) + "\n\n"
 
 
-def _end_failed(errors, warnings, extracted, payload, drawing_id, start) -> str:
-    update_drawing_status(drawing_id, "error")
+def _end_failed(errors, warnings, extracted, payload, drawing_id, start, status="error") -> str:
+    update_drawing_status(drawing_id, status)
     elapsed = round(time.time() - start, 1)
     return f"data: {json.dumps({'type': 'done', 'verdict': 'FAILED', 'elapsed': elapsed, 'errors': errors, 'warnings': warnings, 'extracted': extracted, 'realsoft_payload': payload, 'drawing_id': drawing_id})}\n\n"
 
