@@ -490,6 +490,19 @@ def _fmt_val(val):
     return str(val)
 
 
+def _room_row(r):
+    """Normalise one room-schedule entry to (name, area).
+
+    The extractor/AI is untrusted: an item may be a {"name","area"} dict, a
+    bare string (just the room name), or something else. Never assume a dict.
+    """
+    if isinstance(r, dict):
+        return r.get("name", "—") or "—", r.get("area", "—") or "—"
+    if isinstance(r, str):
+        return r, "—"
+    return str(r), "—"
+
+
 def _guess_media_type(name: str) -> str:
     suffix = Path(name).suffix.lower()
     return {
@@ -701,7 +714,9 @@ with st.sidebar:
 
     st.markdown("### ⚙️ Dashboard")
     try:
-        health = requests.get(f"{API_URL}/health", timeout=3).json()
+        # /health probes the remote Printo Gateway (TCP reach to the VPS), which can
+        # take ~4s. Use a generous timeout so a slow-but-healthy backend isn't shown offline.
+        health = requests.get(f"{API_URL}/health", timeout=10).json()
         st.success(f"Server online · v{health.get('version', '—')}")
         if health.get("erp_mode") == "live":
             st.success("RealSoft ERP: Live")
@@ -941,8 +956,8 @@ elif st.session_state.active_tab == "Results":
         if room_schedule:
             st.markdown('<div class="field-group-header">🛋️ Room Schedule</div>',
                         unsafe_allow_html=True)
-            st.table([{"Room": r.get("name", "—"), "Area": r.get("area", "—")}
-                      for r in room_schedule])
+            st.table([{"Room": name, "Area": area}
+                      for name, area in (_room_row(r) for r in room_schedule)])
 
     # ── Validation + correction ──────────────────────────────────────────────────
     st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)

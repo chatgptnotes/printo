@@ -43,6 +43,19 @@ def _verdict_style(verdict):
     return "#dc2626", "FAIL", "VALIDATION FAILED"
 
 
+def _room_row(r):
+    """Normalise one room-schedule entry to (name, area).
+
+    The extractor/AI is untrusted: an entry may be a {"name","area"} dict, a
+    bare string (just the room name), or something else. Never assume a dict.
+    """
+    if isinstance(r, dict):
+        return r.get("name", "—") or "—", r.get("area", "—") or "—"
+    if isinstance(r, str):
+        return r, "—"
+    return str(r), "—"
+
+
 FIELD_LABELS = {
     "drawing_number": "Drawing Number", "drawing_title": "Drawing Title",
     "project_name": "Project Name", "project_location": "Project Location",
@@ -267,8 +280,8 @@ def generate_report(drawing_meta, extracted, rule_results, verdict, elapsed,
     room_schedule = extracted.get("room_schedule") or []
     room_html = ""
     if room_schedule:
-        rr = "".join(f'<tr><td>{r.get("name","—")}</td><td>{r.get("area","—")}</td></tr>'
-                     for r in room_schedule)
+        rr = "".join(f'<tr><td>{name}</td><td>{area}</td></tr>'
+                     for name, area in (_room_row(r) for r in room_schedule))
         room_html = f"""<div class="section"><h2 class="section-title">Room Schedule</h2>
           <table class="data-table"><thead><tr><th>Room</th><th>Area</th></tr></thead>
           <tbody>{rr}</tbody></table></div>"""
