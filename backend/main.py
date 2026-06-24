@@ -35,6 +35,19 @@ import cad_convert
 STORAGE_DIR = Path(__file__).parent.parent / "storage"
 STORAGE_DIR.mkdir(exist_ok=True)
 
+# Chunked-upload staging. Large files are uploaded in <4 MB chunks (so they fit
+# under Vercel's 4.5 MB function-body cap, keeping the whole flow same-origin),
+# appended here in order, then assembled by /upload when finalized.
+CHUNK_DIR = STORAGE_DIR / "_chunks"
+CHUNK_DIR.mkdir(exist_ok=True)
+
+
+def _safe_upload_id(upload_id: str) -> str:
+    safe = "".join(c for c in (upload_id or "") if c.isalnum())[:64]
+    if not safe:
+        raise HTTPException(400, "Invalid upload id")
+    return safe
+
 # Raster formats handled directly + CAD formats rendered to raster (DWG/DXF/DWF).
 RASTER_EXTENSIONS = {".pdf", ".jpg", ".jpeg", ".png", ".tiff", ".tif"}
 ALLOWED_EXTENSIONS = RASTER_EXTENSIONS | cad_convert.CAD_SUFFIXES
@@ -314,6 +327,8 @@ def _annotate_mistakes(img, extracted: dict, rule_results) -> None:
     Boxes use normalised field_locations; failures without a location are stacked
     as red notes top-left. Mutates `img` in place; never raises to the caller."""
     from PIL import ImageDraw
+    if not rule_results:                       # no validation → clean image, no marks
+        return
     failing = _failing_fields(rule_results)
     if not failing:
         return
@@ -408,13 +423,11 @@ def _rebuild_report_html(drawing_id: int) -> str | None:
         return None
     extracted = _apply_corrections(drawing_id, dict(data.get("extracted") or {}))
     corrections = _corrections_for(drawing_id)
-    rule_results = run_all_rules(extracted)
-    verd = verdict(rule_results)
-    thumb = _thumbnail_data_uri(data.get("file_path", ""), extracted, rule_results)
+    thumb = _thumbnail_data_uri(data.get("file_path", ""))   # clean — no markings
     review_status, approved_by, approved_at = _approval_state(drawing_id)
     return generate_report(
-        data.get("drawing_meta", {"drawing_id": drawing_id}), extracted, rule_results,
-        verd, data.get("elapsed", 0), data.get("erp_payload", {}),
+        data.get("drawing_meta", {"drawing_id": drawing_id}), extracted, [],
+        "GENERATED", data.get("elapsed", 0), data.get("erp_payload", {}),
         corrections=corrections, thumbnail_uri=thumb,
         approved=(review_status == "approved"),
         summary_override=data.get("summary_override"),
@@ -535,45 +548,36 @@ async def run_pipeline(file_path: Path, file_name: str, drawing_id: int,
                 f"{field_count} fields extracted — project: {extracted.get('project_name', '—')}", "success")
     save_extractions(drawing_id, extracted)
 
-    # ── Rules Validation ─────────────────────────────────────────────────
-    yield event("🔍", "Validation Rules", "Running ClearSoft validation rules (R04–R18)...", "info")
+    # ── Build Bill of Quantities ─────────────────────────────────────────
+    # Drawings are taken as correct — no validation. The deliverable is a BOQ.
+    boq = [b for b in (extracted.get("boq_items") or []) if isinstance(b, dict)]
+    sections = []
+    for it in boq:
+        s = (it.get("section") or "General").strip() or "General"
+        if s not in sections:
+            sections.append(s)
+    yield event("📐", "Bill of Quantities",
+                f"Generated {len(boq)} BOQ line item(s) across {len(sections)} trade section(s)"
+                + (f": {', '.join(sections)}" if sections else ""), "success")
 
-    rule_results = run_all_rules(extracted, strict=strict)
-    for r in rule_results:
-        if r.passed:
-            yield event("✅", f"{r.rule_id} PASSED", r.message, "success")
-        elif r.severity == "ERROR":
-            yield event("❌", f"{r.rule_id} FAILED", r.message, "error")
-            errors.append(r.message)
-        else:
-            yield event("⚠️ ", f"{r.rule_id} WARNING", r.message, "warning")
-            warnings.append(r.message)
-
-    save_exceptions(drawing_id, rule_results)
-    verd = verdict(rule_results)
-
-    # ── Map to RealSoft Format ───────────────────────────────────────────
-    yield event("🗺️ ", "ERP Mapping", "Converting extracted data to RealSoft ERP format...", "info")
+    # ── Map to RealSoft Format (title block + BOQ) ───────────────────────
+    yield event("🗺️ ", "ERP Mapping", "Converting title block + BOQ to RealSoft ERP format...", "info")
     avg_conf = average_confidence(extracted)
-    realsoft_payload = map_to_realsoft(extracted, drawing_id, file_name, verd, avg_conf)
-    # Gateway-primary mapping: use the VPS ERP_MAP when reachable, else keep local.
+    realsoft_payload = map_to_realsoft(extracted, drawing_id, file_name, "GENERATED", avg_conf)
     gw_data = gateway_erp_map(extracted)
     if gw_data:
         realsoft_payload["data"] = gw_data
         realsoft_payload["metadata"]["mapping_source"] = "gateway"
-        yield event("✅", "ERP Mapping (Gateway)",
-                    "Mapped via Printo Gateway (ERP_MAP)", "success")
+        yield event("✅", "ERP Mapping (Gateway)", "Mapped via Printo Gateway (ERP_MAP)", "success")
     else:
         realsoft_payload["metadata"]["mapping_source"] = "local"
         yield event("✅", "Mapping Complete",
                     f"JSON payload ready — module: {realsoft_payload.get('module', 'DrawingMaster')}", "success")
 
-    # Mapping above is a PREVIEW only — the actual ERP push happens at approval
-    # time (POST /drawings/{id}/approve), on the human-verified data.
+    # Mapping is a PREVIEW — the actual ERP push happens at approval time
+    # (POST /drawings/{id}/approve), after the user reviews/edits the BOQ.
 
-    # ── Stage for human verification ─────────────────────────────────────
-    # Stop here: no ERP push and no final summary until a user cross-verifies the
-    # extraction against the drawing, edits any mistakes, and approves.
+    # ── Stage for review (review/edit the BOQ, then approve to push) ──────
     elapsed = round(time.time() - start, 1)
     drawing_meta = {
         "file_name":      file_name,
@@ -584,29 +588,25 @@ async def run_pipeline(file_path: Path, file_name: str, drawing_id: int,
     _store_report_data(drawing_id, {
         "drawing_meta":  drawing_meta,
         "extracted":     extracted,
-        "verdict":       verd,
+        "verdict":       "GENERATED",
         "elapsed":       elapsed,
         "erp_payload":   realsoft_payload,
         "file_path":     str(file_path),
     })
     set_pending_review(drawing_id, extracted)
-    yield event("🧐", "Cross-Verification",
-                "Extraction staged for human review — nothing pushed to ERP yet", "info")
-    yield event("⏸️ ", "Awaiting Approval",
-                "Review the extracted fields against the drawing, edit any mistakes, "
-                "then approve to push to ERP and generate the summary", "warning")
-
-    passed = sum(1 for r in rule_results if r.passed)
+    yield event("🧐", "Review BOQ",
+                "BOQ ready — review/edit the quantities, then approve to push to ERP", "info")
     yield event("🏁", "Ready for Review",
-                f"Extracted in {elapsed}s — {passed}/{len(rule_results)} rules passed | "
-                f"{len(errors)} errors | {len(warnings)} warnings", "done")
+                f"BOQ generated in {elapsed}s — {len(boq)} line items across {len(sections)} sections", "done")
 
     yield "data: " + json.dumps({
         "type":             "done",
-        "verdict":          verd,
+        "verdict":          "GENERATED",
         "elapsed":          elapsed,
-        "errors":           errors,
-        "warnings":         warnings,
+        "errors":           [],
+        "warnings":         [],
+        "boq_count":        len(boq),
+        "sections":         sections,
         "extracted":        extracted,
         "realsoft_payload": realsoft_payload,
         "erp_status":       "pending",
@@ -625,30 +625,63 @@ def _end_failed(errors, warnings, extracted, payload, drawing_id, start, status=
 
 # ── Endpoints ─────────────────────────────────────────────────────────────
 
+@app.post("/upload/chunk")
+async def upload_chunk(
+    upload_id: str = Form(...),
+    index: int = Form(...),
+    chunk: UploadFile = File(...),
+    _user: dict = Depends(require_auth),
+):
+    """Append one ordered chunk of a large upload. index 0 starts a fresh file."""
+    part = CHUNK_DIR / f"{_safe_upload_id(upload_id)}.part"
+    with open(part, "wb" if index == 0 else "ab") as f:
+        shutil.copyfileobj(chunk.file, f)
+    return {"ok": True, "index": index, "bytes": part.stat().st_size}
+
+
 @app.post("/upload")
 async def upload_drawing(
-    file: UploadFile = File(...),
+    file: UploadFile | None = File(default=None),
+    upload_id: str | None = Form(default=None),
+    file_name: str | None = Form(default=None),
     floor_category: str = Form(default="Other"),
     strict: bool = False,
     _user: dict = Depends(require_auth),
 ):
-    suffix = Path(file.filename).suffix.lower()
-    if suffix not in ALLOWED_EXTENSIONS:
-        raise HTTPException(
-            400,
-            f"Unsupported file type: {suffix} | Allowed: PDF, JPG, PNG, TIFF, DWG, DXF, DWF",
-        )
-
-    unique_name = f"{uuid.uuid4().hex}{suffix}"
-    dest = STORAGE_DIR / unique_name
-    with open(dest, "wb") as f:
-        shutil.copyfileobj(file.file, f)
+    # Two sources: a direct small-file upload, or an assembled chunked upload.
+    if upload_id:
+        part = CHUNK_DIR / f"{_safe_upload_id(upload_id)}.part"
+        if not part.exists() or part.stat().st_size == 0:
+            raise HTTPException(400, "No uploaded chunks found for this upload id")
+        display_name = file_name or "upload.bin"
+        suffix = Path(display_name).suffix.lower()
+        if suffix not in ALLOWED_EXTENSIONS:
+            part.unlink(missing_ok=True)
+            raise HTTPException(
+                400,
+                f"Unsupported file type: {suffix} | Allowed: PDF, JPG, PNG, TIFF, DWG, DXF, DWF",
+            )
+        dest = STORAGE_DIR / f"{uuid.uuid4().hex}{suffix}"
+        shutil.move(str(part), str(dest))
+    elif file is not None:
+        display_name = file.filename
+        suffix = Path(display_name).suffix.lower()
+        if suffix not in ALLOWED_EXTENSIONS:
+            raise HTTPException(
+                400,
+                f"Unsupported file type: {suffix} | Allowed: PDF, JPG, PNG, TIFF, DWG, DXF, DWF",
+            )
+        dest = STORAGE_DIR / f"{uuid.uuid4().hex}{suffix}"
+        with open(dest, "wb") as f:
+            shutil.copyfileobj(file.file, f)
+    else:
+        raise HTTPException(400, "No file or upload_id provided")
 
     size_mb    = dest.stat().st_size / (1024 * 1024)
-    drawing_id = save_drawing_record(file.filename, dest, floor_category)
+    drawing_id = save_drawing_record(display_name, dest, floor_category)
 
     return StreamingResponse(
-        run_pipeline(dest, file.filename, drawing_id, size_mb, strict, floor_category),
+        run_pipeline(dest, display_name, drawing_id, size_mb, strict, floor_category),
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
@@ -760,12 +793,8 @@ def get_review(drawing_id: int, _user: dict = Depends(require_auth)):
         }
 
     extracted = _apply_corrections(drawing_id, dict(data.get("extracted") or {}))
-    rule_results = run_all_rules(extracted)
-    verd = verdict(rule_results)
-    thumb = _thumbnail_data_uri(data.get("file_path", ""), extracted, rule_results)
-    summary_draft = plain_summary(data.get("drawing_meta", {}), extracted, rule_results, verd)
-    rules = [{"rule_id": r.rule_id, "field_name": r.field_name, "message": r.message,
-              "severity": r.severity, "passed": r.passed} for r in rule_results]
+    thumb = _thumbnail_data_uri(data.get("file_path", ""))   # clean image — no markings
+    summary_draft = plain_summary(data.get("drawing_meta", {}), extracted)
     return {
         "drawing_id":       drawing_id,
         "file_name":        row[0],
@@ -773,14 +802,15 @@ def get_review(drawing_id: int, _user: dict = Depends(require_auth)):
         "review_status":    review_status,
         "approved_by":      row[3],
         "approved_at":      row[4],
-        "verdict":          verd,
+        "verdict":          "GENERATED",
         "elapsed":          data.get("elapsed", 0),
         "extracted":        extracted,
+        "boq_items":        extracted.get("boq_items") or [],
         "summary_draft":    summary_draft,
         "summary_override": data.get("summary_override") or row[5],
         "erp_payload":      data.get("erp_payload", {}),
         "thumbnail_uri":    thumb,
-        "rules":            rules,
+        "rules":            [],
     }
 
 
@@ -792,7 +822,17 @@ def save_fields(drawing_id: int, body: dict, user: dict = Depends(require_auth))
         raise HTTPException(400, "Body must include a 'fields' object")
     corrected_by = body.get("corrected_by") or user.get("username") or "user"
     n = _save_fields(drawing_id, fields, corrected_by)
-    return {"message": f"Saved {n} field correction(s)", "saved": n}
+
+    # Persist an edited BOQ (full replacement) into the stored report data.
+    if isinstance(body.get("boq_items"), list):
+        data = _load_report_data(drawing_id)
+        if data:
+            extracted = dict(data.get("extracted") or {})
+            extracted["boq_items"] = body["boq_items"]
+            data["extracted"] = extracted
+            _store_report_data(drawing_id, data)
+
+    return {"message": f"Saved {n} field edit(s) + BOQ", "saved": n}
 
 
 @app.post("/drawings/{drawing_id}/approve")
@@ -810,14 +850,14 @@ def approve_drawing(drawing_id: int, body: dict, user: dict = Depends(require_au
         _save_fields(drawing_id, fields, approved_by)
 
     extracted = _apply_corrections(drawing_id, dict(data.get("extracted") or {}))
-    rule_results = run_all_rules(extracted)
-    verd = verdict(rule_results)
-    save_exceptions(drawing_id, rule_results)
+    # Apply any edited BOQ from the review screen (full replacement list).
+    if isinstance(body.get("boq_items"), list):
+        extracted["boq_items"] = body["boq_items"]
 
-    # Re-map to ERP on the verified data, then push (or simulate).
+    # Re-map to ERP on the reviewed data, then push (or simulate).
     file_name = (data.get("drawing_meta") or {}).get("file_name", "")
     avg_conf = average_confidence(extracted)
-    realsoft_payload = map_to_realsoft(extracted, drawing_id, file_name, verd, avg_conf)
+    realsoft_payload = map_to_realsoft(extracted, drawing_id, file_name, "GENERATED", avg_conf)
     gw_data = gateway_erp_map(extracted)
     if gw_data:
         realsoft_payload["data"] = gw_data
@@ -840,7 +880,7 @@ def approve_drawing(drawing_id: int, body: dict, user: dict = Depends(require_au
 
     approved_at = datetime.datetime.now().isoformat()
     data["extracted"]        = extracted
-    data["verdict"]          = verd
+    data["verdict"]          = "GENERATED"
     data["erp_payload"]      = realsoft_payload
     data["summary_override"] = summary_override
     data["approved_by"]      = approved_by
@@ -850,16 +890,15 @@ def approve_drawing(drawing_id: int, body: dict, user: dict = Depends(require_au
     conn = get_conn()
     conn.execute(
         "UPDATE drawings SET review_status='approved', approved_by=?, approved_at=?, "
-        "summary_override=?, status=? WHERE id=?",
-        (approved_by, approved_at, summary_override,
-         "done" if verd != "FAILED" else "error", drawing_id)
+        "summary_override=?, status='done' WHERE id=?",
+        (approved_by, approved_at, summary_override, drawing_id)
     )
     conn.commit()
     conn.close()
     return {
-        "message":      "Drawing approved",
+        "message":      "BOQ approved & pushed",
         "drawing_id":   drawing_id,
-        "verdict":      verd,
+        "verdict":      "GENERATED",
         "erp_status":   erp_status,
         "erp_message":  erp_message,
         "approved_by":  approved_by,

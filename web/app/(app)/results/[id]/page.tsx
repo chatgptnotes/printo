@@ -5,15 +5,12 @@ import { useCallback, useEffect, useState } from "react";
 import { Card, SectionRule } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import {
-  ConfidenceHeatmap,
+  BoqDisplay,
   ErpPayloadViewer,
   FieldsDisplay,
-  MetricsScorecard,
-  ValidationResults,
-  VerdictBanner,
 } from "@/components/results/ResultViews";
 import { ReviewEditor } from "@/components/results/ReviewEditor";
-import type { ApproveResult, ReviewData, Verdict } from "@/lib/types";
+import type { ApproveResult, BoqItem, ReviewData } from "@/lib/types";
 
 export default function ResultsPage({ params }: { params: { id: string } }) {
   const id = Number(params.id);
@@ -138,21 +135,18 @@ export default function ResultsPage({ params }: { params: { id: string } }) {
     return <ReviewEditor data={review} username={username} onApproved={handleApproved} />;
   }
 
-  // Approved — final results, report exports, and ERP retry.
-  const errors = review.rules
-    .filter((r) => !r.passed && r.severity === "ERROR")
-    .map((r) => r.message);
-  const warnings = review.rules
-    .filter((r) => !r.passed && r.severity === "WARNING")
-    .map((r) => r.message);
-  const verdict: Verdict = review.verdict ?? "PASSED";
+  // Approved — final BOQ, report exports, and ERP retry.
   const approvedWhen = (review.approved_at || "").slice(0, 16).replace("T", " ");
+  const boqItems: BoqItem[] =
+    (review.boq_items && review.boq_items.length
+      ? review.boq_items
+      : (review.extracted.boq_items as BoqItem[] | undefined) || []) as BoqItem[];
 
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center gap-3 rounded-xl border border-result-pass/40 bg-result-pass/10 px-5 py-3 text-sm font-bold text-[#6ee7b7]">
         <span>
-          ✅ Verified &amp; approved
+          ✅ BOQ approved
           {review.approved_by ? ` by ${review.approved_by}` : ""}
           {approvedWhen ? ` on ${approvedWhen}` : ""}
           {approveResult ? ` · ERP: ${approveResult.erp_status.toUpperCase()}` : ""}
@@ -162,32 +156,19 @@ export default function ResultsPage({ params }: { params: { id: string } }) {
         </Button>
       </div>
 
-      <VerdictBanner
-        verdict={verdict}
-        errors={errors}
-        warnings={warnings}
-        elapsed={review.elapsed}
-        erpStatus={approveResult?.erp_status}
-      />
-      <MetricsScorecard
-        extracted={review.extracted}
-        verdict={verdict}
-        errors={errors}
-        warnings={warnings}
-      />
-      <ConfidenceHeatmap conf={review.extracted.confidence || {}} />
+      <Card>
+        <SectionRule>Bill of Quantities</SectionRule>
+        <BoqDisplay items={boqItems} />
+      </Card>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <Card>
-          <SectionRule>Extracted Data</SectionRule>
+          <SectionRule>Title Block &amp; Drawing Info</SectionRule>
           <FieldsDisplay extracted={review.extracted} />
         </Card>
         <Card>
-          <SectionRule>Validation Results</SectionRule>
-          <ValidationResults errors={errors} warnings={warnings} />
-          <div className="mt-4">
-            <ErpPayloadViewer payload={review.erp_payload} />
-          </div>
+          <SectionRule>ERP Payload (RealSoft)</SectionRule>
+          <ErpPayloadViewer payload={review.erp_payload} />
         </Card>
       </div>
 
@@ -195,7 +176,7 @@ export default function ResultsPage({ params }: { params: { id: string } }) {
         <SectionRule>Export &amp; Transfer</SectionRule>
         <div className="flex flex-wrap gap-3">
           <Link href={`/report/${id}`}>
-            <Button variant="primary">📄 View Report</Button>
+            <Button variant="primary">📄 View BOQ Report</Button>
           </Link>
           <a href={`/api/report/${id}/pdf`} target="_blank" rel="noreferrer">
             <Button variant="secondary">⬇️ Download PDF</Button>
@@ -208,9 +189,6 @@ export default function ResultsPage({ params }: { params: { id: string } }) {
           </Button>
         </div>
         {erpMsg && <p className="mt-3 text-xs text-accent-orange-light">{erpMsg}</p>}
-        <p className="mt-3 text-xs text-muted">
-          The report includes the drawing with red markings on any mistakes.
-        </p>
       </Card>
     </div>
   );

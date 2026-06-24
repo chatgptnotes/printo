@@ -63,9 +63,9 @@ def _mock_extract(file_path: str, floor_category: str = None,
         "drawing_number":    f"CT-A-{code}",
         "drawing_title":     f"{floor.upper()} PLAN",
         "project_name":      "CORAL TOWERS RESIDENTIAL COMPLEX",
-        "project_location":  "Plot No. 14, Nagpur, Maharashtra",
-        "client_name":       "Printo Builders Pvt. Ltd.",
-        "contractor_name":   "Coral Infrastructure Consultants",
+        "project_location":  "",
+        "client_name":       "",
+        "contractor_name":   "",
         "drawn_by":          "S. Kumar",
         "checked_by":        "B. K. Murali",
         "approved_by":       "M. Varghese",
@@ -92,6 +92,16 @@ def _mock_extract(file_path: str, floor_category: str = None,
         "materials":       ["RCC", "AAC Block", "Ceramic Tiles", "UPVC Windows", "Teak Wood Doors"],
         "dimensions":      "22m x 19m",
         "quantities":      "Doors: 8 nos | Windows: 12 nos | Columns: 16 nos",
+        "boq_items": [
+            {"section": "Concrete / RCC", "description": "RCC M25 for columns, beams & slab (150mm)", "unit": "cu.m", "quantity": "—"},
+            {"section": "Concrete / RCC", "description": "Columns 4.5m × 4.5m grid", "unit": "nos", "quantity": "16"},
+            {"section": "Masonry", "description": "AAC block walls, 200mm external / 100mm internal", "unit": "sq.m", "quantity": "—"},
+            {"section": "Finishes", "description": "Cement plaster & painting to walls", "unit": "sq.m", "quantity": "—"},
+            {"section": "Finishes", "description": "Ceramic floor tiling", "unit": "sq.m", "quantity": "420"},
+            {"section": "Doors & Windows", "description": "Teak wood doors", "unit": "nos", "quantity": "8"},
+            {"section": "Doors & Windows", "description": "UPVC windows", "unit": "nos", "quantity": "12"},
+            {"section": "Miscellaneous", "description": "Rooms / spaces as per room schedule", "unit": "nos", "quantity": "6"},
+        ],
         "approval_stamp":  True,
         "north_arrow":     True,
         "grid_lines":      True,
@@ -127,15 +137,17 @@ def _mock_extract(file_path: str, floor_category: str = None,
         },
     }
 
-SYSTEM_PROMPT = """You are an expert at reading architectural and construction drawings.
-You have deep experience with title blocks, floor plans, section drawings, and engineering notation.
-Return only valid JSON — no explanation, no markdown fences, no preamble."""
+SYSTEM_PROMPT = """You are a senior quantity surveyor and construction estimator who reads architectural
+and structural drawings. You extract the full title block and produce a clean, trade-grouped Bill of
+Quantities (BOQ) from each drawing. Return only valid JSON — no explanation, no markdown fences, no preamble."""
 
-EXTRACTION_PROMPT_TEMPLATE = """Carefully analyse this architectural construction drawing and extract every field you can identify.
+EXTRACTION_PROMPT_TEMPLATE = """Analyse this construction drawing. Extract the complete TITLE BLOCK and produce a
+trade-grouped BILL OF QUANTITIES (BOQ) of the work shown. Assume the drawing is correct and approved — do NOT
+validate or flag it.
 
 {known_facts_section}
 
-Return ONLY this exact JSON structure (null for any field not visible):
+Return ONLY this exact JSON structure (null for any title-block field not visible; [] for empty lists):
 
 {{
   "drawing_number":    "e.g. A-001 or null",
@@ -154,51 +166,37 @@ Return ONLY this exact JSON structure (null for any field not visible):
   "scale":             "e.g. 1:100 or null",
   "floor_level":       "e.g. Ground Floor, First Floor, Basement or null",
   "total_floor_area":  "e.g. 450 sq.m or null",
-  "building_type":     "e.g. Residential, Commercial, Industrial, Mixed Use or null",
+  "building_type":     "e.g. Residential, Commercial, Industrial or null",
   "number_of_rooms":   "integer count or null",
   "room_schedule":     [{{"name": "Living Room", "area": "25 sq.m"}}, ...] or [],
   "door_count":        "integer count or null",
   "window_count":      "integer count or null",
-  "structural_notes":  "any structural specifications or notes visible or null",
-  "materials":         ["Concrete", "Brick", ...] or [],
-  "dimensions":        "overall building dimensions e.g. 20m x 15m or null",
-  "quantities":        "e.g. Doors: 8 nos | Windows: 12 nos, or null",
-  "approval_stamp":    true or false,
-  "north_arrow":       true or false,
-  "grid_lines":        true or false,
-  "additional_notes":  "any other important notes or null",
-  "confidence": {{
-    "drawing_number":   0.0,
-    "drawing_title":    0.0,
-    "project_name":     0.0,
-    "floor_level":      0.0,
-    "total_floor_area": 0.0,
-    "scale":            0.0,
-    "revision_number":  0.0,
-    "approval_stamp":   0.0,
-    "dimensions":       0.0,
-    "materials":        0.0,
-    "room_schedule":    0.0,
-    "building_type":    0.0,
-    "client_name":      0.0,
-    "date_of_issue":    0.0
-  }},
-  "field_locations": {{
-    "drawing_number":  [0.0, 0.0, 0.0, 0.0],
-    "project_name":    [0.0, 0.0, 0.0, 0.0],
-    "...":             "one box per field you can locate"
-  }}
+  "structural_notes":  "any structural specifications/notes visible or null",
+  "materials":         ["RCC", "AAC Block", ...] or [],
+  "dimensions":        "overall building dimensions e.g. 22m x 19m or null",
+  "boq_items": [
+    {{"section": "Concrete / RCC", "description": "RCC for columns, beams and slab (M25)", "unit": "cu.m", "quantity": "—"}},
+    {{"section": "Masonry",        "description": "AAC block walls, 200mm thick",           "unit": "sq.m", "quantity": "—"}},
+    {{"section": "Finishes",       "description": "Internal wall plastering & painting",    "unit": "sq.m", "quantity": "—"}},
+    {{"section": "Finishes",       "description": "Floor tiling",                           "unit": "sq.m", "quantity": "420"}},
+    {{"section": "Doors & Windows","description": "Flush / teak doors",                     "unit": "nos",  "quantity": "8"}},
+    {{"section": "Doors & Windows","description": "UPVC windows",                           "unit": "nos",  "quantity": "12"}}
+  ],
+  "confidence": {{ "drawing_number": 0.0, "project_name": 0.0, "boq_items": 0.0 }}
 }}
 
-EXTRACTION INSTRUCTIONS:
-1. TITLE BLOCK (usually bottom-right or bottom of drawing): drawing number, project name, scale, date, revision, drawn/checked/approved by, client name, contractor name
-2. FLOOR PLAN CONTENT: room labels give room names and areas; count doors (D-tag or door symbols) and windows (W-tag or window symbols); north arrow; grid lines (A,B,C... or 1,2,3...)
-3. DIMENSIONS: read overall building dimension lines (typically outermost dimensions); record as "W x L" format
-4. APPROVAL STAMP: any circular or rectangular stamp with signature = true
-5. MATERIALS: look for material callouts, hatching legends, specification notes
-6. CONFIDENCE: set 1.0 if you read the exact text clearly, 0.8 if likely correct, 0.6 if uncertain, 0.3 if guessed
-7. Return null for any field not visible — do NOT guess or fabricate values
-8. FIELD_LOCATIONS: for every field you actually read, give its bounding box on the FULL drawing image as normalised coordinates [x1, y1, x2, y2], each 0.0–1.0 (x = left→right, y = top→bottom; top-left origin). Omit any field you cannot locate. These boxes are used to highlight problem fields on the drawing."""
+INSTRUCTIONS:
+1. TITLE BLOCK (usually bottom-right): drawing number, drawing title, project name, project location, client name,
+   contractor/consultant, drawn/checked/approved by, date, revision, sheet number, total sheets, scale.
+2. BOQ — group line items by trade SECTION. Use these sections where applicable, in this order:
+   "Concrete / RCC", "Masonry", "Finishes", "Doors & Windows", "Plumbing & Sanitary", "Electrical", "Miscellaneous".
+   For each item give a clear description, a sensible UNIT (nos, sq.m, cu.m, m, kg, lump sum) and a QUANTITY.
+   - Read explicit quantities directly: door/window counts, room areas, schedules, dimension lines, area statements.
+   - Derive obvious quantities: floor finishes ≈ total floor area; wall plaster/paint ≈ wall area when wall lengths/heights are shown.
+   - If a quantity genuinely cannot be read or reasonably derived from THIS drawing, use "—" (do not invent precise figures).
+   - Include every distinct work item the drawing implies; aim for a useful, complete BOQ (typically 6–20 lines).
+3. Use the drawing's own units/scale. Return null for any title-block field not visible — do NOT fabricate title-block text.
+4. confidence: a single 0..1 self-rating per listed key is enough."""
 
 
 def _repair_json(raw: str) -> str:

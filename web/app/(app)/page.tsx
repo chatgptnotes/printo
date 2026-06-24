@@ -1,10 +1,13 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
+import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
+import HeroFallback from "@/components/upload/HeroFallback";
 import { EventLog, ProgressBar } from "@/components/pipeline/EventLog";
 import { useUploadStream } from "@/components/pipeline/useUploadStream";
 import { usePrintoStore } from "@/lib/store";
@@ -24,6 +27,12 @@ const Hero3D = dynamic(() => import("@/components/upload/Hero3D"), {
   ),
 });
 
+interface BatchItem {
+  name: string;
+  drawingId: number | null;
+  verdict: string | null;
+}
+
 export default function UploadPage() {
   const router = useRouter();
   const setLastResult = usePrintoStore((s) => s.setLastResult);
@@ -31,15 +40,42 @@ export default function UploadPage() {
   const setStrict = usePrintoStore((s) => s.setStrict);
 
   const [floor, setFloor] = useState(FLOOR_CATEGORIES[0]);
-  const [file, setFile] = useState<File | null>(null);
+  const [files, setFiles] = useState<File[]>([]);
+  // Batch progress (multi-file) — null when not running a batch.
+  const [batch, setBatch] = useState<{ index: number; total: number; name: string } | null>(null);
+  const [batchResults, setBatchResults] = useState<BatchItem[]>([]);
 
-  const { lines, progress, phase, error, start } = useUploadStream((payload) => {
-    setLastResult(payload);
-    router.push(`/results/${payload.drawing_id}`);
-  });
+  const { lines, progress, phase, error, start } = useUploadStream();
 
-  async function processFile(blob: Blob, name: string, floorCat: string) {
-    await start(blob, name, floorCat, strict);
+  // Process a list sequentially (the backend handles one drawing at a time).
+  // A single file navigates straight to its result; multiple files show a batch
+  // summary with a link to each.
+  async function processFiles(list: File[], floorCat: string) {
+    if (!list.length) return;
+    setBatchResults([]);
+
+    if (list.length === 1) {
+      const r = await start(list[0], list[0].name, floorCat, strict);
+      if (r) {
+        setLastResult(r);
+        router.push(`/results/${r.drawing_id}`);
+      }
+      return;
+    }
+
+    const acc: BatchItem[] = [];
+    for (let i = 0; i < list.length; i++) {
+      setBatch({ index: i + 1, total: list.length, name: list[i].name });
+      const r = await start(list[i], list[i].name, floorCat, strict);
+      if (r) {
+        setLastResult(r);
+        acc.push({ name: list[i].name, drawingId: r.drawing_id, verdict: r.verdict });
+      } else {
+        acc.push({ name: list[i].name, drawingId: null, verdict: null });
+      }
+      setBatchResults([...acc]);
+    }
+    setBatch(null);
   }
 
   async function onSample(s: (typeof SAMPLE_DRAWINGS)[number]) {
@@ -49,10 +85,15 @@ export default function UploadPage() {
       return;
     }
     const blob = await res.blob();
-    await processFile(blob, s.file, s.floor);
+    const r = await start(blob as File, s.file, s.floor, strict);
+    if (r) {
+      setLastResult(r);
+      router.push(`/results/${r.drawing_id}`);
+    }
   }
 
   const streaming = phase === "streaming";
+  const busy = streaming || batch !== null;
 
   return (
     <div className="space-y-8">
@@ -87,7 +128,9 @@ export default function UploadPage() {
           </div>
         </div>
         <div className="relative h-[300px] overflow-hidden rounded-xl border border-border bg-[#05080f] lg:h-[360px]">
-          <Hero3D />
+          <ErrorBoundary fallback={<HeroFallback />}>
+            <Hero3D />
+          </ErrorBoundary>
           <span className="pointer-events-none absolute left-3 top-3 text-xs text-accent-orange">
             ● Live 3D Model
           </span>
@@ -124,17 +167,78 @@ export default function UploadPage() {
       {/* Live pipeline (shown while streaming or after) */}
       {(streaming || lines.length > 0) && (
         <Card>
-          <h2 className="mb-2 font-bold">Compilation in progress</h2>
+          <div className="mb-2 flex items-center justify-between">
+            <h2 className="font-bold">Compilation in progress</h2>
+            {batch && (
+              <span className="rounded-full bg-surface-2 px-3 py-1 text-xs font-semibold text-accent-orange">
+                Drawing {batch.index} of {batch.total}
+                <span className="ml-2 max-w-[220px] truncate align-middle text-muted">
+                  {batch.name}
+                </span>
+              </span>
+            )}
+          </div>
           <EventLog lines={lines} />
           <ProgressBar value={progress} />
           {error && <p className="mt-2 text-sm text-result-fail">{error}</p>}
         </Card>
       )}
 
+      {/* Batch summary (after a multi-file run completes) */}
+      {!batch && batchResults.length > 0 && (
+        <Card>
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="font-bold">
+              Batch complete — {batchResults.filter((b) => b.drawingId !== null).length}/
+              {batchResults.length} processed
+            </h2>
+            <Link
+              href="/history"
+              className="rounded-[10px] border border-border bg-surface-2 px-3 py-1.5 text-xs font-semibold hover:border-accent-orange/50"
+            >
+              View all in History →
+            </Link>
+          </div>
+          <div className="space-y-2">
+            {batchResults.map((b, i) => (
+              <div
+                key={i}
+                className="flex items-center justify-between gap-3 rounded-[10px] border border-border bg-surface-2 px-4 py-2.5"
+              >
+                <span className="min-w-0 flex-1 truncate text-sm">{b.name}</span>
+                {b.drawingId !== null ? (
+                  <>
+                    <span
+                      className={`text-xs font-semibold ${
+                        b.verdict === "FAILED" || b.verdict === "ERROR"
+                          ? "text-result-fail"
+                          : b.verdict === "WARNING"
+                            ? "text-accent-orange"
+                            : "text-[#6ee7b7]"
+                      }`}
+                    >
+                      {b.verdict ?? "DONE"}
+                    </span>
+                    <Link
+                      href={`/results/${b.drawingId}`}
+                      className="rounded-[10px] bg-accent-orange px-3 py-1 text-xs font-bold text-[#0b1326]"
+                    >
+                      Review
+                    </Link>
+                  </>
+                ) : (
+                  <span className="text-xs font-semibold text-result-fail">Failed</span>
+                )}
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
+
       {/* Upload + samples */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <Card>
-          <h2 className="mb-4 font-bold">Upload a drawing</h2>
+          <h2 className="mb-4 font-bold">Upload drawings</h2>
           <label className="mb-1 block text-xs font-semibold text-muted">
             Floor / Category
           </label>
@@ -152,10 +256,26 @@ export default function UploadPage() {
 
           <input
             type="file"
+            multiple
             accept=".pdf,.jpg,.jpeg,.png,.tiff,.tif,.dwg,.dxf,.dwf"
-            onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-            className="mb-4 block w-full text-sm text-muted file:mr-3 file:rounded-[10px] file:border-0 file:bg-surface-2 file:px-3 file:py-2 file:text-sm file:text-text"
+            onChange={(e) => setFiles(Array.from(e.target.files ?? []))}
+            className="mb-2 block w-full text-sm text-muted file:mr-3 file:rounded-[10px] file:border-0 file:bg-surface-2 file:px-3 file:py-2 file:text-sm file:text-text"
           />
+
+          {files.length > 0 && (
+            <div className="mb-3 max-h-32 space-y-1 overflow-y-auto rounded-[10px] border border-border bg-surface-2 px-3 py-2">
+              <p className="text-xs font-semibold text-muted">
+                {files.length} file{files.length > 1 ? "s" : ""} selected
+                {files.length > 1 ? " — processed one by one" : ""}
+              </p>
+              {files.map((f, i) => (
+                <div key={i} className="flex justify-between gap-2 text-xs text-muted">
+                  <span className="min-w-0 truncate">{f.name}</span>
+                  <span className="shrink-0">{(f.size / (1024 * 1024)).toFixed(1)} MB</span>
+                </div>
+              ))}
+            </div>
+          )}
 
           <label className="mb-4 flex items-center gap-2 text-xs text-muted">
             <input
@@ -169,10 +289,16 @@ export default function UploadPage() {
           <Button
             variant="primary"
             fullWidth
-            disabled={!file || streaming}
-            onClick={() => file && processFile(file, file.name, floor)}
+            disabled={!files.length || busy}
+            onClick={() => processFiles(files, floor)}
           >
-            {streaming ? "Processing…" : "Process Drawing"}
+            {batch
+              ? `Processing ${batch.index}/${batch.total}…`
+              : streaming
+                ? "Processing…"
+                : files.length > 1
+                  ? `Process ${files.length} drawings`
+                  : "Process Drawing"}
           </Button>
         </Card>
 
@@ -182,7 +308,7 @@ export default function UploadPage() {
             {SAMPLE_DRAWINGS.map((s) => (
               <button
                 key={s.file}
-                disabled={streaming}
+                disabled={busy}
                 onClick={() => onSample(s)}
                 className="flex w-full items-center gap-3 rounded-[10px] border border-border bg-surface-2 px-4 py-3 text-left transition-colors hover:border-accent-orange/50 disabled:opacity-50"
               >

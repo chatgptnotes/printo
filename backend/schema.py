@@ -21,6 +21,23 @@ class RoomItem(BaseModel):
     area: Optional[str] = None
 
 
+class BoqItem(BaseModel):
+    """One Bill-of-Quantities line, grouped by trade `section`."""
+    model_config = ConfigDict(extra="ignore")
+    section: Optional[str] = None       # trade group, e.g. "Concrete / RCC"
+    description: Optional[str] = None    # work item description
+    unit: Optional[str] = None           # e.g. nos, sq.m, cu.m, m, kg, lump sum
+    quantity: Optional[str] = None       # quantity as read/derived from the drawing
+
+    @field_validator("section", "description", "unit", "quantity", mode="before")
+    @classmethod
+    def _clean(cls, v):
+        if v is None:
+            return None
+        s = str(v).strip()
+        return None if s == "" or s.lower() in ("null", "none", "n/a") else s
+
+
 class DrawingExtraction(BaseModel):
     """Canonical extracted-field set for a construction drawing."""
     model_config = ConfigDict(extra="ignore")
@@ -50,6 +67,9 @@ class DrawingExtraction(BaseModel):
     door_count: Optional[str] = None
     window_count: Optional[str] = None
     dimensions: Optional[str] = None
+
+    # ── Bill of Quantities (trade-grouped line items derived from the drawing) ──
+    boq_items: list[BoqItem] = Field(default_factory=list)
 
     # ── Technical ──
     structural_notes: Optional[str] = None

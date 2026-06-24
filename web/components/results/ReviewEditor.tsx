@@ -1,15 +1,13 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { Card, SectionRule } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { FIELD_GROUPS } from "@/lib/constants";
-import { confPct, heatColor } from "@/lib/format";
-import type { ApproveResult, ReviewData, RuleRow } from "@/lib/types";
+import type { ApproveResult, BoqItem, ReviewData } from "@/lib/types";
 
 type FieldState = Record<string, string | boolean>;
 
-/** Stringify an extracted value for an editable text input. */
 function toInput(value: unknown): string | boolean {
   if (typeof value === "boolean") return value;
   if (value === null || value === undefined) return "";
@@ -18,8 +16,6 @@ function toInput(value: unknown): string | boolean {
   return String(value);
 }
 
-/** Convert an edited input back to the shape the backend should store, preserving
- * the original field type (arrays stay arrays, objects stay objects). */
 function fromInput(original: unknown, edited: string | boolean): unknown {
   if (typeof edited === "boolean") return edited;
   const text = edited.trim();
@@ -36,6 +32,8 @@ function fromInput(original: unknown, edited: string | boolean): unknown {
   return text;
 }
 
+const SCALAR_GROUPS = Object.entries(FIELD_GROUPS);
+
 export function ReviewEditor({
   data,
   username,
@@ -46,25 +44,27 @@ export function ReviewEditor({
   onApproved: (result: ApproveResult) => void;
 }) {
   const id = data.drawing_id;
-  const conf = data.extracted.confidence || {};
-
-  // Failed-rule findings grouped by field, so each field can flag its own issues.
-  const flagsByField = useMemo(() => {
-    const map: Record<string, RuleRow[]> = {};
-    for (const r of data.rules) {
-      if (r.passed) continue;
-      (map[r.field_name] ||= []).push(r);
-    }
-    return map;
-  }, [data.rules]);
 
   const [fields, setFields] = useState<FieldState>(() => {
     const init: FieldState = {};
-    for (const [, rows] of Object.entries(FIELD_GROUPS)) {
+    for (const [, rows] of SCALAR_GROUPS) {
       for (const [key] of rows) init[key] = toInput(data.extracted[key]);
     }
     return init;
   });
+
+  const initialBoq: BoqItem[] = (data.boq_items && data.boq_items.length
+    ? data.boq_items
+    : (data.extracted.boq_items as BoqItem[] | undefined) || []) as BoqItem[];
+  const [boq, setBoq] = useState<BoqItem[]>(
+    initialBoq.map((b) => ({
+      section: b.section ?? "",
+      description: b.description ?? "",
+      unit: b.unit ?? "",
+      quantity: b.quantity ?? "",
+    })),
+  );
+
   const [summary, setSummary] = useState(data.summary_override || data.summary_draft);
   const [busy, setBusy] = useState<"" | "draft" | "approve">("");
   const [msg, setMsg] = useState<string | null>(null);
@@ -72,14 +72,25 @@ export function ReviewEditor({
   function set(key: string, value: string | boolean) {
     setFields((prev) => ({ ...prev, [key]: value }));
   }
+  function setItem(i: number, key: keyof BoqItem, value: string) {
+    setBoq((prev) => prev.map((it, idx) => (idx === i ? { ...it, [key]: value } : it)));
+  }
+  function addItem() {
+    setBoq((prev) => [...prev, { section: "", description: "", unit: "nos", quantity: "" }]);
+  }
+  function removeItem(i: number) {
+    setBoq((prev) => prev.filter((_, idx) => idx !== i));
+  }
 
-  /** Serialize every editable field back to backend shape. */
   function buildFieldsPayload(): Record<string, unknown> {
     const out: Record<string, unknown> = {};
     for (const [key, edited] of Object.entries(fields)) {
       out[key] = fromInput(data.extracted[key], edited);
     }
     return out;
+  }
+  function buildBoqPayload(): BoqItem[] {
+    return boq.filter((b) => b.section || b.description || b.unit || b.quantity);
   }
 
   async function saveDraft() {
@@ -89,7 +100,11 @@ export function ReviewEditor({
       const r = await fetch(`/api/drawings/${id}/fields`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ fields: buildFieldsPayload(), corrected_by: username }),
+        body: JSON.stringify({
+          fields: buildFieldsPayload(),
+          boq_items: buildBoqPayload(),
+          corrected_by: username,
+        }),
       });
       const body = await r.json().catch(() => ({}));
       setMsg(r.ok ? `💾 ${body.message || "Draft saved"}` : "Save failed");
@@ -109,6 +124,7 @@ export function ReviewEditor({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           fields: buildFieldsPayload(),
+          boq_items: buildBoqPayload(),
           summary_override: summary,
           approved_by: username,
         }),
@@ -118,8 +134,7 @@ export function ReviewEditor({
         setMsg(body.detail || "Approval failed");
         return;
       }
-      const result: ApproveResult = await r.json();
-      onApproved(result);
+      onApproved((await r.json()) as ApproveResult);
     } catch {
       setMsg("Approval failed");
     } finally {
@@ -132,39 +147,79 @@ export function ReviewEditor({
   return (
     <div className="space-y-6">
       <div className="rounded-xl border border-result-warn/40 bg-result-warn/10 px-5 py-4 text-sm font-extrabold text-[#fcd34d]">
-        ⏸️ PENDING YOUR VERIFICATION — nothing has been pushed to ERP and no summary
-        has been generated yet. Cross-check each field against the drawing, fix any
-        mistakes, then approve.
+        ⏸️ BOQ READY FOR REVIEW — nothing has been pushed to ERP yet. Review the title block
+        and Bill of Quantities below, adjust any line, then approve to push to RealSoft.
       </div>
 
+      {/* Bill of Quantities — editable */}
+      <Card>
+        <div className="mb-3 flex items-center justify-between">
+          <SectionRule>Bill of Quantities</SectionRule>
+          <Button variant="secondary" onClick={addItem}>
+            + Add line
+          </Button>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-left text-xs text-muted">
+                <th className="py-1 pr-2">Section</th>
+                <th className="py-1 pr-2">Description</th>
+                <th className="w-20 py-1 pr-2">Unit</th>
+                <th className="w-24 py-1 pr-2">Qty</th>
+                <th className="w-8" />
+              </tr>
+            </thead>
+            <tbody>
+              {boq.length === 0 && (
+                <tr>
+                  <td colSpan={5} className="py-3 text-center text-xs text-muted">
+                    No BOQ lines — click “Add line”.
+                  </td>
+                </tr>
+              )}
+              {boq.map((it, i) => (
+                <tr key={i} className="border-t border-border">
+                  {(["section", "description", "unit", "quantity"] as (keyof BoqItem)[]).map((k) => (
+                    <td key={k} className="py-1 pr-2">
+                      <input
+                        className="w-full rounded-[8px] border border-border bg-surface-2 px-2 py-1.5 text-sm outline-none focus:border-accent-orange"
+                        value={(it[k] as string) ?? ""}
+                        onChange={(e) => setItem(i, k, e.target.value)}
+                      />
+                    </td>
+                  ))}
+                  <td className="py-1 text-center">
+                    <button
+                      onClick={() => removeItem(i)}
+                      className="text-muted hover:text-result-fail"
+                      title="Remove line"
+                    >
+                      ✕
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        {/* Editable fields */}
+        {/* Title block — editable */}
         <Card>
-          <SectionRule>Cross-Verify &amp; Edit Fields</SectionRule>
+          <SectionRule>Title Block &amp; Drawing Info</SectionRule>
           <div className="space-y-4">
-            {Object.entries(FIELD_GROUPS).map(([group, rows]) => (
+            {SCALAR_GROUPS.map(([group, rows]) => (
               <div key={group}>
                 <div className="mb-1 rounded-md bg-accent-blue/10 px-2 py-1 text-xs font-semibold text-[#93c5fd]">
                   {group}
                 </div>
                 {rows.map(([key, label]) => {
-                  const flags = flagsByField[key] || [];
-                  const c = conf[key];
-                  const col = heatColor(c);
                   const isBool = typeof fields[key] === "boolean";
                   return (
                     <div key={key} className="flex items-start gap-2 border-b border-border py-1.5">
-                      <span className="mt-1.5 min-w-[130px] text-xs text-muted">
-                        {label}
-                        {flags.length > 0 && (
-                          <span
-                            title={flags.map((f) => `${f.rule_id}: ${f.message}`).join("\n")}
-                            className="ml-1 cursor-help text-result-fail"
-                          >
-                            {flags.some((f) => f.severity === "ERROR") ? "❌" : "⚠️"}
-                          </span>
-                        )}
-                      </span>
+                      <span className="mt-1.5 min-w-[130px] text-xs text-muted">{label}</span>
                       {isBool ? (
                         <label className="flex flex-1 items-center gap-2 py-1.5 text-sm">
                           <input
@@ -181,14 +236,6 @@ export function ReviewEditor({
                           onChange={(e) => set(key, e.target.value)}
                         />
                       )}
-                      {c !== undefined && (
-                        <span
-                          className="mt-1.5 rounded px-1.5 py-0.5 text-[10px] font-semibold"
-                          style={{ background: col.bg, color: col.text }}
-                        >
-                          {confPct(c)}
-                        </span>
-                      )}
                     </div>
                   );
                 })}
@@ -197,91 +244,46 @@ export function ReviewEditor({
           </div>
         </Card>
 
-        {/* Source drawing + findings, for cross-verification */}
-        <div className="space-y-6">
-          <Card>
-            <SectionRule>Source Drawing</SectionRule>
-            {data.thumbnail_uri ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={data.thumbnail_uri}
-                alt="Source drawing with mistake markings"
-                className="w-full rounded-lg border border-border"
-              />
-            ) : (
-              <p className="text-sm text-muted">Preview unavailable.</p>
-            )}
-            <p className="mt-2 text-xs text-muted">
-              Red marks flag fields that failed validation. Compare the values on the
-              left against the drawing before approving.
-            </p>
-          </Card>
-
-          <Card>
-            <SectionRule>Validation Findings</SectionRule>
-            <ReviewFindings rules={data.rules} />
-          </Card>
-        </div>
+        {/* Source drawing (clean — no markings) */}
+        <Card>
+          <SectionRule>Source Drawing</SectionRule>
+          {data.thumbnail_uri ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={data.thumbnail_uri}
+              alt="Source drawing"
+              className="w-full rounded-lg border border-border"
+            />
+          ) : (
+            <p className="text-sm text-muted">Preview unavailable.</p>
+          )}
+          <p className="mt-2 text-xs text-muted">
+            Cross-check the title block and quantities against the drawing before approving.
+          </p>
+        </Card>
       </div>
 
       {/* Editable summary + approval */}
       <Card>
-        <SectionRule>Executive Summary (editable)</SectionRule>
-        <p className="mb-2 text-xs text-muted">
-          This is the summary that will appear on the report. Edit it as needed — it
-          is generated only once you approve.
-        </p>
+        <SectionRule>BOQ Summary (editable)</SectionRule>
         <textarea
-          className="h-32 w-full rounded-[10px] border border-border bg-surface-2 px-3 py-2 text-sm outline-none focus:border-accent-orange"
+          className="h-28 w-full rounded-[10px] border border-border bg-surface-2 px-3 py-2 text-sm outline-none focus:border-accent-orange"
           value={summary}
           onChange={(e) => setSummary(e.target.value)}
         />
-
         <div className="mt-4 flex flex-wrap items-center gap-3">
           <Button variant="secondary" onClick={saveDraft} disabled={working}>
             💾 {busy === "draft" ? "Saving…" : "Save Draft"}
           </Button>
           <Button variant="primary" onClick={approve} disabled={working}>
-            ✅ {busy === "approve" ? "Approving…" : "Approve & Generate Summary"}
+            ✅ {busy === "approve" ? "Approving…" : "Approve & Push to ERP"}
           </Button>
           {msg && <span className="text-xs text-muted">{msg}</span>}
         </div>
         <p className="mt-2 text-xs text-muted">
-          Approving pushes the verified data to RealSoft ERP and unlocks the report.
+          Approving pushes the title block + BOQ to RealSoft ERP and unlocks the report.
         </p>
       </Card>
-    </div>
-  );
-}
-
-function ReviewFindings({ rules }: { rules: RuleRow[] }) {
-  const failed = rules.filter((r) => !r.passed);
-  if (rules.length === 0)
-    return <p className="text-sm text-muted">No validation findings.</p>;
-  if (failed.length === 0)
-    return (
-      <div className="rounded-lg border border-result-pass/40 bg-result-pass/10 px-3 py-2 text-sm text-[#6ee7b7]">
-        ✅ All validation rules passed
-      </div>
-    );
-  return (
-    <div className="space-y-1.5">
-      {failed.map((r, i) => {
-        const isError = r.severity === "ERROR";
-        return (
-          <div
-            key={`${r.rule_id}-${i}`}
-            className={`rounded-lg border px-3 py-2 text-sm ${
-              isError
-                ? "border-result-fail/40 bg-result-fail/10 text-[#fca5a5]"
-                : "border-result-warn/40 bg-result-warn/10 text-[#fcd34d]"
-            }`}
-          >
-            {isError ? "❌" : "⚠️"} <span className="font-semibold">{r.rule_id}</span>{" "}
-            {r.field_name && <span className="opacity-80">({r.field_name})</span>} — {r.message}
-          </div>
-        );
-      })}
     </div>
   );
 }

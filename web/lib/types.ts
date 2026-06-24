@@ -1,6 +1,14 @@
 // Shared types mirroring the FastAPI backend contract.
 
-export type Verdict = "PASSED" | "WARNING" | "FAILED" | "TIMEOUT" | "ERROR";
+export type Verdict = "PASSED" | "WARNING" | "FAILED" | "TIMEOUT" | "ERROR" | "GENERATED";
+
+/** One Bill-of-Quantities line, grouped by trade `section`. */
+export interface BoqItem {
+  section: string | null;
+  description: string | null;
+  unit: string | null;
+  quantity: string | null;
+}
 
 export type EventType = "info" | "success" | "warning" | "error" | "done";
 
@@ -26,6 +34,7 @@ export interface Extracted {
   confidence?: Record<string, number>;
   field_locations?: Record<string, number[]>;
   room_schedule?: Array<{ name?: string; area?: string } | string>;
+  boq_items?: BoqItem[];
 }
 
 export interface RealsoftPayload {
@@ -77,6 +86,7 @@ export interface ReviewData {
   verdict: Verdict | null;
   elapsed: number;
   extracted: Extracted;
+  boq_items: BoqItem[];
   summary_draft: string;
   summary_override: string | null;
   erp_payload: RealsoftPayload;

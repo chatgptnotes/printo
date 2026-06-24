@@ -244,6 +244,18 @@ def map_to_realsoft(extracted: dict, drawing_id: int, file_name: str,
         if present and c < LOW_CONF_THRESHOLD:
             low_conf.append(erp_field)
 
+    # 4b) Bill of Quantities — trade-grouped line items carried into the ERP
+    boq_items = [
+        {
+            "section":     (b.get("section") or "General"),
+            "description": b.get("description"),
+            "unit":        b.get("unit"),
+            "quantity":    b.get("quantity"),
+        }
+        for b in (extracted.get("boq_items") or []) if isinstance(b, dict)
+    ]
+    data["BoqItemCount"] = len(boq_items)
+
     # 5) validation pass over the built payload
     warnings += _validate(data)
 
@@ -252,16 +264,17 @@ def map_to_realsoft(extracted: dict, drawing_id: int, file_name: str,
         "module": REALSOFT_MODULE,
         "action": "CREATE",
         "data": data,
+        "boq_items": boq_items,
         "metadata": {
             "source":                 "PRINTO_AI",
             "source_file":            file_name,
             "printo_record_id":       drawing_id,
             "ai_confidence_avg":      round(ai_confidence_avg, 3),
-            "validation_status":      validation_verdict,
+            "status":                 validation_verdict,
             "extracted_at":           datetime.datetime.now().isoformat(),
+            "boq_item_count":         len(boq_items),
+            "boq_sections":           sorted({i["section"] for i in boq_items}),
             "field_confidence":       field_confidence,
-            "low_confidence_fields":  sorted(low_conf),
-            "low_confidence_threshold": LOW_CONF_THRESHOLD,
             "mapping_warnings":       warnings,
             "mapped_fields":          len(data) - null_fields,
             "null_fields":            null_fields,

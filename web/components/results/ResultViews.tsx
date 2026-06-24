@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import type { Extracted, RealsoftPayload, Verdict } from "@/lib/types";
+import { Fragment, useState } from "react";
+import type { BoqItem, Extracted, RealsoftPayload, Verdict } from "@/lib/types";
 import { FIELD_GROUPS, HEAT_LABELS } from "@/lib/constants";
 import { confPct, fmtVal, heatColor, roomRow } from "@/lib/format";
 
@@ -226,6 +226,53 @@ export function ValidationResults({
         </div>
       ))}
     </div>
+  );
+}
+
+export function BoqDisplay({ items }: { items: BoqItem[] }) {
+  const list = (items || []).filter(Boolean);
+  if (list.length === 0) return <p className="text-sm text-muted">No BOQ items.</p>;
+  const sections: string[] = [];
+  for (const it of list) {
+    const s = it.section || "General";
+    if (!sections.includes(s)) sections.push(s);
+  }
+  let n = 0;
+  return (
+    <table className="w-full text-sm">
+      <thead>
+        <tr className="text-left text-xs text-muted">
+          <th className="w-8 py-1">#</th>
+          <th className="py-1">Description</th>
+          <th className="w-20 py-1">Unit</th>
+          <th className="w-24 py-1 text-right">Qty</th>
+        </tr>
+      </thead>
+      <tbody>
+        {sections.map((sec) => (
+          <Fragment key={sec}>
+            <tr>
+              <td colSpan={4} className="bg-accent-orange/10 px-2 py-1 text-xs font-semibold text-accent-orange">
+                {sec}
+              </td>
+            </tr>
+            {list
+              .filter((it) => (it.section || "General") === sec)
+              .map((it, i) => {
+                n += 1;
+                return (
+                  <tr key={`${sec}-${i}`} className="border-t border-border">
+                    <td className="py-1 text-center text-muted">{n}</td>
+                    <td className="py-1">{it.description || "—"}</td>
+                    <td className="py-1 text-center">{it.unit || "—"}</td>
+                    <td className="py-1 text-right">{it.quantity || "—"}</td>
+                  </tr>
+                );
+              })}
+          </Fragment>
+        ))}
+      </tbody>
+    </table>
   );
 }
 
