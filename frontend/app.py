@@ -523,9 +523,13 @@ def threejs_building_html() -> str:
   <canvas id="c"></canvas>
   <div class="tag">● Live 3D Model</div>
   <div class="hint">drag to rotate · scroll to zoom</div>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <!-- both scripts from the same CDN so only one origin must be reachable -->
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
   <script>
+    if (typeof THREE === 'undefined') {
+      document.querySelector('.hint').textContent = '3D model unavailable (offline)';
+    } else {
     const canvas = document.getElementById('c');
     const renderer = new THREE.WebGLRenderer({canvas, antialias:true, alpha:true});
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -559,11 +563,21 @@ def threejs_building_html() -> str:
       new THREE.MeshBasicMaterial({color:0xF7941D}));
     ring.rotation.x = Math.PI/2; g.add(ring);
 
-    const controls = new THREE.OrbitControls(camera, renderer.domElement);
-    controls.enableDamping = true; controls.dampingFactor = 0.08;
-    controls.autoRotate = true; controls.autoRotateSpeed = 1.2;
-    controls.enablePan = false; controls.minDistance = 5; controls.maxDistance = 16;
-    controls.target.set(0, 0.2, 0);
+    // OrbitControls is optional: if its script failed to load, the building still
+    // renders and auto-rotates (drag-to-rotate just won't be available).
+    let controls = null;
+    try {
+      if (THREE.OrbitControls) {
+        controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true; controls.dampingFactor = 0.08;
+        controls.autoRotate = true; controls.autoRotateSpeed = 1.2;
+        controls.enablePan = false; controls.minDistance = 5; controls.maxDistance = 16;
+        controls.target.set(0, 0.2, 0);
+      }
+    } catch (e) { controls = null; }
+    if (!controls) {
+      document.querySelector('.hint').textContent = 'auto-rotating · drag unavailable';
+    }
 
     function resize(){
       const w = canvas.clientWidth, h = canvas.clientHeight;
@@ -576,9 +590,11 @@ def threejs_building_html() -> str:
     function loop(){
       requestAnimationFrame(loop); resize();
       t += 0.02; ring.position.y = 1.55 + Math.sin(t) * 0.9;
-      controls.update(); renderer.render(scene, camera);
+      if (controls) { controls.update(); } else { g.rotation.y += 0.005; }
+      renderer.render(scene, camera);
     }
     loop();
+    }
   </script>
 </body></html>"""
 
