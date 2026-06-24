@@ -152,7 +152,7 @@ export default function UploadPage() {
 
           <input
             type="file"
-            accept=".pdf,.jpg,.jpeg,.png,.tiff,.tif"
+            accept=".pdf,.jpg,.jpeg,.png,.tiff,.tif,.dwg,.dxf,.dwf"
             onChange={(e) => setFile(e.target.files?.[0] ?? null)}
             className="mb-4 block w-full text-sm text-muted file:mr-3 file:rounded-[10px] file:border-0 file:bg-surface-2 file:px-3 file:py-2 file:text-sm file:text-text"
           />

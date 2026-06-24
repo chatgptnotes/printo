@@ -17,6 +17,8 @@ export interface StreamEvent {
   erp_status?: string;
   drawing_id?: number;
   prepass_count?: number;
+  needs_review?: boolean;
+  review_status?: ReviewStatus;
 }
 
 export interface Extracted {
@@ -49,6 +51,47 @@ export interface DonePayload {
   erp_status?: string;
   drawing_id: number;
   prepass_count?: number;
+  needs_review?: boolean;
+  review_status?: ReviewStatus;
+}
+
+// ── Human-in-the-loop verification ──────────────────────────────────────────
+export type ReviewStatus = "pending_review" | "approved";
+
+export interface RuleRow {
+  rule_id: string;
+  field_name: string;
+  message: string;
+  severity: string;
+  passed: boolean;
+}
+
+/** Payload for the cross-verification / approval screen (GET /drawings/:id/review). */
+export interface ReviewData {
+  drawing_id: number;
+  file_name: string;
+  status: string;
+  review_status: ReviewStatus;
+  approved_by: string | null;
+  approved_at: string | null;
+  verdict: Verdict | null;
+  elapsed: number;
+  extracted: Extracted;
+  summary_draft: string;
+  summary_override: string | null;
+  erp_payload: RealsoftPayload;
+  thumbnail_uri: string | null;
+  rules: RuleRow[];
+}
+
+export interface ApproveResult {
+  message: string;
+  drawing_id: number;
+  verdict: Verdict;
+  erp_status: "sent" | "failed" | "simulated";
+  erp_message: string;
+  approved_by: string;
+  approved_at: string;
 }
 
 export interface DrawingSummary {
@@ -78,6 +121,41 @@ export interface DrawingDetail {
 export interface CurrentUser {
   username: string;
   role: string;
+}
+
+// ── RealSoft ERP integration ────────────────────────────────────────────────
+export interface ErpStatus {
+  configured: boolean;
+  reachable: boolean;
+  base_url: string;
+  module: string;
+  mode: "live" | "simulation";
+}
+
+export interface ErpPushResult {
+  drawing_id: number;
+  status: "sent" | "failed" | "simulated" | "skipped";
+  status_code?: number;
+  pushed_at?: string;
+  message: string;
+}
+
+export interface ErpPushSummary {
+  total: number;
+  sent: number;
+  failed: number;
+  simulated: number;
+  results: ErpPushResult[];
+}
+
+export interface ErpPushRecord {
+  id: number;
+  drawing_id: number;
+  file_name: string | null;
+  project_name: string | null;
+  status: string;
+  pushed_at: string | null;
+  response_summary: string;
 }
 
 export interface Health {

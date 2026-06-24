@@ -18,6 +18,13 @@ pytesseract==0.3.13         # OCR fallback for scanned PDFs / images (needs Tess
 opencv-python-headless==4.10.0.84  # image cleanup: deskew, contrast, denoise
 xhtml2pdf==0.2.16           # pure-Python HTML→PDF for the improvement doc
 
+# ── CAD upload support (DWG / DXF / DWF) ─────────────────────────────────
+ezdxf>=1.3                  # parse + render DXF to raster via its PyMuPDF backend (no matplotlib)
+#                             DXF works pip-only. DWG needs an external converter:
+#                               • LibreDWG `dwg2dxf`  (Linux: apt-get install libredwg-bin / build)
+#                               • or ODA File Converter (set ODA_CONVERTER_PATH; on Linux wrap with xvfb-run)
+#                             DWF is best-effort (embedded raster preview); else user is asked for PDF/DXF.
+
 # ── Auth ───────────────────────────────────────────────────────────────
 bcrypt==4.2.0               # password hashing
 pyjwt==2.9.0                # signed JWT access tokens

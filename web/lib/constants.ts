@@ -46,7 +46,7 @@ export const STEP_CARDS = [
   { n: "1", title: "Upload", body: "Drop an approved construction drawing (PDF or image)." },
   { n: "2", title: "AI Extract", body: "Claude Vision reads the title block, plan, dimensions and stamps." },
   { n: "3", title: "Validate", body: "18 rules check completeness, confidence and format." },
-  { n: "4", title: "Push to ERP", body: "Mapped to RealSoft format and pushed — with a full report." },
+  { n: "4", title: "Review & Approve", body: "Cross-verify, edit any mistakes, then approve to push to ERP and generate the summary." },
 ];
 
 // field key -> display label, grouped

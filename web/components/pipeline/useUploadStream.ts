@@ -17,7 +17,7 @@ function progressFor(text: string, current: number): number {
   if (/Claude|AI Processing|Extraction/i.test(text)) return Math.min(current + 15, 70);
   if (/Validation|R1\d/.test(text)) return Math.min(current + 4, 85);
   if (/ERP|Mapping/i.test(text)) return Math.min(current + 3, 92);
-  if (/Report/i.test(text)) return Math.min(current + 3, 97);
+  if (/Verification|Approval|Review|Report/i.test(text)) return Math.min(current + 3, 97);
   return Math.min(current + 1, 96);
 }
 

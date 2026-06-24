@@ -47,6 +47,7 @@ const NAV = [
   { tab: "Results", icon: "📊", href: (id?: number) => (id ? `/results/${id}` : "/results") },
   { tab: "Report", icon: "📄", href: (id?: number) => (id ? `/report/${id}` : "/report") },
   { tab: "History", icon: "🗂️", href: () => "/history" },
+  { tab: "Integrations", icon: "🔗", href: () => "/integrations" },
 ];
 
 export function AppShell({

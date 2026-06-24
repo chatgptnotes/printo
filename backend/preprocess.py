@@ -29,8 +29,29 @@ try:
 except Exception:                       # pragma: no cover - env dependent
     _HAS_CV2 = False
 
+try:
+    import cad_convert                  # CAD (DWG/DXF/DWF) → raster rendering
+    _HAS_CAD = True
+except Exception:                       # pragma: no cover - env dependent
+    _HAS_CAD = False
+
 
 IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".tiff", ".tif", ".bmp", ".webp"}
+
+
+def _resolve_raster_path(file_path: str) -> str:
+    """If `file_path` is a CAD file, render it to a cached PNG and return that path.
+
+    Returns the original path unchanged when it isn't CAD, when CAD support is
+    unavailable, or when conversion fails — callers then degrade as they would for
+    any unreadable input. Conversion is cached, so repeated calls are cheap.
+    """
+    if not _HAS_CAD:
+        return file_path
+    if Path(file_path).suffix.lower() not in cad_convert.CAD_SUFFIXES:
+        return file_path
+    result = cad_convert.convert_to_png(file_path)
+    return result.png_path if (result.ok and result.png_path) else file_path
 
 
 # ── basic helpers ─────────────────────────────────────────────────────────────
@@ -187,6 +208,7 @@ def build_images(file_path: str, dpi: int = 220, clean: bool = True) -> dict:
         "is_pdf": bool,
       }
     """
+    file_path = _resolve_raster_path(file_path)   # CAD → rendered PNG (cached)
     suffix = Path(file_path).suffix.lower()
     is_pdf = suffix == ".pdf"
 
@@ -222,6 +244,7 @@ def sharpness_score(file_path: str) -> float | None:
     if not _HAS_CV2:
         return None
     try:
+        file_path = _resolve_raster_path(file_path)   # CAD → rendered PNG (cached)
         suffix = Path(file_path).suffix.lower()
         if suffix == ".pdf":
             pages = render_pdf_to_images(file_path, dpi=150, max_pages=1)
@@ -243,4 +266,7 @@ def sharpness_score(file_path: str) -> float | None:
 
 def capabilities() -> dict:
     """What preprocessing is actually available in this environment."""
-    return {"pdf_render": _HAS_FITZ, "image_clean": _HAS_CV2}
+    caps = {"pdf_render": _HAS_FITZ, "image_clean": _HAS_CV2, "cad": _HAS_CAD}
+    if _HAS_CAD:
+        caps["cad_detail"] = cad_convert.capabilities()
+    return caps

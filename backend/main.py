@@ -24,17 +24,20 @@ from rules           import run_all_rules, verdict
 from realsoft_mapper import map_to_realsoft, average_confidence
 from realsoft_client import push_to_realsoft, ping_realsoft, RealSoftAPIError
 from report_generator import (generate_report, generate_project_report,
-                              html_to_pdf_bytes)
+                              html_to_pdf_bytes, plain_summary)
 from auth import (verify_login, create_token, require_auth,
                   is_locked, record_failure, clear_failures)
 from ai_provider import gateway_erp_map
 import base64
 import preprocess
+import cad_convert
 
 STORAGE_DIR = Path(__file__).parent.parent / "storage"
 STORAGE_DIR.mkdir(exist_ok=True)
 
-ALLOWED_EXTENSIONS = {".pdf", ".jpg", ".jpeg", ".png", ".tiff", ".tif"}
+# Raster formats handled directly + CAD formats rendered to raster (DWG/DXF/DWF).
+RASTER_EXTENSIONS = {".pdf", ".jpg", ".jpeg", ".png", ".tiff", ".tif"}
+ALLOWED_EXTENSIONS = RASTER_EXTENSIONS | cad_convert.CAD_SUFFIXES
 MAX_FILE_SIZE_MB    = 20
 # Extraction timeout — the gateway runs Claude CLI on the VPS, which is slower
 # than a direct API, so allow more headroom than the original 55s. Configurable.
@@ -207,6 +210,77 @@ def _corrections_for(drawing_id: int) -> list:
             for r in rows]
 
 
+def _apply_corrections(drawing_id: int, extracted: dict) -> dict:
+    """Overlay the latest human correction per field onto `extracted` (mutated and
+    returned) so reports and ERP mapping reflect verified values."""
+    latest = {}
+    for c in _corrections_for(drawing_id):          # newest-first; keep first seen
+        latest.setdefault(c["field"], c["corrected"])
+    for field, value in latest.items():
+        extracted[field] = value
+    return extracted
+
+
+def _serialize_field_value(value):
+    """Normalise an edited field value to the TEXT form stored in `extractions`."""
+    if value is None:
+        return None
+    if isinstance(value, (list, dict)):
+        return json.dumps(value)
+    return str(value)
+
+
+def _save_fields(drawing_id: int, fields: dict, corrected_by: str) -> int:
+    """Batch-save edited fields as corrections. Records an audit row + updates the
+    live extraction for every field whose value actually changed. Returns the count
+    of fields changed."""
+    conn = get_conn()
+    saved = 0
+    for field_name, value in (fields or {}).items():
+        if not field_name or field_name in ("confidence", "field_locations"):
+            continue
+        new_val = _serialize_field_value(value)
+        row = conn.execute(
+            "SELECT field_value FROM extractions WHERE drawing_id=? AND field_name=?",
+            (drawing_id, field_name)
+        ).fetchone()
+        original_value = row[0] if row else None
+        if (original_value or "") == (new_val or ""):
+            continue                                # no-op edit — skip
+        conn.execute(
+            "INSERT INTO corrections (drawing_id, field_name, original_value, corrected_value, corrected_by) "
+            "VALUES (?,?,?,?,?)",
+            (drawing_id, field_name, original_value, new_val, corrected_by)
+        )
+        if row:
+            conn.execute(
+                "UPDATE extractions SET field_value=?, validated=1 WHERE drawing_id=? AND field_name=?",
+                (new_val, drawing_id, field_name)
+            )
+        else:
+            conn.execute(
+                "INSERT INTO extractions (drawing_id, field_name, field_value, validated) VALUES (?,?,?,1)",
+                (drawing_id, field_name, new_val)
+            )
+        saved += 1
+    conn.commit()
+    conn.close()
+    return saved
+
+
+def set_pending_review(drawing_id: int, extracted: dict):
+    """Park a freshly-extracted drawing in the human verification queue."""
+    conn = get_conn()
+    conn.execute(
+        "UPDATE drawings SET status='pending_review', review_status='pending_review', "
+        "drawing_number=?, project_name=?, drawing_title=? WHERE id=?",
+        (extracted.get("drawing_number"), extracted.get("project_name"),
+         extracted.get("drawing_title"), drawing_id)
+    )
+    conn.commit()
+    conn.close()
+
+
 _MARK_RED = (217, 25, 25)          # Pratyaya-style mistake red (#D91919)
 
 
@@ -312,26 +386,39 @@ def _thumbnail_data_uri(file_path: str, extracted: dict = None,
         return None
 
 
+def _approval_state(drawing_id: int) -> tuple[str, str | None, str | None]:
+    """(review_status, approved_by, approved_at) for a drawing; legacy rows → approved."""
+    conn = get_conn()
+    row = conn.execute(
+        "SELECT review_status, approved_by, approved_at FROM drawings WHERE id=?",
+        (drawing_id,)
+    ).fetchone()
+    conn.close()
+    if not row:
+        return "approved", None, None
+    return (row[0] or "approved"), row[1], row[2]
+
+
 def _rebuild_report_html(drawing_id: int) -> str | None:
-    """Regenerate the per-drawing report from stored data + latest corrections."""
+    """Regenerate the per-drawing report from stored data + latest corrections.
+    Renders a DRAFT banner until the drawing is approved, and uses the user's
+    approved summary override when one was saved."""
     data = _load_report_data(drawing_id)
     if not data:
         return None
-    extracted = dict(data.get("extracted") or {})
+    extracted = _apply_corrections(drawing_id, dict(data.get("extracted") or {}))
     corrections = _corrections_for(drawing_id)
-    # apply the latest correction per field so the report reflects human edits
-    latest = {}
-    for c in corrections:                       # newest-first; keep first seen
-        latest.setdefault(c["field"], c["corrected"])
-    for field, value in latest.items():
-        extracted[field] = value
     rule_results = run_all_rules(extracted)
     verd = verdict(rule_results)
     thumb = _thumbnail_data_uri(data.get("file_path", ""), extracted, rule_results)
+    review_status, approved_by, approved_at = _approval_state(drawing_id)
     return generate_report(
         data.get("drawing_meta", {"drawing_id": drawing_id}), extracted, rule_results,
         verd, data.get("elapsed", 0), data.get("erp_payload", {}),
         corrections=corrections, thumbnail_uri=thumb,
+        approved=(review_status == "approved"),
+        summary_override=data.get("summary_override"),
+        approved_by=approved_by, approved_at=approved_at,
     )
 
 
@@ -354,7 +441,7 @@ async def run_pipeline(file_path: Path, file_name: str, drawing_id: int,
 
     suffix = Path(file_name).suffix.lower()
     if suffix not in ALLOWED_EXTENSIONS:
-        msg = f"Unsupported format: {suffix} | Allowed: PDF, JPG, PNG, TIFF"
+        msg = f"Unsupported format: {suffix} | Allowed: PDF, JPG, PNG, TIFF, DWG, DXF, DWF"
         yield event("❌", "R01 FAILED", msg, "error")
         errors.append(msg)
         yield _end_failed(errors, warnings, {}, {}, drawing_id, start)
@@ -370,20 +457,41 @@ async def run_pipeline(file_path: Path, file_name: str, drawing_id: int,
     yield event("✅", "R02 PASSED", f"File size OK — {file_size_mb:.1f}MB (limit: {MAX_FILE_SIZE_MB}MB)", "success")
     yield event("✅", "R03 PASSED", "File readable and non-empty", "success")
 
+    # ── CAD render (DWG/DXF/DWF → image) ─────────────────────────────────
+    # Construction engineers upload native CAD files. Render them to a raster so
+    # the rest of the vision pipeline (blur check, extraction, thumbnail) works.
+    work_path = file_path
+    if cad_convert.is_cad(suffix):
+        yield event("📐", "CAD drawing", f"{suffix[1:].upper()} vector file — rendering to high-resolution image...", "info")
+        cad = cad_convert.convert_to_png(str(file_path), STORAGE_DIR)
+        if not cad.ok:
+            yield event("❌", "CAD CONVERSION FAILED", cad.reason, "error")
+            errors.append(cad.reason)
+            yield _end_failed(errors, warnings, {}, {}, drawing_id, start)
+            return
+        work_path = Path(cad.png_path)
+        note = f" · {len(cad.text_hints)} text labels found" if cad.text_hints else ""
+        yield event("✅", "CAD rendered", f"Vector drawing converted to image (via {cad.converter}){note}", "success")
+
     # ── Image quality (blur) check ───────────────────────────────────────
-    score = preprocess.sharpness_score(str(file_path))
-    threshold = float(os.getenv("BLUR_THRESHOLD", "100"))
-    if score is not None and score < threshold:
-        msg = ("Uploaded image is too blurry for report generation — "
-               "please re-upload a clearer scan or photo.")
-        yield event("❌", "BLUR CHECK FAILED",
-                    f"{msg} (sharpness {score:.0f} < {threshold:.0f})", "error")
-        errors.append(msg)
-        yield _end_failed(errors, warnings, {}, {}, drawing_id, start, status="blurred")
-        return
-    yield event("✅", "Blur Check",
-                f"Image sharp enough (sharpness {score:.0f})" if score is not None
-                else "Blur check skipped (OpenCV unavailable)", "success")
+    # Skip for CAD: a rendered vector drawing is sharp by construction, so the
+    # photo/scan blur gate would only risk false rejections of sparse drawings.
+    if cad_convert.is_cad(suffix):
+        yield event("✅", "Blur Check", "Skipped — vector CAD render is sharp by construction", "success")
+    else:
+        score = preprocess.sharpness_score(str(work_path))
+        threshold = float(os.getenv("BLUR_THRESHOLD", "100"))
+        if score is not None and score < threshold:
+            msg = ("Uploaded image is too blurry for report generation — "
+                   "please re-upload a clearer scan or photo.")
+            yield event("❌", "BLUR CHECK FAILED",
+                        f"{msg} (sharpness {score:.0f} < {threshold:.0f})", "error")
+            errors.append(msg)
+            yield _end_failed(errors, warnings, {}, {}, drawing_id, start, status="blurred")
+            return
+        yield event("✅", "Blur Check",
+                    f"Image sharp enough (sharpness {score:.0f})" if score is not None
+                    else "Blur check skipped (OpenCV unavailable)", "success")
 
     # ── Pre-pass (PDF text layer) ────────────────────────────────────────
     if suffix == ".pdf":
@@ -399,7 +507,7 @@ async def run_pipeline(file_path: Path, file_name: str, drawing_id: int,
             asyncio.get_event_loop().run_in_executor(
                 None,
                 lambda: extract_drawing_with_prepass(
-                    str(file_path), floor_category, file_name
+                    str(work_path), floor_category, file_name
                 ),
             ),
             timeout=EXTRACT_TIMEOUT
@@ -460,30 +568,12 @@ async def run_pipeline(file_path: Path, file_name: str, drawing_id: int,
         yield event("✅", "Mapping Complete",
                     f"JSON payload ready — module: {realsoft_payload.get('module', 'DrawingMaster')}", "success")
 
-    # ── ERP Push (or simulation) ─────────────────────────────────────────
-    erp_status = "simulated"
-    if _erp_configured:
-        yield event("🚀", "RealSoft API", "Pushing to RealSoft test environment...", "info")
-        try:
-            api_response = await asyncio.get_event_loop().run_in_executor(
-                None, push_to_realsoft, realsoft_payload
-            )
-            yield event("✅", "ERP Push Success",
-                        f"RealSoft responded: HTTP {api_response['status_code']}", "success")
-            save_erp_push(drawing_id, realsoft_payload, "sent", json.dumps(api_response))
-            erp_status = "sent"
-        except RealSoftAPIError as e:
-            yield event("⚠️ ", "ERP Push Failed", f"{str(e)} — payload saved for retry", "warning")
-            save_erp_push(drawing_id, realsoft_payload, "failed", str(e))
-            warnings.append(f"ERP Push failed: {str(e)}")
-            erp_status = "failed"
-    else:
-        yield event("🖥️ ", "ERP Simulation",
-                    "RealSoft credentials not configured — data ready, showing simulation", "info")
-        save_erp_push(drawing_id, realsoft_payload, "simulated", "Simulation mode — no ERP credentials")
+    # Mapping above is a PREVIEW only — the actual ERP push happens at approval
+    # time (POST /drawings/{id}/approve), on the human-verified data.
 
-    # ── Generate Report ──────────────────────────────────────────────────
-    yield event("📄", "Report", "Generating summary report...", "info")
+    # ── Stage for human verification ─────────────────────────────────────
+    # Stop here: no ERP push and no final summary until a user cross-verifies the
+    # extraction against the drawing, edits any mistakes, and approves.
     elapsed = round(time.time() - start, 1)
     drawing_meta = {
         "file_name":      file_name,
@@ -499,20 +589,16 @@ async def run_pipeline(file_path: Path, file_name: str, drawing_id: int,
         "erp_payload":   realsoft_payload,
         "file_path":     str(file_path),
     })
-    yield event("✅", "Report Ready", f"Summary report generated — view at /report/{drawing_id}", "success")
-
-    # ── Save final status ────────────────────────────────────────────────
-    update_drawing_status(
-        drawing_id,
-        "done" if verd != "FAILED" else "error",
-        drawing_number=extracted.get("drawing_number"),
-        project_name=extracted.get("project_name"),
-        drawing_title=extracted.get("drawing_title"),
-    )
+    set_pending_review(drawing_id, extracted)
+    yield event("🧐", "Cross-Verification",
+                "Extraction staged for human review — nothing pushed to ERP yet", "info")
+    yield event("⏸️ ", "Awaiting Approval",
+                "Review the extracted fields against the drawing, edit any mistakes, "
+                "then approve to push to ERP and generate the summary", "warning")
 
     passed = sum(1 for r in rule_results if r.passed)
-    yield event("🏁", "Complete",
-                f"Done in {elapsed}s — {passed}/{len(rule_results)} rules passed | "
+    yield event("🏁", "Ready for Review",
+                f"Extracted in {elapsed}s — {passed}/{len(rule_results)} rules passed | "
                 f"{len(errors)} errors | {len(warnings)} warnings", "done")
 
     yield "data: " + json.dumps({
@@ -523,7 +609,9 @@ async def run_pipeline(file_path: Path, file_name: str, drawing_id: int,
         "warnings":         warnings,
         "extracted":        extracted,
         "realsoft_payload": realsoft_payload,
-        "erp_status":       erp_status,
+        "erp_status":       "pending",
+        "needs_review":     True,
+        "review_status":    "pending_review",
         "drawing_id":       drawing_id,
         "prepass_count":    prepass_count,
     }) + "\n\n"
@@ -546,7 +634,10 @@ async def upload_drawing(
 ):
     suffix = Path(file.filename).suffix.lower()
     if suffix not in ALLOWED_EXTENSIONS:
-        raise HTTPException(400, f"Unsupported file type: {suffix}")
+        raise HTTPException(
+            400,
+            f"Unsupported file type: {suffix} | Allowed: PDF, JPG, PNG, TIFF, DWG, DXF, DWF",
+        )
 
     unique_name = f"{uuid.uuid4().hex}{suffix}"
     dest = STORAGE_DIR / unique_name
@@ -640,6 +731,160 @@ def save_correction(drawing_id: int, body: dict, _user: dict = Depends(require_a
     return {"message": f"Correction saved for {field_name}"}
 
 
+# ── Human-in-the-loop verification: review → edit → approve ────────────────────
+
+@app.get("/drawings/{drawing_id}/review")
+def get_review(drawing_id: int, _user: dict = Depends(require_auth)):
+    """Everything the cross-verification screen needs: the extracted fields (with
+    any saved edits applied), per-field confidence, the validation findings, an
+    editable draft summary, the ERP payload preview, the source drawing thumbnail
+    (with red mistake markings), and the current approval state."""
+    conn = get_conn()
+    row = conn.execute(
+        "SELECT file_name, status, review_status, approved_by, approved_at, summary_override "
+        "FROM drawings WHERE id=?", (drawing_id,)
+    ).fetchone()
+    conn.close()
+    if not row:
+        raise HTTPException(404, "Drawing not found")
+
+    review_status = row[2] or "approved"
+    data = _load_report_data(drawing_id)
+    if not data:
+        # Processed but no report payload (e.g. failed pre-checks) — return the shell.
+        return {
+            "drawing_id": drawing_id, "file_name": row[0], "status": row[1],
+            "review_status": review_status, "approved_by": row[3], "approved_at": row[4],
+            "verdict": None, "elapsed": 0, "extracted": {}, "summary_draft": "",
+            "summary_override": row[5], "erp_payload": {}, "thumbnail_uri": None, "rules": [],
+        }
+
+    extracted = _apply_corrections(drawing_id, dict(data.get("extracted") or {}))
+    rule_results = run_all_rules(extracted)
+    verd = verdict(rule_results)
+    thumb = _thumbnail_data_uri(data.get("file_path", ""), extracted, rule_results)
+    summary_draft = plain_summary(data.get("drawing_meta", {}), extracted, rule_results, verd)
+    rules = [{"rule_id": r.rule_id, "field_name": r.field_name, "message": r.message,
+              "severity": r.severity, "passed": r.passed} for r in rule_results]
+    return {
+        "drawing_id":       drawing_id,
+        "file_name":        row[0],
+        "status":           row[1],
+        "review_status":    review_status,
+        "approved_by":      row[3],
+        "approved_at":      row[4],
+        "verdict":          verd,
+        "elapsed":          data.get("elapsed", 0),
+        "extracted":        extracted,
+        "summary_draft":    summary_draft,
+        "summary_override": data.get("summary_override") or row[5],
+        "erp_payload":      data.get("erp_payload", {}),
+        "thumbnail_uri":    thumb,
+        "rules":            rules,
+    }
+
+
+@app.put("/drawings/{drawing_id}/fields")
+def save_fields(drawing_id: int, body: dict, user: dict = Depends(require_auth)):
+    """Batch-save edited fields (cross-verification 'Save Draft')."""
+    fields = body.get("fields")
+    if not isinstance(fields, dict):
+        raise HTTPException(400, "Body must include a 'fields' object")
+    corrected_by = body.get("corrected_by") or user.get("username") or "user"
+    n = _save_fields(drawing_id, fields, corrected_by)
+    return {"message": f"Saved {n} field correction(s)", "saved": n}
+
+
+@app.post("/drawings/{drawing_id}/approve")
+def approve_drawing(drawing_id: int, body: dict, user: dict = Depends(require_auth)):
+    """Finalize a reviewed drawing: persist any last edits, re-map and push the
+    verified data to ERP, store the approved summary, and unlock the final report."""
+    data = _load_report_data(drawing_id)
+    if not data:
+        raise HTTPException(404, "Nothing to approve — process the drawing first")
+
+    approved_by = body.get("approved_by") or user.get("username") or "user"
+    summary_override = body.get("summary_override")
+    fields = body.get("fields")
+    if isinstance(fields, dict):
+        _save_fields(drawing_id, fields, approved_by)
+
+    extracted = _apply_corrections(drawing_id, dict(data.get("extracted") or {}))
+    rule_results = run_all_rules(extracted)
+    verd = verdict(rule_results)
+    save_exceptions(drawing_id, rule_results)
+
+    # Re-map to ERP on the verified data, then push (or simulate).
+    file_name = (data.get("drawing_meta") or {}).get("file_name", "")
+    avg_conf = average_confidence(extracted)
+    realsoft_payload = map_to_realsoft(extracted, drawing_id, file_name, verd, avg_conf)
+    gw_data = gateway_erp_map(extracted)
+    if gw_data:
+        realsoft_payload["data"] = gw_data
+        realsoft_payload["metadata"]["mapping_source"] = "gateway"
+    else:
+        realsoft_payload["metadata"]["mapping_source"] = "local"
+
+    erp_status, erp_message = "simulated", "Simulation mode — no ERP credentials"
+    if _erp_configured:
+        try:
+            api_response = push_to_realsoft(realsoft_payload)
+            save_erp_push(drawing_id, realsoft_payload, "sent", json.dumps(api_response))
+            erp_status = "sent"
+            erp_message = f"RealSoft responded: HTTP {api_response.get('status_code')}"
+        except RealSoftAPIError as e:
+            save_erp_push(drawing_id, realsoft_payload, "failed", str(e))
+            erp_status, erp_message = "failed", str(e)
+    else:
+        save_erp_push(drawing_id, realsoft_payload, "simulated", erp_message)
+
+    approved_at = datetime.datetime.now().isoformat()
+    data["extracted"]        = extracted
+    data["verdict"]          = verd
+    data["erp_payload"]      = realsoft_payload
+    data["summary_override"] = summary_override
+    data["approved_by"]      = approved_by
+    data["approved_at"]      = approved_at
+    _store_report_data(drawing_id, data)
+
+    conn = get_conn()
+    conn.execute(
+        "UPDATE drawings SET review_status='approved', approved_by=?, approved_at=?, "
+        "summary_override=?, status=? WHERE id=?",
+        (approved_by, approved_at, summary_override,
+         "done" if verd != "FAILED" else "error", drawing_id)
+    )
+    conn.commit()
+    conn.close()
+    return {
+        "message":      "Drawing approved",
+        "drawing_id":   drawing_id,
+        "verdict":      verd,
+        "erp_status":   erp_status,
+        "erp_message":  erp_message,
+        "approved_by":  approved_by,
+        "approved_at":  approved_at,
+    }
+
+
+@app.post("/drawings/{drawing_id}/reopen")
+def reopen_drawing(drawing_id: int, _user: dict = Depends(require_auth)):
+    """Send an approved drawing back to 'pending_review' so it can be edited again."""
+    conn = get_conn()
+    row = conn.execute("SELECT id FROM drawings WHERE id=?", (drawing_id,)).fetchone()
+    if not row:
+        conn.close()
+        raise HTTPException(404, "Drawing not found")
+    conn.execute(
+        "UPDATE drawings SET review_status='pending_review', status='pending_review', "
+        "approved_by=NULL, approved_at=NULL WHERE id=?", (drawing_id,)
+    )
+    conn.commit()
+    conn.close()
+    return {"message": "Reopened for editing", "drawing_id": drawing_id,
+            "review_status": "pending_review"}
+
+
 def _all_drawings_for_project_report() -> list:
     """Gather drawings + per-drawing average confidence for the aggregate report."""
     conn = get_conn()
@@ -696,7 +941,7 @@ def get_report_pdf(drawing_id: int, _user: dict = Depends(require_auth)):
         headers={"Content-Disposition": f'attachment; filename="erp_realsoft_report_{drawing_id}.pdf"'})
 
 
-@app.get("/export/{drawing_id}/excel")
+@app.get("/export/{drawing_id:int}/excel")
 def export_excel(drawing_id: int, _user: dict = Depends(require_auth)):
     import openpyxl
     from openpyxl.styles import Font, PatternFill, Alignment
@@ -761,6 +1006,209 @@ def export_excel(drawing_id: int, _user: dict = Depends(require_auth)):
         buf,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={"Content-Disposition": f'attachment; filename="{fname_safe}"'},
+    )
+
+
+# ── RealSoft ERP — connection test, manual transfer, history ────────────────
+REALSOFT_MODULE = os.getenv("REALSOFT_MODULE", "DrawingMaster")
+
+
+def _mask_base_url(url: str | None) -> str:
+    """Return scheme://host[:port] only — never expose any embedded credentials."""
+    if not url:
+        return ""
+    try:
+        from urllib.parse import urlparse
+        p = urlparse(url)
+        if not p.hostname:
+            return url
+        return f"{p.scheme}://{p.hostname}" + (f":{p.port}" if p.port else "")
+    except Exception:
+        return url
+
+
+def _push_one(drawing_id: int) -> dict:
+    """(Re)send a single drawing's stored ERP payload to RealSoft, recording the
+    attempt in erp_pushes. Falls back to 'simulated' when no real credentials are
+    configured, matching the upload pipeline's behaviour."""
+    data = _load_report_data(drawing_id)
+    if not data or not data.get("erp_payload"):
+        return {"drawing_id": drawing_id, "status": "skipped",
+                "message": "No report payload — process the drawing first"}
+    payload = data["erp_payload"]
+
+    if not _erp_configured:
+        save_erp_push(drawing_id, payload, "simulated", "Simulation mode — no ERP credentials")
+        return {"drawing_id": drawing_id, "status": "simulated",
+                "message": "RealSoft credentials not configured — recorded as simulation"}
+
+    try:
+        resp = push_to_realsoft(payload)
+        save_erp_push(drawing_id, payload, "sent", json.dumps(resp))
+        return {"drawing_id": drawing_id, "status": "sent",
+                "status_code": resp.get("status_code"),
+                "pushed_at": resp.get("pushed_at"),
+                "message": f"Sent — RealSoft responded HTTP {resp.get('status_code')}"}
+    except RealSoftAPIError as e:
+        save_erp_push(drawing_id, payload, "failed", str(e))
+        return {"drawing_id": drawing_id, "status": "failed", "message": str(e)}
+
+
+def _list_erp_pushes() -> list[dict]:
+    """Latest ERP push per drawing, joined with the drawing's file/project."""
+    conn = get_conn()
+    rows = conn.execute(
+        "SELECT e.id, e.drawing_id, d.file_name, d.project_name, e.status, e.pushed_at, e.response "
+        "FROM erp_pushes e LEFT JOIN drawings d ON d.id = e.drawing_id "
+        "WHERE e.id IN (SELECT MAX(id) FROM erp_pushes GROUP BY drawing_id) "
+        "ORDER BY e.id DESC"
+    ).fetchall()
+    conn.close()
+    return [
+        {"id": rid, "drawing_id": did, "file_name": fname, "project_name": project,
+         "status": status, "pushed_at": pushed_at, "response_summary": (response or "")[:160]}
+        for rid, did, fname, project, status, pushed_at, response in rows
+    ]
+
+
+@app.get("/erp/status")
+async def erp_status(_user: dict = Depends(require_auth)):
+    """Connection link/test for the RealSoft API."""
+    reachable = False
+    if _erp_configured:
+        reachable = await asyncio.get_event_loop().run_in_executor(None, ping_realsoft)
+    return {
+        "configured": _erp_configured,
+        "reachable":  reachable,
+        "base_url":   _mask_base_url(os.getenv("REALSOFT_BASE_URL")),
+        "module":     REALSOFT_MODULE,
+        "mode":       "live" if _erp_configured else "simulation",
+    }
+
+
+@app.post("/erp/push/{drawing_id:int}")
+async def erp_push(drawing_id: int, _user: dict = Depends(require_auth)):
+    """Manually (re)send one drawing's report to RealSoft — also used to retry failures."""
+    result = await asyncio.get_event_loop().run_in_executor(None, _push_one, drawing_id)
+    if result["status"] == "skipped":
+        raise HTTPException(404, result["message"])
+    return result
+
+
+@app.post("/erp/push-all")
+async def erp_push_all(only: str = "all", _user: dict = Depends(require_auth)):
+    """Bulk transfer stored reports to RealSoft. only = all | failed | pending."""
+    conn = get_conn()
+    rows = conn.execute(
+        "SELECT d.id, (SELECT status FROM erp_pushes e WHERE e.drawing_id = d.id "
+        "ORDER BY e.id DESC LIMIT 1) AS last_status FROM drawings d ORDER BY d.id"
+    ).fetchall()
+    conn.close()
+
+    targets = []
+    for did, last_status in rows:
+        if _load_report_data(did) is None:
+            continue
+        if only == "failed" and last_status != "failed":
+            continue
+        if only == "pending" and last_status == "sent":
+            continue
+        targets.append(did)
+
+    results = []
+    loop = asyncio.get_event_loop()
+    for did in targets:
+        results.append(await loop.run_in_executor(None, _push_one, did))
+
+    summary = {"total": len(results), "sent": 0, "failed": 0, "simulated": 0, "results": results}
+    for r in results:
+        if r["status"] in summary:
+            summary[r["status"]] += 1
+    return summary
+
+
+@app.get("/erp/pushes")
+def erp_pushes(_user: dict = Depends(require_auth)):
+    """ERP push history — latest attempt per drawing."""
+    return _list_erp_pushes()
+
+
+@app.get("/export/project/excel")
+def export_project_excel(_user: dict = Depends(require_auth)):
+    """Combined Excel workbook for every drawing: a Summary sheet plus all extractions."""
+    import openpyxl
+    from openpyxl.styles import Font, PatternFill, Alignment
+
+    conn = get_conn()
+    drawings = conn.execute(
+        "SELECT id, file_name, project_name, drawing_number, status FROM drawings ORDER BY id"
+    ).fetchall()
+
+    wb = openpyxl.Workbook()
+    header_fill = PatternFill("solid", fgColor="1A2744")
+    header_font = Font(color="FFFFFF", bold=True)
+
+    def _header(ws, cols):
+        for c, h in enumerate(cols, 1):
+            cell = ws.cell(row=1, column=c, value=h)
+            cell.fill = header_fill
+            cell.font = header_font
+            cell.alignment = Alignment(horizontal="center")
+
+    # Sheet 1 — Summary (one row per drawing)
+    ws1 = wb.active
+    ws1.title = "Summary"
+    _header(ws1, ["Drawing ID", "File", "Project", "Drawing No.", "Status",
+                  "Avg Confidence", "Fields Populated", "ERP Status"])
+    r = 2
+    for did, fname, project, dno, status in drawings:
+        ext = conn.execute(
+            "SELECT confidence, field_value FROM extractions WHERE drawing_id=?", (did,)
+        ).fetchall()
+        confs = [c for c, _ in ext if c is not None]
+        populated = sum(1 for _, v in ext if v not in (None, "", "null"))
+        avg = sum(confs) / len(confs) if confs else None
+        last_push = conn.execute(
+            "SELECT status FROM erp_pushes WHERE drawing_id=? ORDER BY id DESC LIMIT 1", (did,)
+        ).fetchone()
+        ws1.cell(row=r, column=1, value=did)
+        ws1.cell(row=r, column=2, value=fname)
+        ws1.cell(row=r, column=3, value=project or "—")
+        ws1.cell(row=r, column=4, value=dno or "—")
+        ws1.cell(row=r, column=5, value=status)
+        ws1.cell(row=r, column=6, value=f"{avg:.0%}" if avg is not None else "—")
+        ws1.cell(row=r, column=7, value=populated)
+        ws1.cell(row=r, column=8, value=(last_push[0] if last_push else "—"))
+        r += 1
+    for c in range(1, 9):
+        ws1.column_dimensions[ws1.cell(row=1, column=c).column_letter].width = 20
+
+    # Sheet 2 — All Extractions (every field across every drawing)
+    ws2 = wb.create_sheet("All Extractions")
+    _header(ws2, ["Drawing ID", "Field", "Value", "Confidence", "Validated"])
+    r = 2
+    for did, *_rest in drawings:
+        for fname, fval, fconf, fvalid in conn.execute(
+            "SELECT field_name, field_value, confidence, validated FROM extractions WHERE drawing_id=?",
+            (did,)
+        ).fetchall():
+            ws2.cell(row=r, column=1, value=did)
+            ws2.cell(row=r, column=2, value=fname)
+            ws2.cell(row=r, column=3, value=fval)
+            ws2.cell(row=r, column=4, value=f"{fconf:.0%}" if fconf is not None else "—")
+            ws2.cell(row=r, column=5, value="Yes" if fvalid else "No")
+            r += 1
+    for c, w in zip(range(1, 6), [12, 26, 40, 14, 12]):
+        ws2.column_dimensions[ws2.cell(row=1, column=c).column_letter].width = w
+
+    conn.close()
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    return StreamingResponse(
+        buf,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": 'attachment; filename="erp_realsoft_all_drawings.xlsx"'},
     )
 
 

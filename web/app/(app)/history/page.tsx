@@ -9,6 +9,9 @@ import type { DrawingSummary } from "@/lib/types";
 export default function HistoryPage() {
   const [drawings, setDrawings] = useState<DrawingSummary[] | null>(null);
   const [error, setError] = useState(false);
+  const [transferring, setTransferring] = useState(false);
+  const [transferMsg, setTransferMsg] = useState<string | null>(null);
+  const [sendingId, setSendingId] = useState<number | null>(null);
 
   function load() {
     setError(false);
@@ -21,6 +24,38 @@ export default function HistoryPage() {
 
   useEffect(load, []);
 
+  async function transferAll() {
+    setTransferring(true);
+    setTransferMsg(null);
+    try {
+      const r = await fetch("/api/erp/push-all", { method: "POST" });
+      const j = await r.json().catch(() => null);
+      setTransferMsg(
+        r.ok && j
+          ? `Transferred ${j.total}: ${j.sent} sent, ${j.failed} failed, ${j.simulated} simulated.`
+          : "Transfer failed.",
+      );
+    } catch {
+      setTransferMsg("Transfer failed — backend unreachable.");
+    } finally {
+      setTransferring(false);
+    }
+  }
+
+  async function sendOne(did: number) {
+    setSendingId(did);
+    setTransferMsg(null);
+    try {
+      const r = await fetch(`/api/erp/push/${did}`, { method: "POST" });
+      const j = await r.json().catch(() => null);
+      setTransferMsg(r.ok && j ? `#${did}: ${j.message || j.status}` : `#${did}: transfer failed.`);
+    } catch {
+      setTransferMsg(`#${did}: transfer failed — backend unreachable.`);
+    } finally {
+      setSendingId(null);
+    }
+  }
+
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-center gap-3">
@@ -31,10 +66,18 @@ export default function HistoryPage() {
         <Link href="/report/project">
           <Button variant="secondary">📊 Project Summary Report</Button>
         </Link>
-        <a href="/api/report/project/pdf" download="erp_realsoft_project_report.pdf" target="_blank" rel="noreferrer">
-          <Button variant="primary">⬇️ Project PDF</Button>
+        <a href="/api/export/project/excel">
+          <Button variant="secondary">📊 All Excel</Button>
         </a>
+        <a href="/api/report/project/pdf" download="erp_realsoft_project_report.pdf" target="_blank" rel="noreferrer">
+          <Button variant="secondary">⬇️ Project PDF</Button>
+        </a>
+        <Button variant="primary" onClick={transferAll} disabled={transferring}>
+          {transferring ? "Transferring…" : "🚀 Transfer all"}
+        </Button>
       </div>
+
+      {transferMsg && <p className="text-sm text-accent-orange-light">{transferMsg}</p>}
 
       {error && <p className="text-result-fail">Backend not reachable.</p>}
       {!drawings && !error && <p className="text-muted">Loading…</p>}
@@ -85,6 +128,13 @@ export default function HistoryPage() {
               <Link href={`/report/${d.id}`}>
                 <Button variant="secondary">📄 Report</Button>
               </Link>
+              <Button
+                variant="secondary"
+                onClick={() => sendOne(d.id)}
+                disabled={sendingId === d.id}
+              >
+                {sendingId === d.id ? "Sending…" : "🚀 Send to RealSoft"}
+              </Button>
             </div>
           </details>
         ))}

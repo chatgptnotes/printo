@@ -500,7 +500,10 @@ def _guess_media_type(name: str) -> str:
     return {
         ".pdf": "application/pdf", ".jpg": "image/jpeg", ".jpeg": "image/jpeg",
         ".png": "image/png", ".tiff": "image/tiff", ".tif": "image/tiff",
-    }.get(suffix, "image/png")
+        # CAD formats — the backend re-derives handling from the suffix and
+        # renders these to an image, so the exact MIME here is informational.
+        ".dwg": "image/vnd.dwg", ".dxf": "image/vnd.dxf", ".dwf": "model/vnd.dwf",
+    }.get(suffix, "application/octet-stream")
 
 
 # ── Interactive 3D hero visual (Three.js — drag to rotate, scroll to zoom) ────
@@ -813,7 +816,7 @@ if st.session_state.active_tab == "Upload":
                 '<div class="sec-title">From drawing to ERP in four steps</div>',
                 unsafe_allow_html=True)
     steps = [
-        ("1", "Upload", "Drop a PDF or image of any architectural drawing."),
+        ("1", "Upload", "Drop a PDF, image, or CAD file (DWG/DXF/DWF) of any architectural drawing."),
         ("2", "AI Extract", "Claude Vision reads the title block & plan into structured data."),
         ("3", "Validate", "18 ClearSoft rules check completeness & confidence."),
         ("4", "Push to ERP", "Mapped to RealSoft format and pushed — with a full report."),
@@ -847,10 +850,10 @@ if st.session_state.active_tab == "Upload":
         st.markdown('<div class="sec-rule">📤 Or upload your own</div>', unsafe_allow_html=True)
         floor_cat = st.selectbox("Floor / Category", FLOOR_CATEGORIES)
         uploaded = st.file_uploader(
-            "Select drawing (PDF / JPG / PNG / TIFF)",
-            type=["pdf", "jpg", "jpeg", "png", "tiff"],
+            "Select drawing (PDF / JPG / PNG / TIFF / DWG / DXF / DWF)",
+            type=["pdf", "jpg", "jpeg", "png", "tiff", "dwg", "dxf", "dwf"],
         )
-        st.markdown('<div class="sample-cap">Max 20 MB · floor plans, sections, elevations</div>',
+        st.markdown('<div class="sample-cap">Max 20 MB · PDF, image, or CAD (DWG/DXF/DWF) · floor plans, sections, elevations</div>',
                     unsafe_allow_html=True)
         if st.button("🚀  Process Drawing", type="primary", use_container_width=True,
                      disabled=uploaded is None):

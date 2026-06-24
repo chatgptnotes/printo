@@ -78,12 +78,29 @@ def init_db():
 
     # Migrate existing drawings table — add new columns if they don't exist
     existing_cols = {row[1] for row in conn.execute("PRAGMA table_info(drawings)").fetchall()}
+    newly_added = []
     for col, typedef in [
-        ("drawing_title",  "TEXT"),
-        ("floor_category", "TEXT DEFAULT 'Other'"),
+        ("drawing_title",   "TEXT"),
+        ("floor_category",  "TEXT DEFAULT 'Other'"),
+        # Human-in-the-loop verification gate: a drawing waits in 'pending_review'
+        # until a user cross-verifies the extraction, edits it, and approves —
+        # only then is it pushed to ERP and the final summary generated.
+        ("review_status",   "TEXT DEFAULT 'pending_review'"),
+        ("approved_by",     "TEXT"),
+        ("approved_at",     "TIMESTAMP"),
+        ("summary_override","TEXT"),
     ]:
         if col not in existing_cols:
             conn.execute(f"ALTER TABLE drawings ADD COLUMN {col} {typedef}")
+            newly_added.append(col)
+
+    # Legacy rows processed before the verification gate existed are already
+    # final — mark them approved so they don't resurface as "pending review".
+    if "review_status" in newly_added:
+        conn.execute(
+            "UPDATE drawings SET review_status='approved' "
+            "WHERE status IN ('done','error','blurred','timeout')"
+        )
 
     conn.commit()
     conn.close()

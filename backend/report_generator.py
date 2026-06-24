@@ -12,6 +12,7 @@ audit trail, ERP payload.
 """
 
 import datetime
+from html import escape
 
 
 # ── small helpers ─────────────────────────────────────────────────────────────
@@ -116,6 +117,35 @@ def quality_score(extracted: dict, rule_results: list) -> tuple[int, str, str]:
     if score >= 50:
         return score, "Fair", "#d97706"
     return score, "Needs Review", "#dc2626"
+
+
+def plain_summary(drawing_meta, extracted, rule_results, verdict) -> str:
+    """Plain-text executive summary — the editable draft a user reviews and approves
+    before the final report is generated. Mirrors the HTML summary in generate_report
+    without markup, so it round-trips cleanly through an editable textarea."""
+    conf = extracted.get("confidence", {}) or {}
+    field_count = sum(1 for k, v in extracted.items()
+                      if k != "confidence" and v not in (None, [], "", False))
+    conf_values = [v for v in conf.values() if v is not None]
+    avg_conf = sum(conf_values) / len(conf_values) if conf_values else 0.0
+    passed_rules = sum(1 for r in rule_results if r.passed)
+    total_rules = len(rule_results)
+    error_count = sum(1 for r in rule_results if not r.passed and r.severity == "ERROR")
+    warn_count = sum(1 for r in rule_results if not r.passed and r.severity == "WARNING")
+    score, score_label, _ = quality_score(extracted, rule_results)
+
+    floor_cat = (drawing_meta or {}).get("floor_category") or ""
+    num = extracted.get("drawing_number") or "no number"
+    title = extracted.get("drawing_title")
+    proj = extracted.get("project_name") or "—"
+    title_part = f", {title}" if title else ""
+    return (
+        f"This {floor_cat.lower() + ' ' if floor_cat else ''}drawing "
+        f"({num}{title_part}) for project {proj} yielded {field_count} populated "
+        f"fields at {avg_conf:.0%} average confidence. {passed_rules} of {total_rules} "
+        f"validation rules passed ({error_count} error(s), {warn_count} warning(s)). "
+        f"Overall extraction quality is rated {score_label} ({score}/100)."
+    )
 
 
 def _display_val(val):
@@ -230,7 +260,9 @@ _BASE_CSS = """
 
 
 def generate_report(drawing_meta, extracted, rule_results, verdict, elapsed,
-                    erp_payload, corrections=None, thumbnail_uri=None):
+                    erp_payload, corrections=None, thumbnail_uri=None,
+                    approved=True, summary_override=None,
+                    approved_by=None, approved_at=None):
     conf = extracted.get("confidence", {}) or {}
     vcolor, vtag, vtext = _verdict_style(verdict)
     generated_at = datetime.datetime.now().strftime("%d %b %Y, %H:%M")
@@ -260,6 +292,31 @@ def generate_report(drawing_meta, extracted, rule_results, verdict, elapsed,
         f"({error_count} error(s), {warn_count} warning(s)). Overall extraction quality is "
         f"rated <strong style=\"color:{score_color}\">{score_label} ({score}/100)</strong>."
     )
+
+    # A user-approved summary overrides the auto-generated one (escaped, newlines kept).
+    if summary_override:
+        summary = escape(str(summary_override)).replace("\n", "<br>")
+
+    # Draft / approval banners — communicate verification state at the top of the report.
+    draft_banner = ""
+    if not approved:
+        draft_banner = (
+            '<div style="background-color:#fef3c7;color:#92400e;padding:9px 24px;'
+            'font-size:12px;font-weight:bold;border-bottom:2px solid #f59e0b;">'
+            '&#9208; DRAFT — AWAITING HUMAN VERIFICATION &amp; APPROVAL '
+            '(not yet pushed to ERP)</div>'
+        )
+    approval_line = ""
+    if approved and approved_by:
+        when = str(approved_at or "")[:16].replace("T", " ")
+        approval_line = (
+            '<div style="background-color:#dcfce7;color:#166534;padding:9px 24px;'
+            'font-size:12px;font-weight:bold;border-bottom:2px solid #16a34a;">'
+            f'&#10003; Verified &amp; approved by {escape(str(approved_by))}'
+            f'{(" on " + when) if when else ""}</div>'
+        )
+    erp_title = ("ERP Payload — RealSoft (simulation)" if approved
+                 else "ERP Payload — RealSoft (preview — not yet pushed)")
 
     # field group rows
     field_sections_html = ""
@@ -332,6 +389,8 @@ def generate_report(drawing_meta, extracted, rule_results, verdict, elapsed,
   <div class="verdict-bar" style="background-color:{vcolor};">[{vtag}] EXTRACTION {vtext}
     &nbsp;|&nbsp; {elapsed}s</div>
 
+  {draft_banner}{approval_line}
+
   <!-- Exec summary + quality score -->
   <div class="section">
     <h2 class="section-title">Executive Summary</h2>
@@ -373,7 +432,7 @@ def generate_report(drawing_meta, extracted, rule_results, verdict, elapsed,
   {_corrections_html(corrections)}
 
   <div class="section">
-    <h2 class="section-title">ERP Payload — RealSoft (simulation)</h2>
+    <h2 class="section-title">{erp_title}</h2>
     {erp_note}
     <table class="data-table"><thead><tr><th>ERP Field</th><th>Value</th></tr></thead>
       <tbody>{erp_rows}</tbody></table>
