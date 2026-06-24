@@ -111,6 +111,28 @@ export default function ResultsPage({ params }: { params: { id: string } }) {
     );
   }
 
+  // A pending drawing with no extracted fields means the pipeline failed before
+  // producing an extraction (timeout / AI error) — there is nothing to verify.
+  const fieldCount = Object.keys(review.extracted || {}).filter(
+    (k) => k !== "confidence" && k !== "field_locations",
+  ).length;
+  if (review.review_status === "pending_review" && fieldCount === 0) {
+    return (
+      <div className="space-y-4">
+        <div className="rounded-xl border border-result-fail/40 bg-result-fail/10 px-5 py-4 font-extrabold text-[#fca5a5]">
+          ⚠️ EXTRACTION DID NOT COMPLETE
+        </div>
+        <p className="text-muted">
+          This drawing could not be processed{review.status ? ` (status: ${review.status})` : ""}.
+          Please re-upload and try again.
+        </p>
+        <Link href="/">
+          <Button variant="primary">← Upload another drawing</Button>
+        </Link>
+      </div>
+    );
+  }
+
   // Pending verification — editable cross-verify screen (no ERP push / summary yet).
   if (review.review_status === "pending_review") {
     return <ReviewEditor data={review} username={username} onApproved={handleApproved} />;
