@@ -142,6 +142,18 @@ _BASE_CSS = """
   .field-name { color: #475569; width: 38%; }
   .group-header td { background-color: #fff3e2; font-weight: bold; color: #b45309;
      font-size: 10px; padding: 6px 9px; }
+  .bill-band { background-color: #1a2744; color: #ffffff; font-weight: bold;
+     font-size: 11px; padding: 7px 10px; margin-top: 14px; }
+  .bill-band span { color: #F7941D; }
+  .boq td { vertical-align: top; }
+  .boq .num { color: #94a3b8; text-align: center; }
+  .boq .ralign { text-align: right; }
+  .boq .calign { text-align: center; }
+  .subtotal td { background-color: #f1f5f9; font-weight: bold; color: #1a2744;
+     font-size: 10px; }
+  .billsum td { font-size: 10px; }
+  .billsum .total { text-align: right; color: #cbd5e1; }
+  .grand td { background-color: #fff3e2; font-weight: bold; color: #b45309; }
   .badge { padding: 1px 7px; border-radius: 9px; font-size: 9.5px; font-weight: bold; }
   .badge-green { background-color: #dcfce7; color: #16a34a; }
   .badge-amber { background-color: #fef3c7; color: #d97706; }
@@ -167,31 +179,81 @@ def _title_block_rows(extracted: dict) -> str:
     return rows or '<tr><td colspan="2" class="muted">No title-block fields detected.</td></tr>'
 
 
+def _bill_table_head() -> str:
+    # Per-line tables stay at four columns (#, Description, Unit, Qty): xhtml2pdf
+    # renders a four-column table inside a padded section reliably but crashes on
+    # six. Rate / Amount and the commercial roll-up live in the Summary of Bills
+    # block below and (with live formulas) in the Excel workbook. Only the side
+    # columns get fixed widths; Description is width-less so it takes the rest.
+    return (
+        '<table class="data-table boq"><thead><tr>'
+        '<th style="width:30px">#</th><th>Description</th>'
+        '<th style="width:64px">Unit</th><th style="width:88px">Qty</th>'
+        '</tr></thead><tbody>'
+    )
+
+
 def _boq_table_html(extracted: dict) -> str:
+    """Bill of Quantities rendered the industry way: one Bill per trade section,
+    Item / Description / Reference / Unit / Qty / Rate / Amount, a sub-total per
+    Bill, then a Summary of Bills. Rates are left for pricing (use the Excel
+    workbook for live totals)."""
     items = _boq_items(extracted)
     if not items:
         return ('<div class="section"><h2 class="section-title">Bill of Quantities</h2>'
                 '<p class="muted">No BOQ line items were extracted from this drawing.</p></div>')
-    rows, n = "", 0
-    for sec in _boq_sections(extracted):
-        rows += f'<tr class="group-header"><td colspan="4">{escape(sec)}</td></tr>'
-        for it in items:
-            if ((it.get("section") or "General").strip() or "General") != sec:
-                continue
-            n += 1
+
+    sections = _boq_sections(extracted)
+
+    bills_html = ""
+    summary_rows = ""
+    for bill_no, sec in enumerate(sections, 1):
+        sec_items = [it for it in items
+                     if ((it.get("section") or "General").strip() or "General") == sec]
+        rows = ""
+        for k, it in enumerate(sec_items, 1):
             rows += (
-                f'<tr><td style="text-align:center;">{n}</td>'
+                f'<tr><td class="num">{bill_no}.{k}</td>'
                 f'<td>{escape(_display_val(it.get("description")))}</td>'
-                f'<td style="text-align:center;">{escape(_display_val(it.get("unit")))}</td>'
-                f'<td style="text-align:right;">{escape(_display_val(it.get("quantity")))}</td></tr>'
+                f'<td class="calign">{escape(_display_val(it.get("unit")))}</td>'
+                f'<td class="ralign">{escape(_display_val(it.get("quantity")))}</td></tr>'
             )
+        bills_html += (
+            f'<div class="bill-band">BILL No. {bill_no} <span>|</span> {escape(sec)} '
+            f'<span style="float:right;font-weight:normal;">{len(sec_items)} item(s)</span></div>'
+            f'{_bill_table_head()}{rows}</tbody></table>'
+        )
+        summary_rows += (
+            f'<tr><td class="calign">{bill_no}</td><td>{escape(sec)}</td>'
+            f'<td class="calign">Bill {bill_no}</td><td class="total">—</td></tr>'
+        )
+
+    summary_html = (
+        '<div class="bill-band" style="margin-top:18px;">SUMMARY OF BILLS</div>'
+        '<table class="data-table billsum"><thead><tr>'
+        '<th style="width:36px">Bill</th><th>Description</th>'
+        '<th style="width:66px">Sheet</th><th style="width:110px">Bill Total (AED)</th>'
+        f'</tr></thead><tbody>{summary_rows}'
+        '<tr class="subtotal"><td colspan="3" style="text-align:right;">'
+        'Sub-Total of Bills (excl. VAT)</td><td class="total">—</td></tr>'
+        '<tr class="billsum"><td colspan="3" style="text-align:right;">Contingency (10%)</td>'
+        '<td class="total">—</td></tr>'
+        '<tr class="billsum"><td colspan="3" style="text-align:right;">VAT (5%)</td>'
+        '<td class="total">—</td></tr>'
+        '<tr class="grand"><td colspan="3" style="text-align:right;">'
+        'GRAND TOTAL (incl. VAT)</td><td class="ralign">—</td></tr>'
+        '</tbody></table>'
+    )
+
     return (
         '<div class="section"><h2 class="section-title">Bill of Quantities '
-        f'<span class="muted">({len(items)} item(s))</span></h2>'
-        '<table class="data-table"><thead><tr>'
-        '<th style="width:34px">#</th><th>Description</th>'
-        '<th style="width:78px">Unit</th><th style="width:96px">Quantity</th>'
-        f'</tr></thead><tbody>{rows}</tbody></table></div>'
+        f'<span class="muted">({len(items)} item(s) &middot; {len(sections)} bill(s))</span></h2>'
+        '<p class="muted" style="margin:0 0 8px;font-size:9.5px;">'
+        'Quantities taken off the approved drawing, grouped into priced Bills by trade. '
+        'Unit rates, line amounts and Bill totals are in the downloadable Excel '
+        'workbook (live auto-totalling formulas); the Summary of Bills below shows the '
+        'commercial roll-up.</p>'
+        f'{bills_html}{summary_html}</div>'
     )
 
 

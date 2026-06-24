@@ -3,6 +3,7 @@ import datetime
 import io
 import json
 import os
+import re
 import shutil
 import sqlite3
 import time
@@ -25,6 +26,7 @@ from realsoft_mapper import map_to_realsoft, average_confidence
 from realsoft_client import push_to_realsoft, ping_realsoft, RealSoftAPIError
 from report_generator import (generate_report, generate_project_report,
                               html_to_pdf_bytes, plain_summary)
+from boq_excel import build_boq_workbook, build_project_workbook
 from auth import (verify_login, create_token, require_auth,
                   is_locked, record_failure, clear_failures)
 from ai_provider import gateway_erp_map
@@ -982,69 +984,31 @@ def get_report_pdf(drawing_id: int, _user: dict = Depends(require_auth)):
 
 @app.get("/export/{drawing_id:int}/excel")
 def export_excel(drawing_id: int, _user: dict = Depends(require_auth)):
-    import openpyxl
-    from openpyxl.styles import Font, PatternFill, Alignment
+    """Industry-format Bill of Quantities workbook for one drawing.
 
-    conn = get_conn()
-    drawing = conn.execute("SELECT * FROM drawings WHERE id=?", (drawing_id,)).fetchone()
-    if not drawing:
-        conn.close()
-        raise HTTPException(404, "Drawing not found")
-    extractions = conn.execute(
-        "SELECT field_name, field_value, confidence, validated FROM extractions WHERE drawing_id=?",
-        (drawing_id,)
-    ).fetchall()
-    exceptions = conn.execute(
-        "SELECT rule_id, field_name, reason, severity, resolved FROM exceptions WHERE drawing_id=?",
-        (drawing_id,)
-    ).fetchall()
-    conn.close()
+    Cover -> one Bill sheet per trade section (Item/Description/Reference/Unit/
+    Qty/Rate/Amount with live formulas) -> Summary of Bills (cross-sheet totals,
+    contingency, VAT, grand total). Built from the same stored report data + human
+    corrections that drive the PDF, so the two deliverables always agree.
+    """
+    data = _load_report_data(drawing_id)
+    if not data:
+        raise HTTPException(404, "BOQ not yet generated — process the drawing first")
 
-    wb = openpyxl.Workbook()
+    extracted = _apply_corrections(drawing_id, dict(data.get("extracted") or {}))
+    data = {**data, "extracted": extracted}
+    review_status, approved_by, approved_at = _approval_state(drawing_id)
 
-    # Sheet 1 — Extraction
-    ws1 = wb.active
-    ws1.title = "Extraction"
-    header_fill = PatternFill("solid", fgColor="1A2744")
-    header_font = Font(color="FFFFFF", bold=True)
-    headers = ["Field", "Extracted Value", "Confidence", "Validated"]
-    for col, h in enumerate(headers, 1):
-        cell = ws1.cell(row=1, column=col, value=h)
-        cell.fill = header_fill
-        cell.font = header_font
-        cell.alignment = Alignment(horizontal="center")
-    for row_idx, (fname, fval, fconf, fval_flag) in enumerate(extractions, 2):
-        ws1.cell(row=row_idx, column=1, value=fname)
-        ws1.cell(row=row_idx, column=2, value=fval)
-        ws1.cell(row=row_idx, column=3,
-                 value=f"{fconf:.0%}" if fconf is not None else "—")
-        ws1.cell(row=row_idx, column=4, value="Yes" if fval_flag else "No")
-    for col in [1, 2, 3, 4]:
-        ws1.column_dimensions[ws1.cell(row=1, column=col).column_letter].width = 28
-
-    # Sheet 2 — Validation
-    ws2 = wb.create_sheet("Validation")
-    for col, h in enumerate(["Rule ID", "Field", "Message", "Severity", "Resolved"], 1):
-        cell = ws2.cell(row=1, column=col, value=h)
-        cell.fill = header_fill
-        cell.font = header_font
-    for row_idx, (rid, fname, reason, sev, resolved) in enumerate(exceptions, 2):
-        ws2.cell(row=row_idx, column=1, value=rid)
-        ws2.cell(row=row_idx, column=2, value=fname)
-        ws2.cell(row=row_idx, column=3, value=reason)
-        ws2.cell(row=row_idx, column=4, value=sev)
-        ws2.cell(row=row_idx, column=5, value="Yes" if resolved else "No")
-    for col in [1, 2, 3, 4, 5]:
-        ws2.column_dimensions[ws2.cell(row=1, column=col).column_letter].width = 24
-
-    buf = io.BytesIO()
-    wb.save(buf)
-    buf.seek(0)
-    fname_safe = f"erp_realsoft_drawing_{drawing_id}.xlsx"
+    xlsx = build_boq_workbook(
+        data, approved=(review_status == "approved"),
+        approved_by=approved_by, approved_at=approved_at,
+    )
+    dno = (extracted.get("drawing_number") or f"drawing_{drawing_id}")
+    safe = re.sub(r"[^A-Za-z0-9._-]+", "_", str(dno)).strip("_") or f"drawing_{drawing_id}"
     return StreamingResponse(
-        buf,
+        io.BytesIO(xlsx),
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": f'attachment; filename="{fname_safe}"'},
+        headers={"Content-Disposition": f'attachment; filename="BOQ_{safe}.xlsx"'},
     )
 
 
@@ -1174,80 +1138,34 @@ def erp_pushes(_user: dict = Depends(require_auth)):
 
 @app.get("/export/project/excel")
 def export_project_excel(_user: dict = Depends(require_auth)):
-    """Combined Excel workbook for every drawing: a Summary sheet plus all extractions."""
-    import openpyxl
-    from openpyxl.styles import Font, PatternFill, Alignment
-
+    """Combined BOQ workbook across every drawing: an Overview sheet + one
+    consolidated, filterable line-item sheet (Drawing/Section/Item/Description/
+    Unit/Qty/Rate/Amount) so a whole portfolio can be priced in one place."""
     conn = get_conn()
-    drawings = conn.execute(
-        "SELECT id, file_name, project_name, drawing_number, status FROM drawings ORDER BY id"
+    rows = conn.execute(
+        "SELECT id, file_name, project_name, drawing_number, drawing_title, floor_category "
+        "FROM drawings ORDER BY id"
     ).fetchall()
-
-    wb = openpyxl.Workbook()
-    header_fill = PatternFill("solid", fgColor="1A2744")
-    header_font = Font(color="FFFFFF", bold=True)
-
-    def _header(ws, cols):
-        for c, h in enumerate(cols, 1):
-            cell = ws.cell(row=1, column=c, value=h)
-            cell.fill = header_fill
-            cell.font = header_font
-            cell.alignment = Alignment(horizontal="center")
-
-    # Sheet 1 — Summary (one row per drawing)
-    ws1 = wb.active
-    ws1.title = "Summary"
-    _header(ws1, ["Drawing ID", "File", "Project", "Drawing No.", "Status",
-                  "Avg Confidence", "Fields Populated", "ERP Status"])
-    r = 2
-    for did, fname, project, dno, status in drawings:
-        ext = conn.execute(
-            "SELECT confidence, field_value FROM extractions WHERE drawing_id=?", (did,)
-        ).fetchall()
-        confs = [c for c, _ in ext if c is not None]
-        populated = sum(1 for _, v in ext if v not in (None, "", "null"))
-        avg = sum(confs) / len(confs) if confs else None
-        last_push = conn.execute(
-            "SELECT status FROM erp_pushes WHERE drawing_id=? ORDER BY id DESC LIMIT 1", (did,)
-        ).fetchone()
-        ws1.cell(row=r, column=1, value=did)
-        ws1.cell(row=r, column=2, value=fname)
-        ws1.cell(row=r, column=3, value=project or "—")
-        ws1.cell(row=r, column=4, value=dno or "—")
-        ws1.cell(row=r, column=5, value=status)
-        ws1.cell(row=r, column=6, value=f"{avg:.0%}" if avg is not None else "—")
-        ws1.cell(row=r, column=7, value=populated)
-        ws1.cell(row=r, column=8, value=(last_push[0] if last_push else "—"))
-        r += 1
-    for c in range(1, 9):
-        ws1.column_dimensions[ws1.cell(row=1, column=c).column_letter].width = 20
-
-    # Sheet 2 — All Extractions (every field across every drawing)
-    ws2 = wb.create_sheet("All Extractions")
-    _header(ws2, ["Drawing ID", "Field", "Value", "Confidence", "Validated"])
-    r = 2
-    for did, *_rest in drawings:
-        for fname, fval, fconf, fvalid in conn.execute(
-            "SELECT field_name, field_value, confidence, validated FROM extractions WHERE drawing_id=?",
-            (did,)
-        ).fetchall():
-            ws2.cell(row=r, column=1, value=did)
-            ws2.cell(row=r, column=2, value=fname)
-            ws2.cell(row=r, column=3, value=fval)
-            ws2.cell(row=r, column=4, value=f"{fconf:.0%}" if fconf is not None else "—")
-            ws2.cell(row=r, column=5, value="Yes" if fvalid else "No")
-            r += 1
-    for c, w in zip(range(1, 6), [12, 26, 40, 14, 12]):
-        ws2.column_dimensions[ws2.cell(row=1, column=c).column_letter].width = w
-
     conn.close()
-    buf = io.BytesIO()
-    wb.save(buf)
-    buf.seek(0)
+
+    drawings = []
+    for did, fname, project, dno, dtitle, floor in rows:
+        data = _load_report_data(did)
+        if data:
+            extracted = _apply_corrections(did, dict(data.get("extracted") or {}))
+        else:
+            extracted = {"drawing_number": dno, "drawing_title": dtitle,
+                         "project_name": project}
+        drawings.append({
+            "id": did, "file_name": fname, "floor_category": floor,
+            "extracted": extracted,
+        })
+
+    xlsx = build_project_workbook(drawings)
     return StreamingResponse(
-        buf,
+        io.BytesIO(xlsx),
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": 'attachment; filename="erp_realsoft_all_drawings.xlsx"'},
+        headers={"Content-Disposition": 'attachment; filename="Project_BOQ.xlsx"'},
     )
 
 

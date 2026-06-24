@@ -182,12 +182,17 @@ export default function ResultsPage({ params }: { params: { id: string } }) {
             <Button variant="secondary">⬇️ Download PDF</Button>
           </a>
           <a href={`/api/export/${id}/excel`}>
-            <Button variant="secondary">📊 Excel</Button>
+            <Button variant="secondary">📊 Download Excel (BOQ)</Button>
           </a>
           <Button variant="secondary" onClick={sendToErp} disabled={erpSending}>
             {erpSending ? "Sending…" : "🚀 Re-send to RealSoft"}
           </Button>
         </div>
+        <p className="mt-3 text-xs text-muted">
+          The Excel workbook is a full multi-sheet Bill of Quantities (Cover · one
+          sheet per trade · Summary) with live rate/amount formulas — type unit rates
+          and every total recalculates automatically.
+        </p>
         {erpMsg && <p className="mt-3 text-xs text-accent-orange-light">{erpMsg}</p>}
       </Card>
     </div>
