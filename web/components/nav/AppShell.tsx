@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/Button";
 function Logo() {
   return (
     <div className="text-xl font-black tracking-wide">
-      PRIN<span className="text-accent-orange">TO</span>
+      ERP <span className="text-accent-orange">RealSoft</span>
     </div>
   );
 }

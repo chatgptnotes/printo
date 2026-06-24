@@ -68,7 +68,7 @@ export default function UploadPage() {
             <span className="text-grad">Read &amp; Verified</span> by AI
           </h1>
           <p className="mt-3 max-w-md text-muted">
-            Upload an approved drawing — Printo extracts the title block, validates
+            Upload an approved drawing — ERP RealSoft extracts the title block, validates
             it against 18 rules, and pushes clean data to RealSoft.
           </p>
           <div className="mt-5 flex gap-6 text-sm">

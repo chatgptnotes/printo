@@ -31,7 +31,7 @@ export default function HistoryPage() {
         <Link href="/report/project">
           <Button variant="secondary">📊 Project Summary Report</Button>
         </Link>
-        <a href="/api/report/project/pdf" download="printo_project_report.pdf" target="_blank" rel="noreferrer">
+        <a href="/api/report/project/pdf" download="erp_realsoft_project_report.pdf" target="_blank" rel="noreferrer">
           <Button variant="primary">⬇️ Project PDF</Button>
         </a>
       </div>

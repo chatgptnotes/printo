@@ -13,7 +13,7 @@ ROOT_DIR = Path(__file__).parent.parent
 SAMPLE_DIR = ROOT_DIR / "test_drawings"
 
 st.set_page_config(
-    page_title="Printo — Drawing Intelligence",
+    page_title="ERP RealSoft — Drawing Intelligence",
     page_icon="📐",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -330,7 +330,7 @@ def render_login():
     st.markdown("""
     <div style="text-align:center;margin:6vh 0 0;">
       <div style="font-size:30px;font-weight:900;color:#fff;letter-spacing:.5px;">
-        PRIN<span style="color:#F7941D">TO</span></div>
+        ERP <span style="color:#F7941D">RealSoft</span></div>
       <div style="color:#94a3b8;font-size:13px;margin-top:2px;">
         AI Drawing Intelligence — please sign in</div>
     </div>
@@ -696,7 +696,7 @@ st.markdown("""
 <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
   <div>
     <div style="font-size:24px;font-weight:900;letter-spacing:.5px;color:#fff">
-      PRIN<span style="color:#F7941D">TO</span>
+      ERP <span style="color:#F7941D">RealSoft</span>
       <span style="font-size:13px;font-weight:500;color:#94a3b8;margin-left:8px">
         AI Drawing Intelligence Platform</span>
     </div>
@@ -786,7 +786,7 @@ if st.session_state.active_tab == "Upload":
           <div class="hero-left">
             <div class="badge"><span class="pulse-dot"></span> AI Compliance &amp; Extraction Gateway</div>
             <h1>Construction Drawings,<br><span class="grad">Read &amp; Verified by AI</span></h1>
-            <p class="sub">Drop a floor plan, section, or elevation — Printo extracts the title
+            <p class="sub">Drop a floor plan, section, or elevation — ERP RealSoft extracts the title
             block, room schedule, dimensions and materials, validates against 18 rules, and
             maps it to RealSoft ERP. In seconds, not days.</p>
             <div class="hero-stats">
@@ -1037,7 +1037,7 @@ elif st.session_state.active_tab == "Results":
             pdf_bytes = requests.get(f"{API_URL}/report/{drawing_id}/pdf",
                                      headers=api_headers(), timeout=20).content
             ec2.download_button("⬇️ Download PDF", data=pdf_bytes,
-                                file_name=f"printo_report_{drawing_id}.pdf",
+                                file_name=f"erp_realsoft_report_{drawing_id}.pdf",
                                 mime="application/pdf", use_container_width=True)
         except Exception:
             ec2.button("⬇️ PDF (unavailable)", disabled=True, use_container_width=True)
@@ -1045,7 +1045,7 @@ elif st.session_state.active_tab == "Results":
             excel_bytes = requests.get(f"{API_URL}/export/{drawing_id}/excel",
                                        headers=api_headers(), timeout=10).content
             ec3.download_button("📊 Excel", data=excel_bytes,
-                                file_name=f"printo_drawing_{drawing_id}.xlsx",
+                                file_name=f"erp_realsoft_drawing_{drawing_id}.xlsx",
                                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                                 use_container_width=True)
         except Exception:
@@ -1061,13 +1061,13 @@ elif st.session_state.active_tab == "Report":
 
     if is_project:
         html_path, pdf_path = "/report/project", "/report/project/pdf"
-        pdf_name = "printo_project_report.pdf"
+        pdf_name = "erp_realsoft_project_report.pdf"
     else:
         if not drawing_id:
             st.info("Process a drawing first to view its report.")
             st.stop()
         html_path, pdf_path = f"/report/{drawing_id}", f"/report/{drawing_id}/pdf"
-        pdf_name = f"printo_report_{drawing_id}.pdf"
+        pdf_name = f"erp_realsoft_report_{drawing_id}.pdf"
 
     rt1, rt2 = st.columns([1, 1])
     if rt1.button("🔄 Refresh", use_container_width=True):
@@ -1105,7 +1105,7 @@ elif st.session_state.active_tab == "History":
         proj_pdf = requests.get(f"{API_URL}/report/project/pdf",
                                 headers=api_headers(), timeout=25).content
         hb3.download_button("⬇️ Project PDF", data=proj_pdf,
-                            file_name="printo_project_report.pdf",
+                            file_name="erp_realsoft_project_report.pdf",
                             mime="application/pdf", use_container_width=True)
     except Exception:
         hb3.button("⬇️ Project PDF (unavailable)", disabled=True, use_container_width=True)

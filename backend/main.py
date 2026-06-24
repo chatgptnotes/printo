@@ -47,7 +47,7 @@ def _is_real_credential(val: str | None) -> bool:
 _erp_configured = _is_real_credential(os.getenv("REALSOFT_BASE_URL")) and \
                   _is_real_credential(os.getenv("REALSOFT_API_KEY"))
 
-app = FastAPI(title="Printo API", version="2.0.0")
+app = FastAPI(title="ERP RealSoft API", version="2.0.0")
 
 # Browser CORS. The Next.js frontend talks to this API server-side (BFF proxy), so
 # the browser normally never calls it cross-origin. Keep this configurable for any
@@ -672,7 +672,7 @@ def get_project_report_pdf(_user: dict = Depends(require_auth)):
         raise HTTPException(500, "PDF generation failed")
     return StreamingResponse(
         io.BytesIO(pdf), media_type="application/pdf",
-        headers={"Content-Disposition": 'attachment; filename="printo_project_report.pdf"'})
+        headers={"Content-Disposition": 'attachment; filename="erp_realsoft_project_report.pdf"'})
 
 
 @app.get("/report/{drawing_id}", response_class=HTMLResponse)
@@ -693,7 +693,7 @@ def get_report_pdf(drawing_id: int, _user: dict = Depends(require_auth)):
         raise HTTPException(500, "PDF generation failed")
     return StreamingResponse(
         io.BytesIO(pdf), media_type="application/pdf",
-        headers={"Content-Disposition": f'attachment; filename="printo_report_{drawing_id}.pdf"'})
+        headers={"Content-Disposition": f'attachment; filename="erp_realsoft_report_{drawing_id}.pdf"'})
 
 
 @app.get("/export/{drawing_id}/excel")
@@ -756,7 +756,7 @@ def export_excel(drawing_id: int, _user: dict = Depends(require_auth)):
     buf = io.BytesIO()
     wb.save(buf)
     buf.seek(0)
-    fname_safe = f"printo_drawing_{drawing_id}.xlsx"
+    fname_safe = f"erp_realsoft_drawing_{drawing_id}.xlsx"
     return StreamingResponse(
         buf,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",

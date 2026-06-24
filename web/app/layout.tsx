@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Printo — AI Drawing-to-ERP Gateway",
+  title: "ERP RealSoft — Drawing Intelligence",
   description: "AI compliance & extraction gateway for construction drawings.",
 };
 

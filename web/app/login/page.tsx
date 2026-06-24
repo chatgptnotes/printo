@@ -46,7 +46,7 @@ export default function LoginPage() {
       <div className="w-full max-w-md rounded-2xl border border-border bg-surface p-8 shadow-hero">
         <div className="mb-6 text-center">
           <div className="text-2xl font-black tracking-wide">
-            PRIN<span className="text-accent-orange">TO</span>
+            ERP <span className="text-accent-orange">RealSoft</span>
           </div>
           <p className="mt-1 text-sm text-muted">
             AI Drawing-to-ERP Compliance Gateway
