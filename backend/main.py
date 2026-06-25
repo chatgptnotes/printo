@@ -57,9 +57,9 @@ MAX_FILE_SIZE_MB    = 20
 # Extraction timeout — the gateway runs Claude CLI on the VPS, which is slower
 # than a direct API, so allow more headroom than the original 55s. Configurable.
 EXTRACT_TIMEOUT     = float(os.getenv("EXTRACT_TIMEOUT", "110"))
-# Multi-sheet vision sends every sheet to Claude + a gap-fill re-read, so it needs
-# more headroom than a single-image call. Kept under the 300s SSE/nginx ceiling.
-VISION_EXTRACT_TIMEOUT = float(os.getenv("VISION_EXTRACT_TIMEOUT", "240"))
+# Multi-sheet vision via the gateway (Claude CLI over every sheet) is slow — a
+# single pass observed ~224s. Kept just under the 300s SSE/nginx + Vercel ceiling.
+VISION_EXTRACT_TIMEOUT = float(os.getenv("VISION_EXTRACT_TIMEOUT", "285"))
 
 # ERP simulation mode when credentials are absent or placeholder
 def _is_real_credential(val: str | None) -> bool:

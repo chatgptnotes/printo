@@ -246,6 +246,58 @@ def anthropic_vision_extract(system: str, prompt: str, schema: dict,
     return AnthropicProvider().extract(req)
 
 
+# ── Unified multi-sheet vision: prefer the Printo Gateway (Claude CLI, no API key) ──
+GATEWAY_VISION_TASK = "DRAWTOBOQ_ELECTRICAL_EXTRACT"  # honours a consumer systemPrompt
+
+
+def gateway_vision_ready() -> bool:
+    """Gateway configured (URL set) + client importable."""
+    return bool(_gateway_url()) and _gateway_client() is not None
+
+
+def gateway_vision_extract(system_prompt: str, sheets: list[bytes],
+                           task_id: str = GATEWAY_VISION_TASK) -> dict:
+    """Send ALL sheets to the gateway's vision task with our own prompt as
+    payload.systemPrompt — the gateway runs Claude CLI over the images (no key)."""
+    client = _gateway_client()
+    if client is None:
+        raise SidecarError("printo_gateway_client not installed")
+    files = [(f"sheet_{i + 1}.png", "image/png", b) for i, b in enumerate(sheets) if b]
+    if not files:
+        raise SidecarError("no sheet images to send")
+    try:
+        resp = client.invoke_vision_files(
+            task_id, files, payload={"systemPrompt": system_prompt},
+            use_json=True, timeout=int(_vision_timeout()))
+    except Exception as e:
+        raise SidecarError(f"gateway vision failed: {e}") from e
+
+    parsed = resp.get("parsed") if isinstance(resp, dict) else None
+    if isinstance(parsed, dict) and parsed:
+        return parsed
+    raw = resp.get("stdout") if isinstance(resp, dict) else None
+    if raw:
+        import json as _json
+        from extractor import _repair_json
+        try:
+            return _json.loads(_repair_json(raw))
+        except Exception:
+            pass
+    raise SidecarError("gateway vision returned no parseable JSON")
+
+
+def vision_extract(system: str, prompt: str, sheets: list[bytes],
+                   media_type: str = "image/png", schema: dict | None = None) -> dict:
+    """Multi-sheet vision dispatcher: gateway (Claude CLI, no key) first, then a
+    direct Anthropic call if a key is configured. Raises SidecarError if neither
+    is available (caller falls back to the legacy single-image path)."""
+    if gateway_vision_ready() and sheets:
+        return gateway_vision_extract(system + "\n\n" + prompt, sheets)
+    if anthropic_ready() and sheets:
+        return anthropic_vision_extract(system, prompt, schema or {}, sheets, media_type)
+    raise SidecarError("no vision provider available")
+
+
 # ── Printo Gateway (Hostinger VPS via printo_gateway_client) ──────────────────
 def _gateway_url() -> str:
     return _cfg("PRINTO_GATEWAY_URL")

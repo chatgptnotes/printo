@@ -8,7 +8,7 @@ from prepass import (extract_pdf_text, prepass_extract,
                      build_known_facts_block, ocr_text)
 from schema import validate_and_repair, extraction_json_schema
 from ai_provider import (resolve_provider, ExtractRequest, SidecarError,
-                         anthropic_ready, anthropic_vision_extract)
+                         vision_extract)
 
 
 def _env_bool(name: str, default: bool = False) -> bool:
@@ -315,8 +315,8 @@ def _gap_fill(raw: dict, sheets: list, media_type: str) -> dict:
     if not missing:
         return raw
     try:
-        more = _coerce_raw(anthropic_vision_extract(
-            SYSTEM_PROMPT, _gap_fill_prompt(missing), extraction_json_schema(), sheets, media_type))
+        more = _coerce_raw(vision_extract(
+            SYSTEM_PROMPT, _gap_fill_prompt(missing), sheets, media_type, extraction_json_schema()))
         extra = [e for e in (more.get("boq_items") or []) if isinstance(e, dict)]
         if extra:
             raw["boq_items"] = items + extra
@@ -359,19 +359,23 @@ def extract_drawing_with_prepass(file_path: str, floor_category: str = None,
     schema = extraction_json_schema()
     raw: dict | None = None
 
-    # ── Preferred: multi-sheet vision — send EVERY sheet to Anthropic at once ──
-    if anthropic_ready():
-        try:
-            sheet_set = preprocess.build_sheet_images(file_path)
-            sheets = sheet_set.get("sheets") or ([full_image] if full_image else [])
-            if sheets:
-                raw = _coerce_raw(anthropic_vision_extract(
-                    SYSTEM_PROMPT, prompt, schema, sheets, media_type))
+    # ── Preferred: multi-sheet vision — send every sheet at once. The dispatcher
+    #    prefers the Printo Gateway (Claude CLI, no API key), else a direct key. ──
+    try:
+        max_sheets = _env_int("VISION_MAX_SHEETS", 5)   # gateway accepts up to 5
+        sheet_set = preprocess.build_sheet_images(file_path, max_sheets=max_sheets)
+        sheets = sheet_set.get("sheets") or ([full_image] if full_image else [])
+        if sheets:
+            raw = _coerce_raw(vision_extract(SYSTEM_PROMPT, prompt, sheets, media_type, schema))
+            # Gap-fill is a SECOND vision pass (~doubles latency). The single pass
+            # already enforces per-area completeness via the prompt, so keep this
+            # opt-in (VISION_GAPFILL=1) to stay under the 300s SSE/nginx ceiling.
+            if _env_bool("VISION_GAPFILL", False):
                 raw = _gap_fill(raw, sheets, media_type)
-        except SidecarError:
-            raw = None  # degrade below
+    except SidecarError:
+        raw = None  # no vision provider / call failed — degrade below
 
-    # ── Fallback: legacy single-image sidecar / mock (no key, or vision failed) ──
+    # ── Fallback: legacy single-image sidecar / mock ──
     if raw is None:
         provider, _status = resolve_provider()
 

@@ -98,6 +98,36 @@ def invoke_vision(task_id, source, payload=None, mime=None, filename=None,
     return _send(req, timeout)
 
 
+def invoke_vision_files(task_id, files, payload=None, use_json=None, model=None, timeout=300):
+    """Run a VISION task with MULTIPLE drawing sheets in one call (the gateway
+    accepts up to 5). `files` is a list of (filename, mime, bytes). Templates that
+    honour `payload.systemPrompt` (e.g. DRAWTOBOQ_ELECTRICAL_EXTRACT) let the caller
+    ship its own prompt + schema. Returns the full gateway response dict."""
+    if task_id.upper() in _TEXT_TASKS:
+        raise ValueError(f"{task_id} is a text task — use invoke().")
+    norm = []
+    for fn, mime, data in files:
+        norm.append((fn or "sheet.png", mime or "image/png", bytes(data)))
+    if not norm:
+        raise ValueError("invoke_vision_files requires at least one file")
+
+    fields = {"taskID": task_id}
+    if payload is not None:
+        fields["payload"] = json.dumps(payload)
+    if use_json is not None:
+        fields["useJson"] = "true" if use_json else "false"
+    if model:
+        fields["model"] = model
+
+    body, content_type = _multipart_files(fields, norm)
+    req = urllib.request.Request(
+        f"{GATEWAY_URL}/api/invoke-vision",
+        data=body,
+        headers=_headers({"content-type": content_type}),
+    )
+    return _send(req, timeout)
+
+
 def extract_drawing(source, known_facts=None, model=None, **kw):
     """Convenience: DRAWING_EXTRACT -> the extracted fields dict (or {} )."""
     payload = {"known_facts": known_facts} if known_facts else None
@@ -133,6 +163,26 @@ def _multipart(fields, filename, mime, file_bytes):
     pre.append(f"Content-Type: {mime}\r\n\r\n".encode())
     body = b"".join(pre) + file_bytes + f"\r\n--{boundary}--\r\n".encode()
     return body, f"multipart/form-data; boundary={boundary}"
+
+
+def _multipart_files(fields, files):
+    """Multipart body with N file parts (all named "files", per the gateway's
+    multer.array('files') contract). `files` is a list of (filename, mime, bytes)."""
+    boundary = "----printo-gw-boundary-7f3a2c"
+    parts = []
+    for k, v in fields.items():
+        parts.append(f"--{boundary}\r\n".encode())
+        parts.append(f'Content-Disposition: form-data; name="{k}"\r\n\r\n'.encode())
+        parts.append(f"{v}\r\n".encode())
+    for fn, mime, data in files:
+        parts.append(f"--{boundary}\r\n".encode())
+        parts.append(
+            f'Content-Disposition: form-data; name="files"; filename="{fn}"\r\n'.encode())
+        parts.append(f"Content-Type: {mime}\r\n\r\n".encode())
+        parts.append(data)
+        parts.append(b"\r\n")
+    parts.append(f"--{boundary}--\r\n".encode())
+    return b"".join(parts), f"multipart/form-data; boundary={boundary}"
 
 
 if __name__ == "__main__":
