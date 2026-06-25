@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import type { DonePayload, EventType, StreamEvent } from "@/lib/types";
+import type { DonePayload, EventType } from "@/lib/types";
 
 // Vercel functions cap request bodies at 4.5 MB. Files at or under the cap go
 // to the same-origin BFF `/api/upload` in one request; larger files upload in
@@ -161,52 +161,57 @@ export function useUploadStream() {
           );
         }
       }
-      if (!resp.ok || !resp.body) {
-        const d = await resp.json().catch(() => ({ detail: `Upload failed (HTTP ${resp.status})` }));
-        throw new Error(d.detail || `Upload failed (HTTP ${resp.status})`);
+      const upJson = await resp.json().catch(() => null);
+      if (!resp.ok || !upJson || !upJson.drawing_id) {
+        throw new Error((upJson && upJson.detail) || `Upload failed (HTTP ${resp.status})`);
       }
-      push("Extracting — this can take up to ~90s for large drawings…", "success");
+      const drawingId: number = upJson.drawing_id;
+      push("Extracting — multi-sheet drawings take a few minutes…", "success");
 
-      const reader = resp.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
-      let prog = 0;
+      // The pipeline runs in a background job; poll for step-log lines + the result.
+      let since = 0;
+      let prog = 12;
+      let netFails = 0;
+      const startedAt = Date.now();
+      const MAX_POLL_MS = 30 * 60 * 1000; // 30-minute safety guard
 
       // eslint-disable-next-line no-constant-condition
       while (true) {
-        const { value, done } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-        const parts = buffer.split("\n");
-        buffer = parts.pop() ?? "";
-        for (const raw of parts) {
-          const line = raw.trim();
-          if (!line.startsWith("data:")) continue;
-          let ev: StreamEvent;
-          try {
-            ev = JSON.parse(line.slice(5).trim());
-          } catch {
-            continue;
-          }
-          if (ev.type === "done" && ev.verdict) {
-            setProgress(100);
-            setPhase("done");
-            busy.current = false;
-            return ev as DonePayload;
-          }
-          if (ev.line) {
-            const t = ev.type || "info";
-            setLines((prev) => [...prev, { text: ev.line as string, type: t }]);
-            prog = progressFor(ev.line, prog);
-            setProgress(prog);
-          }
+        if (Date.now() - startedAt > MAX_POLL_MS) {
+          throw new Error("Timed out waiting for the drawing to finish processing.");
+        }
+        await sleep(1500);
+        let pollResp: Response;
+        try {
+          pollResp = await fetch(`/api/drawings/${drawingId}/events?since=${since}`);
+        } catch {
+          if (++netFails > 12) throw new Error("Lost connection to the server.");
+          continue;
+        }
+        if (!pollResp.ok) {
+          if (++netFails > 12) throw new Error(`Status check failed (HTTP ${pollResp.status}).`);
+          continue;
+        }
+        netFails = 0;
+        const j = await pollResp.json().catch(() => null);
+        if (!j) continue;
+        for (const ln of j.lines || []) {
+          const t = (ln.type || "info") as EventType;
+          setLines((prev) => [...prev, { text: ln.text as string, type: t }]);
+          prog = progressFor(ln.text, prog);
+          setProgress(prog);
+        }
+        if (typeof j.next === "number") since = j.next;
+        if (j.done && j.done.verdict) {
+          setProgress(100);
+          setPhase("done");
+          busy.current = false;
+          return j.done as DonePayload;
+        }
+        if (j.phase === "error") {
+          throw new Error(j.detail || "Processing failed.");
         }
       }
-      // stream ended without an explicit done
-      setPhase("error");
-      const endMsg = "The pipeline stream ended unexpectedly.";
-      setError(endMsg);
-      push(endMsg, "error");
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Upload failed";
       setPhase("error");

@@ -2,9 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { API_URL } from "@/lib/api";
 import { getSessionToken } from "@/lib/auth";
 
-// The pipeline can run for up to ~110s (EXTRACT_TIMEOUT). 300s needs Vercel Pro;
-// Hobby caps at 60s — see the plan's SSE fallback note if that's too short.
-export const maxDuration = 300;
+// The pipeline now runs in a background job on the backend and returns a
+// drawing_id immediately, so this proxy only forwards a quick JSON response —
+// the client polls /api/drawings/[id]/events for progress + the result.
+export const maxDuration = 60;
 export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
@@ -32,18 +33,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ detail: "Backend unreachable" }, { status: 502 });
   }
 
-  if (!upstream.ok || !upstream.body) {
-    const detail = await upstream.text().catch(() => "Upload failed");
-    return NextResponse.json({ detail }, { status: upstream.status || 502 });
-  }
-
-  // Stream the SSE response straight back to the browser.
-  return new Response(upstream.body, {
-    status: 200,
-    headers: {
-      "Content-Type": "text/event-stream",
-      "Cache-Control": "no-cache, no-transform",
-      "X-Accel-Buffering": "no",
-    },
-  });
+  const data = await upstream.json().catch(() => ({ detail: "Upload failed" }));
+  return NextResponse.json(data, { status: upstream.status || 502 });
 }

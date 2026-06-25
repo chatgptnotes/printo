@@ -57,9 +57,9 @@ MAX_FILE_SIZE_MB    = 20
 # Extraction timeout — the gateway runs Claude CLI on the VPS, which is slower
 # than a direct API, so allow more headroom than the original 55s. Configurable.
 EXTRACT_TIMEOUT     = float(os.getenv("EXTRACT_TIMEOUT", "110"))
-# Multi-sheet vision via the gateway (Claude CLI over every sheet) is slow — a
-# single pass observed ~224s. Kept just under the 300s SSE/nginx + Vercel ceiling.
-VISION_EXTRACT_TIMEOUT = float(os.getenv("VISION_EXTRACT_TIMEOUT", "285"))
+# Extraction now runs in a background job (no request ceiling), so this is just a
+# safety bound for batching + gap-fill. Kept under the gateway's 1800s CLAUDE timeout.
+VISION_EXTRACT_TIMEOUT = float(os.getenv("VISION_EXTRACT_TIMEOUT", "1500"))
 
 # ERP simulation mode when credentials are absent or placeholder
 def _is_real_credential(val: str | None) -> bool:
@@ -135,6 +135,54 @@ def now() -> str:
 def event(icon: str, step: str, message: str, etype: str = "info") -> str:
     line = f"  [{now()}]  {icon}  {step} — {message}"
     return f"data: {json.dumps({'line': line, 'type': etype})}\n\n"
+
+
+# ── Async job runner ─────────────────────────────────────────────────────────
+# Multi-sheet vision takes minutes — longer than the 300s Vercel/nginx request
+# ceiling — so the pipeline runs as a background task and the client polls
+# GET /drawings/{id}/events. Single uvicorn worker → an in-memory dict suffices;
+# results are still persisted to DB + report_data exactly as before.
+JOBS: dict[int, dict] = {}
+_JOB_TTL_S = 1800   # prune terminal jobs older than this (on each new upload)
+
+
+def _prune_jobs():
+    cutoff = time.time() - _JOB_TTL_S
+    for did in [d for d, j in JOBS.items()
+                if j.get("phase") in ("done", "error") and j.get("ended", 0) < cutoff]:
+        JOBS.pop(did, None)
+
+
+def _parse_sse(chunk: str) -> dict:
+    try:
+        return json.loads(chunk.split("data:", 1)[1].strip())
+    except Exception:
+        return {}
+
+
+async def _run_job(file_path, file_name, drawing_id, size_mb, strict,
+                   floor_category, project_description, discipline):
+    """Drain run_pipeline's SSE events into the in-memory buffer for polling."""
+    job = JOBS[drawing_id]
+    try:
+        async for chunk in run_pipeline(file_path, file_name, drawing_id, size_mb,
+                                        strict, floor_category, project_description, discipline):
+            ev = _parse_sse(chunk)
+            if not ev:
+                continue
+            if ev.get("type") == "done":
+                job["done"] = ev
+                job["phase"] = "done"
+            elif ev.get("line"):
+                job["lines"].append({"text": ev["line"], "type": ev.get("type", "info")})
+    except Exception as e:
+        job["phase"] = "error"
+        job["lines"].append({"text": f"Pipeline error: {e}", "type": "error"})
+        job["done"] = {"type": "done", "verdict": "ERROR", "drawing_id": drawing_id}
+    finally:
+        if job.get("phase") not in ("done", "error"):
+            job["phase"] = "done"
+        job["ended"] = time.time()
 
 def save_drawing_record(file_name: str, file_path: str, floor_category: str,
                          project_description: str = "") -> int:
@@ -698,12 +746,42 @@ async def upload_drawing(
     size_mb    = dest.stat().st_size / (1024 * 1024)
     drawing_id = save_drawing_record(display_name, dest, floor_category, project_description)
 
-    return StreamingResponse(
-        run_pipeline(dest, display_name, drawing_id, size_mb, strict, floor_category,
-                     project_description, discipline),
-        media_type="text/event-stream",
-        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
-    )
+    # Run the (minutes-long) pipeline in the background; the client polls
+    # GET /drawings/{id}/events. Returns immediately so no request hits the 300s cap.
+    _prune_jobs()
+    JOBS[drawing_id] = {"lines": [], "phase": "streaming", "done": None}
+    asyncio.create_task(_run_job(dest, display_name, drawing_id, size_mb, strict,
+                                 floor_category, project_description, discipline))
+    return {"drawing_id": drawing_id, "status": "processing"}
+
+
+@app.get("/drawings/{drawing_id:int}/events")
+def drawing_events(drawing_id: int, since: int = 0, _user: dict = Depends(require_auth)):
+    """Poll a background extraction job: new step-log lines + terminal done payload.
+    Falls back to stored DB/report state if the in-memory job is gone (restart)."""
+    job = JOBS.get(drawing_id)
+    if job is not None:
+        lines = job["lines"]
+        return {"lines": lines[since:], "next": len(lines),
+                "phase": job["phase"], "done": job["done"]}
+
+    conn = get_conn()
+    row = conn.execute(
+        "SELECT status, review_status FROM drawings WHERE id=?", (drawing_id,)
+    ).fetchone()
+    conn.close()
+    if not row:
+        raise HTTPException(404, "Drawing not found")
+    status = row[0] or ""
+    if status in ("pending_review", "approved", "done", "error", "blurred", "timeout"):
+        verdict = "GENERATED" if status in ("pending_review", "approved", "done") else status.upper()
+        return {"lines": [], "next": since, "phase": "done",
+                "done": {"type": "done", "verdict": verdict, "drawing_id": drawing_id,
+                         "review_status": row[1] or "pending_review"}}
+    # 'processing' but no live job → orphaned by a worker restart.
+    return {"lines": [], "next": since, "phase": "error",
+            "done": {"type": "done", "verdict": "ERROR", "drawing_id": drawing_id},
+            "detail": "Processing was interrupted — please re-upload."}
 
 
 @app.get("/drawings")

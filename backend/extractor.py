@@ -325,6 +325,39 @@ def _gap_fill(raw: dict, sheets: list, media_type: str) -> dict:
     return raw
 
 
+def _merge_extractions(results: list[dict]) -> dict:
+    """Merge per-batch vision results: title-block scalars (first non-empty wins),
+    boq_items concatenated (per-area, no aggregation) with exact dups removed, and
+    floor_labels unioned (order-preserving)."""
+    merged: dict = {}
+    boq: list = []
+    labels: list = []
+    seen: set = set()
+    for r in results:
+        if not isinstance(r, dict):
+            continue
+        for k, v in r.items():
+            if k == "boq_items":
+                for it in (v or []):
+                    if not isinstance(it, dict):
+                        continue
+                    key = (str(it.get("section")), str(it.get("description")),
+                           str(it.get("unit")), str(it.get("floor")))
+                    if key in seen:
+                        continue
+                    seen.add(key)
+                    boq.append(it)
+            elif k == "floor_labels":
+                for lbl in (v or []):
+                    if lbl not in labels:
+                        labels.append(lbl)
+            elif not merged.get(k):
+                merged[k] = v
+    merged["boq_items"] = boq
+    merged["floor_labels"] = labels
+    return merged
+
+
 def extract_drawing_with_prepass(file_path: str, floor_category: str = None,
                                  original_name: str = None,
                                  project_description: str = "",
@@ -362,16 +395,23 @@ def extract_drawing_with_prepass(file_path: str, floor_category: str = None,
     # ── Preferred: multi-sheet vision — send every sheet at once. The dispatcher
     #    prefers the Printo Gateway (Claude CLI, no API key), else a direct key. ──
     try:
-        max_sheets = _env_int("VISION_MAX_SHEETS", 5)   # gateway accepts up to 5
-        sheet_set = preprocess.build_sheet_images(file_path, max_sheets=max_sheets)
+        total = _env_int("VISION_MAX_TOTAL_SHEETS", 20)   # bound runaway cost
+        batch_size = _env_int("VISION_BATCH_SIZE", 5)     # gateway accepts up to 5 per call
+        sheet_set = preprocess.build_sheet_images(file_path, max_sheets=total)
         sheets = sheet_set.get("sheets") or ([full_image] if full_image else [])
-        if sheets:
+        if sheets and len(sheets) <= batch_size:
             raw = _coerce_raw(vision_extract(SYSTEM_PROMPT, prompt, sheets, media_type, schema))
-            # Gap-fill is a SECOND vision pass (~doubles latency). The single pass
-            # already enforces per-area completeness via the prompt, so keep this
-            # opt-in (VISION_GAPFILL=1) to stay under the 300s SSE/nginx ceiling.
-            if _env_bool("VISION_GAPFILL", False):
-                raw = _gap_fill(raw, sheets, media_type)
+        elif sheets:
+            # >batch_size sheets: analyse in groups (gateway 5-file cap) and merge.
+            results = []
+            for i in range(0, len(sheets), batch_size):
+                results.append(_coerce_raw(vision_extract(
+                    SYSTEM_PROMPT, prompt, sheets[i:i + batch_size], media_type, schema)))
+            raw = _merge_extractions(results)
+        # Gap-fill re-reads any floor the model listed but left empty. Now runs in
+        # the background job (no request ceiling), so it's on by default.
+        if raw is not None and _env_bool("VISION_GAPFILL", True):
+            raw = _gap_fill(raw, sheets, media_type)
     except SidecarError:
         raw = None  # no vision provider / call failed — degrade below
 
