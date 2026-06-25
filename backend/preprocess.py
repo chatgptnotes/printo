@@ -234,6 +234,67 @@ def build_images(file_path: str, dpi: int = 220, clean: bool = True) -> dict:
             "page_count": page_count, "is_pdf": is_pdf}
 
 
+def _pdf_page_count(file_path: str) -> int:
+    """Total pages in a PDF (0 if PyMuPDF is unavailable / unreadable)."""
+    if not _HAS_FITZ:
+        return 0
+    try:
+        with fitz.open(file_path) as doc:
+            return doc.page_count
+    except Exception:
+        return 0
+
+
+def _downscale_png(image_bytes: bytes, max_long_edge: int = 1568) -> bytes:
+    """Downscale a PNG so its long edge ≤ max_long_edge (Claude-optimal), to keep
+    the multi-image request within sane token/payload limits. Original on failure."""
+    img = load_image(image_bytes)
+    if img is None:
+        return image_bytes
+    try:
+        w, h = img.size
+        long_edge = max(w, h)
+        if long_edge <= max_long_edge:
+            return image_bytes
+        scale = max_long_edge / float(long_edge)
+        img = img.resize((max(1, int(w * scale)), max(1, int(h * scale))), Image.LANCZOS)
+        return _pil_to_png_bytes(img)
+    except Exception:
+        return image_bytes
+
+
+def build_sheet_images(file_path: str, dpi: int = 200, max_sheets: int = 12,
+                       max_long_edge: int = 1568) -> dict:
+    """Render EVERY sheet of a drawing as a vision image (multi-sheet take-off).
+
+    Unlike build_images (page-1 only), this returns one PNG per PDF page — capped
+    at max_sheets — each downscaled to max_long_edge so a multi-image request stays
+    bounded. Single-image / CAD uploads yield one sheet.
+
+    Returns {"sheets": [bytes,...], "media_type": "image/png",
+             "page_count": int, "truncated": bool}.
+    """
+    file_path = _resolve_raster_path(file_path)   # CAD → rendered PNG (cached)
+    suffix = Path(file_path).suffix.lower()
+    sheets: list[bytes] = []
+    page_count = 0
+
+    if suffix == ".pdf":
+        pages = render_pdf_to_images(file_path, dpi=dpi, max_pages=max_sheets)
+        page_count = _pdf_page_count(file_path) or len(pages)
+        sheets = [_downscale_png(p, max_long_edge) for p in pages]
+    elif suffix in IMAGE_SUFFIXES:
+        try:
+            sheets = [_downscale_png(Path(file_path).read_bytes(), max_long_edge)]
+            page_count = 1
+        except Exception:
+            sheets = []
+
+    truncated = bool(page_count and page_count > len(sheets))
+    return {"sheets": sheets, "media_type": "image/png",
+            "page_count": page_count or len(sheets), "truncated": truncated}
+
+
 def sharpness_score(file_path: str) -> float | None:
     """Laplacian-variance sharpness of the RAW primary raster (higher = sharper).
 

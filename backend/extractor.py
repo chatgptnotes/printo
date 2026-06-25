@@ -7,7 +7,8 @@ import preprocess
 from prepass import (extract_pdf_text, prepass_extract,
                      build_known_facts_block, ocr_text)
 from schema import validate_and_repair, extraction_json_schema
-from ai_provider import resolve_provider, ExtractRequest, SidecarError
+from ai_provider import (resolve_provider, ExtractRequest, SidecarError,
+                         anthropic_ready, anthropic_vision_extract)
 
 
 def _env_bool(name: str, default: bool = False) -> bool:
@@ -140,85 +141,8 @@ def _mock_extract(file_path: str, floor_category: str = None,
         },
     }
 
-SYSTEM_PROMPT = """You are a senior quantity surveyor and construction estimator who reads architectural
-and structural drawings. You extract the full title block and produce a clean, trade-grouped Bill of
-Quantities (BOQ) from each drawing. Return only valid JSON — no explanation, no markdown fences, no preamble."""
-
-EXTRACTION_PROMPT_TEMPLATE = """Analyse this construction drawing. Extract the complete TITLE BLOCK and produce a
-trade-grouped BILL OF QUANTITIES (BOQ) of the work shown. Assume the drawing is correct and approved — do NOT
-validate or flag it.
-
-{known_facts_section}
-{project_context_section}
-Return ONLY this exact JSON structure (null for any title-block field not visible; [] for empty lists):
-
-{{
-  "drawing_number":    "e.g. A-001 or null",
-  "drawing_title":     "e.g. GROUND FLOOR PLAN or null",
-  "project_name":      "full project name or null",
-  "project_location":  "city / area / full site address or null",
-  "plot_number":       "e.g. Plot 345-1023, Plot No. 17, Makani/parcel no. or null",
-  "client_name":       "owner/client name or null",
-  "contractor_name":   "contractor or consultant firm name or null",
-  "drawn_by":          "name or initials or null",
-  "checked_by":        "name or initials or null",
-  "approved_by":       "name or initials or null",
-  "date_of_issue":     "DD/MM/YYYY or null",
-  "revision_number":   "e.g. Rev A, Rev 0, 01 or null",
-  "sheet_number":      "e.g. 1 or null",
-  "total_sheets":      "e.g. 10 or null",
-  "scale":             "e.g. 1:100 or null",
-  "floor_level":       "e.g. Ground Floor, First Floor, Basement or null",
-  "total_floor_area":  "e.g. 450 sq.m or null",
-  "building_type":     "e.g. Residential, Commercial, Industrial or null",
-  "number_of_rooms":   "integer count or null",
-  "room_schedule":     [{{"name": "Living Room", "area": "25 sq.m"}}, ...] or [],
-  "door_count":        "integer count or null",
-  "window_count":      "integer count or null",
-  "structural_notes":  "any structural specifications/notes visible or null",
-  "materials":         ["RCC", "AAC Block", ...] or [],
-  "dimensions":        "overall building dimensions e.g. 22m x 19m or null",
-  "boq_items": [
-    {{"section": "Concrete / RCC", "description": "RCC for columns, beams and slab (M25)", "unit": "cu.m", "quantity": "—",  "rate": "1450", "origin": "Approved equal — contractor selection", "reference": "S-101"}},
-    {{"section": "Finishes",       "description": "Floor tiling",                           "unit": "sq.m", "quantity": "420", "rate": "95",   "origin": "RAK Ceramics / approved equal",          "reference": "A-301"}},
-    {{"section": "Doors & Windows","description": "UPVC windows",                           "unit": "nos",  "quantity": "12",  "rate": "1200", "origin": "Deceuninck / Veka / approved equal",     "reference": "A-401"}},
-    {{"section": "LV Switchgear & Distribution", "description": "Final distribution board, 12-way TPN", "unit": "nos", "quantity": "4", "rate": "2400", "origin": "Schneider Electric / ABB / Siemens", "reference": "E-201"}},
-    {{"section": "Cables & Wiring", "description": "LV power cable 4C × 16 sq.mm XLPE/SWA/PVC", "unit": "m", "quantity": "—", "rate": "48", "origin": "Ducab / NCC / Oman Cables", "reference": "E-202"}},
-    {{"section": "Lighting",       "description": "Recessed LED panel 600×600, 36W",        "unit": "nos",  "quantity": "60",  "rate": "165",  "origin": "Philips / approved equal",               "reference": "E-301"}}
-  ],
-  "confidence": {{ "drawing_number": 0.0, "project_name": 0.0, "boq_items": 0.0 }}
-}}
-
-INSTRUCTIONS:
-1. TITLE BLOCK (usually bottom-right): drawing number, drawing title, project name, project location, plot number,
-   client name, contractor/consultant, drawn/checked/approved by, date, revision, sheet number, total sheets, scale.
-   Read the title block carefully — the PROJECT LOCATION (site address / area / city), the PLOT NUMBER
-   (plot / parcel / Makani no.), the CLIENT / OWNER name and the CONTRACTOR / CONSULTANT firm are often present
-   in the title block, a project header or a key plan. Extract them when shown; use null only if genuinely absent.
-2. BOQ — group line items by trade SECTION. Use ONLY the sections this drawing actually implies, drawn from this
-   ordered list (civil first, then MEP, then electrical):
-   "Preliminaries / General", "Concrete / RCC", "Masonry", "Finishes", "Doors & Windows", "Waterproofing",
-   "Plumbing & Sanitary", "Drainage", "HVAC", "Fire Fighting",
-   "LV Switchgear & Distribution", "Cables & Wiring", "Containment (Trunking/Conduit/Tray)", "Lighting",
-   "Small Power & Accessories", "Earthing & Lightning Protection", "Fire Alarm", "ELV / Data / Telecom",
-   "Miscellaneous".
-   For each item give a clear description, a sensible UNIT (nos, sq.m, cu.m, m, kg, lump sum) and a QUANTITY.
-   - Read explicit quantities directly: door/window counts, room areas, schedules, dimension lines, area statements.
-   - Derive obvious quantities: floor finishes ≈ total floor area; wall plaster/paint ≈ wall area when wall lengths/heights are shown.
-   - If a quantity genuinely cannot be read or reasonably derived from THIS drawing, use "—" (do not invent precise figures).
-   - Include every distinct work item the drawing implies; aim for a useful, complete BOQ (typically 6–20 lines).
-2a. PRICING & BRANDS (indicative budget guidance for Dubai — NOT a binding quotation):
-   - "rate": an indicative Dubai 2026 unit rate in AED for the item's UNIT, as a plain number only (no currency symbol,
-     no thousands separators, e.g. "1450" or "48.50"). Base it on prevailing Dubai market rates. If a line genuinely
-     cannot be reasonably priced, set "rate" to null — it will be flagged for manual pricing. Do NOT invent precise figures.
-   - "origin": Dubai AVL approved brand / origin guidance for the item. Examples: LV switchgear / MCCB / ACB / distribution
-     boards → "Schneider Electric / ABB / Siemens"; LV & MV cables → "Ducab / NCC / Oman Cables"; give the typical
-     AVL-approved makes for lighting, wiring accessories, sanitaryware, tiling, paints, etc. Where no specific brand
-     applies, use "Approved equal — contractor selection".
-   - "reference": the drawing reference / grid / detail tag the item is taken from (e.g. the sheet number or a detail
-     callout); null if not identifiable.
-3. Use the drawing's own units/scale. Return null for any title-block field not visible — do NOT fabricate title-block text.
-4. confidence: a single 0..1 self-rating per listed key is enough."""
+from extraction_prompt import (SYSTEM_PROMPT, EXTRACTION_PROMPT_TEMPLATE,
+                               build_discipline_block)
 
 
 def _repair_json(raw: str) -> str:
@@ -259,7 +183,8 @@ TITLE_BLOCK_KEYS = [
 MAX_DESCRIPTION_CHARS = 350_000
 
 
-def _build_prompt(prepass_hints: dict, project_description: str = "") -> str:
+def _build_prompt(prepass_hints: dict, project_description: str = "",
+                  discipline: str | None = None) -> str:
     known = ""
     if prepass_hints:
         block = build_known_facts_block(prepass_hints)
@@ -290,7 +215,8 @@ def _build_prompt(prepass_hints: dict, project_description: str = "") -> str:
             "the drawing.\n"
         )
     return EXTRACTION_PROMPT_TEMPLATE.format(
-        known_facts_section=known, project_context_section=context
+        known_facts_section=known, project_context_section=context,
+        discipline_section=build_discipline_block(discipline),
     )
 
 
@@ -363,14 +289,52 @@ def _merge_prepass_ground_truth(extracted: dict, prepass_hints: dict) -> dict:
     return extracted
 
 
+def _gap_fill_prompt(missing_floors: list[str]) -> str:
+    floors = ", ".join(missing_floors)
+    return (
+        "You already scanned this drawing SET (all sheets are attached). Your first pass returned NO Bill-of-Quantities "
+        f"rows for these areas/floors: {floors}.\n"
+        "Open the sheet(s) for EACH of these areas and read them properly — they are real parts of this project and "
+        "carry scope (lighting, small power/sockets, finishes, pumps/equipment, etc.). Return ONLY a JSON object "
+        '{"boq_items": [ ... ]} with one row per distinct item per area, each row\'s "floor" set EXACTLY to the area '
+        "name from the list above, following the same fields (section, description, unit, quantity, rate, origin, "
+        "reference, floor, provisional). Estimation is a last resort — set provisional=true on any estimated row. "
+        "Do NOT include rows for any area that is not in the list above."
+    )
+
+
+def _gap_fill(raw: dict, sheets: list, media_type: str) -> dict:
+    """One re-read pass: if a floor the model itself listed has NO take-off rows,
+    re-ask only for those floors and append the results (never replace)."""
+    if not isinstance(raw, dict):
+        return raw
+    items = [it for it in (raw.get("boq_items") or []) if isinstance(it, dict)]
+    labels = [str(l).strip() for l in (raw.get("floor_labels") or []) if str(l).strip()]
+    covered = {(it.get("floor") or "").strip().lower() for it in items}
+    missing = [l for l in labels if l.lower() not in covered]
+    if not missing:
+        return raw
+    try:
+        more = _coerce_raw(anthropic_vision_extract(
+            SYSTEM_PROMPT, _gap_fill_prompt(missing), extraction_json_schema(), sheets, media_type))
+        extra = [e for e in (more.get("boq_items") or []) if isinstance(e, dict)]
+        if extra:
+            raw["boq_items"] = items + extra
+    except SidecarError:
+        pass
+    return raw
+
+
 def extract_drawing_with_prepass(file_path: str, floor_category: str = None,
                                  original_name: str = None,
-                                 project_description: str = "") -> tuple[dict, dict]:
+                                 project_description: str = "",
+                                 discipline: str = None) -> tuple[dict, dict]:
     """
-    Full extraction pipeline (Phase 2):
-      1. preprocess — render PDF→image, clean, title-block crop
+    Full extraction pipeline:
+      1. preprocess — render PDF→image(s), clean, title-block crop
       2. prepass    — PDF text layer OR OCR → regex (deterministic ground truth)
-      3. provider   — sidecar (vision|text) or mock; optional multi-pass
+      3. extract    — multi-sheet Anthropic vision (every sheet) when a key is set,
+                      else legacy single-image sidecar/mock; one gap-fill re-read
       4. validate   — coerce into the canonical schema
       5. merge      — prepass overrides the model for matched fields
       6. calibrate  — trustworthy per-field confidence
@@ -381,6 +345,7 @@ def extract_drawing_with_prepass(file_path: str, floor_category: str = None,
     img_set = preprocess.build_images(file_path, dpi=dpi)
     full_image = img_set.get("full")
     crops = img_set.get("crops") or []
+    media_type = img_set.get("media_type", "image/png")
 
     # ── prepass: text layer, else OCR of the rendered image ──
     prepass_hints = {}
@@ -390,35 +355,47 @@ def extract_drawing_with_prepass(file_path: str, floor_category: str = None,
     if pdf_text:
         prepass_hints = prepass_extract(pdf_text)
 
-    # ── provider ──
-    provider, _status = resolve_provider()
-    prompt = _build_prompt(prepass_hints, project_description)
+    prompt = _build_prompt(prepass_hints, project_description, discipline)
     schema = extraction_json_schema()
+    raw: dict | None = None
 
-    def _call(image):
-        req = ExtractRequest(
-            prompt=prompt, schema=schema, image=image,
-            media_type=img_set.get("media_type", "image/png"),
-            text=pdf_text, file_path=file_path,
-            floor_category=floor_category, original_name=original_name,
-        )
+    # ── Preferred: multi-sheet vision — send EVERY sheet to Anthropic at once ──
+    if anthropic_ready():
         try:
-            return _coerce_raw(provider.extract(req))
+            sheet_set = preprocess.build_sheet_images(file_path)
+            sheets = sheet_set.get("sheets") or ([full_image] if full_image else [])
+            if sheets:
+                raw = _coerce_raw(anthropic_vision_extract(
+                    SYSTEM_PROMPT, prompt, schema, sheets, media_type))
+                raw = _gap_fill(raw, sheets, media_type)
         except SidecarError:
-            # sidecar failed mid-run → degrade to mock so the demo never dies
-            from ai_provider import MockProvider
-            return _coerce_raw(MockProvider().extract(req))
+            raw = None  # degrade below
 
-    multipass = _env_bool("MULTIPASS", False)
-    if (multipass and getattr(provider, "name", "") == "sidecar"
-            and getattr(provider, "mode", "") == "vision" and crops):
-        raw = _call(full_image)
-        raw_crop = _call(crops[0])               # dedicated title-block pass
-        for k in TITLE_BLOCK_KEYS:
-            if raw_crop.get(k):
-                raw[k] = raw_crop[k]
-    else:
-        raw = _call(full_image)
+    # ── Fallback: legacy single-image sidecar / mock (no key, or vision failed) ──
+    if raw is None:
+        provider, _status = resolve_provider()
+
+        def _call(image):
+            req = ExtractRequest(
+                prompt=prompt, schema=schema, image=image, media_type=media_type,
+                text=pdf_text, file_path=file_path, system=SYSTEM_PROMPT,
+                floor_category=floor_category, original_name=original_name,
+            )
+            try:
+                return _coerce_raw(provider.extract(req))
+            except SidecarError:
+                from ai_provider import MockProvider
+                return _coerce_raw(MockProvider().extract(req))
+
+        multipass = _env_bool("MULTIPASS", False)
+        if (multipass and getattr(provider, "mode", "") == "vision" and crops):
+            raw = _call(full_image)
+            raw_crop = _call(crops[0])               # dedicated title-block pass
+            for k in TITLE_BLOCK_KEYS:
+                if raw_crop.get(k):
+                    raw[k] = raw_crop[k]
+        else:
+            raw = _call(full_image)
 
     # ── validate → merge ground truth → calibrate ──
     extracted = validate_and_repair(raw)

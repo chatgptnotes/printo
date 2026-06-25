@@ -12,6 +12,7 @@ import { EventLog, ProgressBar } from "@/components/pipeline/EventLog";
 import { useUploadStream } from "@/components/pipeline/useUploadStream";
 import { usePrintoStore } from "@/lib/store";
 import {
+  DISCIPLINES,
   FLOOR_CATEGORIES,
   MARQUEE_TAGS,
   SAMPLE_DRAWINGS,
@@ -51,6 +52,7 @@ export default function UploadPage() {
   const setStrict = usePrintoStore((s) => s.setStrict);
 
   const [floor, setFloor] = useState(FLOOR_CATEGORIES[0]);
+  const [discipline, setDiscipline] = useState(DISCIPLINES[0]);
   const [projectDescription, setProjectDescription] = useState("");
   const [files, setFiles] = useState<File[]>([]);
   // Batch progress (multi-file) — null when not running a batch.
@@ -62,12 +64,12 @@ export default function UploadPage() {
   // Process a list sequentially (the backend handles one drawing at a time).
   // A single file navigates straight to its result; multiple files show a batch
   // summary with a link to each.
-  async function processFiles(list: File[], floorCat: string, desc: string) {
+  async function processFiles(list: File[], floorCat: string, desc: string, disc: string) {
     if (!list.length) return;
     setBatchResults([]);
 
     if (list.length === 1) {
-      const r = await start(list[0], list[0].name, floorCat, strict, desc);
+      const r = await start(list[0], list[0].name, floorCat, strict, desc, disc);
       if (r) {
         setLastResult(r);
         router.push(`/results/${r.drawing_id}`);
@@ -78,7 +80,7 @@ export default function UploadPage() {
     const acc: BatchItem[] = [];
     for (let i = 0; i < list.length; i++) {
       setBatch({ index: i + 1, total: list.length, name: list[i].name });
-      const r = await start(list[i], list[i].name, floorCat, strict, desc);
+      const r = await start(list[i], list[i].name, floorCat, strict, desc, disc);
       if (r) {
         setLastResult(r);
         acc.push({ name: list[i].name, drawingId: r.drawing_id, verdict: r.verdict });
@@ -97,7 +99,7 @@ export default function UploadPage() {
       return;
     }
     const blob = await res.blob();
-    const r = await start(blob as File, s.file, s.floor, strict, projectDescription);
+    const r = await start(blob as File, s.file, s.floor, strict, projectDescription, discipline);
     if (r) {
       setLastResult(r);
       router.push(`/results/${r.drawing_id}`);
@@ -289,6 +291,24 @@ export default function UploadPage() {
           </p>
 
           <label className="mb-1 block text-xs font-semibold text-muted">
+            Discipline / drawing type
+          </label>
+          <select
+            className="mb-1 w-full rounded-[10px] border border-border bg-surface-2 px-3 py-2 text-sm outline-none focus:border-accent-orange"
+            value={discipline}
+            onChange={(e) => setDiscipline(e.target.value)}
+          >
+            {DISCIPLINES.map((d) => (
+              <option key={d} value={d}>
+                {d}
+              </option>
+            ))}
+          </select>
+          <p className="mb-4 text-xs text-dim">
+            Runs the rigorous, per-area take-off for that discipline. Auto-detect lets the AI classify the sheets.
+          </p>
+
+          <label className="mb-1 block text-xs font-semibold text-muted">
             Floor / Category
           </label>
           <select
@@ -369,7 +389,7 @@ export default function UploadPage() {
             variant="primary"
             fullWidth
             disabled={!files.length || busy}
-            onClick={() => processFiles(files, floor, projectDescription)}
+            onClick={() => processFiles(files, floor, projectDescription, discipline)}
           >
             {batch
               ? `Processing ${batch.index}/${batch.total}…`

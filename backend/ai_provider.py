@@ -39,6 +39,9 @@ class ExtractRequest:
     image: bytes | None = None
     media_type: str = "image/png"
     text: str | None = None
+    # multi-sheet vision: every drawing sheet attached at once (Anthropic path)
+    images: list[bytes] | None = None
+    system: str | None = None
     # context the MockProvider needs
     file_path: str | None = None
     floor_category: str | None = None
@@ -59,6 +62,14 @@ def _timeout() -> float:
         return float(_cfg("SIDECAR_TIMEOUT", "45"))
     except ValueError:
         return 45.0
+
+
+def _vision_timeout() -> float:
+    """Generous timeout for a multi-sheet vision call (many images, big JSON)."""
+    try:
+        return float(_cfg("VISION_EXTRACT_TIMEOUT", "240"))
+    except ValueError:
+        return 240.0
 
 
 def _auth_headers() -> dict:
@@ -134,6 +145,105 @@ class SidecarProvider:
 
         # Accept {"data": {...}} or a bare field dict.
         return payload.get("data", payload) if isinstance(payload, dict) else {}
+
+
+# ── Direct Anthropic (multi-sheet vision take-off) ────────────────────────────
+ANTHROPIC_URL = "https://api.anthropic.com/v1/messages"
+ANTHROPIC_VERSION = "2023-06-01"
+
+
+def _anthropic_key() -> str:
+    return _cfg("ANTHROPIC_API_KEY")
+
+
+def _anthropic_model() -> str:
+    # Override on the VPS with ANTHROPIC_MODEL (e.g. claude-opus-4-8 for max accuracy).
+    return _cfg("ANTHROPIC_MODEL", "claude-sonnet-4-6")
+
+
+# Set False after an auth failure (401/403) so an invalid/placeholder key doesn't
+# make every extraction waste a call and then degrade to mock — we fall straight
+# back to the sidecar instead. Re-enabled on process restart (i.e. after the key
+# is fixed and printo-backend is restarted).
+_ANTHROPIC_AUTH_OK = True
+
+
+def anthropic_ready() -> bool:
+    return bool(_anthropic_key()) and _ANTHROPIC_AUTH_OK
+
+
+class AnthropicProvider:
+    """Calls the Anthropic Messages API directly, sending the system prompt + ALL
+    sheet images in one request — the multi-sheet vision take-off path. Used when
+    ANTHROPIC_API_KEY is set. Raw HTTPS (requests only); no SDK dependency."""
+    name = "anthropic"
+    mode = "vision"
+
+    def extract(self, req: ExtractRequest) -> dict:
+        key = _anthropic_key()
+        if not key:
+            raise SidecarError("ANTHROPIC_API_KEY not set")
+        images = req.images if req.images else ([req.image] if req.image else [])
+        content: list[dict] = [{"type": "text", "text": req.prompt}]
+        for img in images:
+            if not img:
+                continue
+            content.append({
+                "type": "image",
+                "source": {
+                    "type": "base64",
+                    "media_type": req.media_type or "image/png",
+                    "data": base64.standard_b64encode(img).decode("utf-8"),
+                },
+            })
+        body: dict = {
+            "model": _anthropic_model(),
+            "max_tokens": int(_cfg("ANTHROPIC_MAX_TOKENS", "8000") or "8000"),
+            "messages": [{"role": "user", "content": content}],
+        }
+        if req.system:
+            body["system"] = req.system
+
+        headers = {
+            "x-api-key": key,
+            "anthropic-version": ANTHROPIC_VERSION,
+            "content-type": "application/json",
+        }
+        try:
+            r = requests.post(ANTHROPIC_URL, json=body, headers=headers,
+                              timeout=_vision_timeout())
+        except Exception as e:
+            raise SidecarError(f"anthropic unreachable: {e}") from e
+        if r.status_code in (401, 403):
+            # Invalid/placeholder key — stop trying Anthropic this process (fall back
+            # to the sidecar). Re-enabled after the key is fixed + a restart.
+            global _ANTHROPIC_AUTH_OK
+            _ANTHROPIC_AUTH_OK = False
+            raise SidecarError(f"anthropic auth failed (HTTP {r.status_code}) — falling back")
+        if r.status_code != 200:
+            raise SidecarError(f"anthropic HTTP {r.status_code}: {r.text[:300]}")
+        try:
+            payload = r.json()
+            parts = payload.get("content") or []
+            text = "".join(p.get("text", "") for p in parts if p.get("type") == "text")
+        except Exception as e:
+            raise SidecarError(f"anthropic bad response: {e}") from e
+
+        # Lazy imports avoid a circular dependency with extractor.py.
+        import json as _json
+        from extractor import _repair_json
+        try:
+            return _json.loads(_repair_json(text))
+        except Exception as e:
+            raise SidecarError(f"anthropic returned non-JSON: {e}") from e
+
+
+def anthropic_vision_extract(system: str, prompt: str, schema: dict,
+                             images: list[bytes], media_type: str = "image/png") -> dict:
+    """Run a multi-sheet vision extraction (system + all sheet images in one call)."""
+    req = ExtractRequest(prompt=prompt, schema=schema, images=images,
+                         media_type=media_type, system=system)
+    return AnthropicProvider().extract(req)
 
 
 # ── Printo Gateway (Hostinger VPS via printo_gateway_client) ──────────────────
@@ -216,6 +326,14 @@ def resolve_provider():
         return MockProvider(), {"ai_provider": "mock", "sidecar_reachable": False,
                                 "mode": "mock", "model": "builtin-demo"}
 
+    if choice == "anthropic":
+        if anthropic_ready():
+            return AnthropicProvider(), {"ai_provider": "anthropic", "sidecar_reachable": True,
+                                         "mode": "vision", "model": _anthropic_model()}
+        return MockProvider(), {"ai_provider": "mock", "sidecar_reachable": False,
+                                "mode": "mock", "model": "builtin-demo",
+                                "note": "ANTHROPIC_API_KEY unset — using mock"}
+
     if choice == "gateway":
         if _gateway_client() is not None and _gateway_url():
             return GatewayProvider(), {"ai_provider": "gateway",
@@ -231,7 +349,10 @@ def resolve_provider():
         return prov, {"ai_provider": "sidecar", "sidecar_reachable": health is not None,
                       "mode": prov.mode, "model": (health or {}).get("model", "unknown")}
 
-    # auto — prefer the real gateway, then a local sidecar, then mock
+    # auto — prefer direct Anthropic vision (multi-sheet), then gateway, sidecar, mock
+    if anthropic_ready():
+        return AnthropicProvider(), {"ai_provider": "anthropic", "sidecar_reachable": True,
+                                     "mode": "vision", "model": _anthropic_model()}
     if gateway_ready():
         return GatewayProvider(), {"ai_provider": "gateway", "sidecar_reachable": True,
                                    "mode": "gateway", "model": "printo-gateway"}

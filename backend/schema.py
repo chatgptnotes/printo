@@ -30,16 +30,25 @@ class BoqItem(BaseModel):
     quantity: Optional[str] = None       # quantity as read/derived from the drawing
     rate: Optional[str] = None           # indicative Dubai 2026 unit rate (AED, number only)
     origin: Optional[str] = None         # AVL approved brand / origin guidance
-    reference: Optional[str] = None      # drawing reference / detail tag
+    reference: Optional[str] = None      # source drawing number / detail tag
+    floor: Optional[str] = None          # area/level this row was counted on (per-area take-off)
+    provisional: Optional[bool] = None   # True = estimated/unread row (flagged amber, not read)
 
     @field_validator("section", "description", "unit", "quantity",
-                     "rate", "origin", "reference", mode="before")
+                     "rate", "origin", "reference", "floor", mode="before")
     @classmethod
     def _clean(cls, v):
         if v is None:
             return None
         s = str(v).strip()
         return None if s == "" or s.lower() in ("null", "none", "n/a") else s
+
+    @field_validator("provisional", mode="before")
+    @classmethod
+    def _clean_bool(cls, v):
+        if isinstance(v, bool) or v is None:
+            return v
+        return str(v).strip().lower() in ("true", "1", "yes", "y")
 
 
 class DrawingExtraction(BaseModel):
@@ -64,6 +73,7 @@ class DrawingExtraction(BaseModel):
     scale: Optional[str] = None
 
     # ── Floor-plan content ──
+    floor_labels: list[str] = Field(default_factory=list)  # every area/level the set covers
     floor_level: Optional[str] = None
     total_floor_area: Optional[str] = None
     building_type: Optional[str] = None

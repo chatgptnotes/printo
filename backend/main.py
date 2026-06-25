@@ -57,6 +57,9 @@ MAX_FILE_SIZE_MB    = 20
 # Extraction timeout — the gateway runs Claude CLI on the VPS, which is slower
 # than a direct API, so allow more headroom than the original 55s. Configurable.
 EXTRACT_TIMEOUT     = float(os.getenv("EXTRACT_TIMEOUT", "110"))
+# Multi-sheet vision sends every sheet to Claude + a gap-fill re-read, so it needs
+# more headroom than a single-image call. Kept under the 300s SSE/nginx ceiling.
+VISION_EXTRACT_TIMEOUT = float(os.getenv("VISION_EXTRACT_TIMEOUT", "240"))
 
 # ERP simulation mode when credentials are absent or placeholder
 def _is_real_credential(val: str | None) -> bool:
@@ -443,7 +446,7 @@ def _rebuild_report_html(drawing_id: int) -> str | None:
 
 async def run_pipeline(file_path: Path, file_name: str, drawing_id: int,
                         file_size_mb: float, strict: bool, floor_category: str,
-                        project_description: str = ""):
+                        project_description: str = "", discipline: str = ""):
     start       = time.time()
     errors      = []
     warnings    = []
@@ -525,10 +528,10 @@ async def run_pipeline(file_path: Path, file_name: str, drawing_id: int,
             asyncio.get_event_loop().run_in_executor(
                 None,
                 lambda: extract_drawing_with_prepass(
-                    str(work_path), floor_category, file_name, project_description
+                    str(work_path), floor_category, file_name, project_description, discipline
                 ),
             ),
-            timeout=EXTRACT_TIMEOUT
+            timeout=VISION_EXTRACT_TIMEOUT
         )
         prepass_count = len(prepass_hints)
     except asyncio.TimeoutError:
@@ -589,6 +592,7 @@ async def run_pipeline(file_path: Path, file_name: str, drawing_id: int,
         "file_name":           file_name,
         "drawing_id":          drawing_id,
         "floor_category":      floor_category,
+        "discipline":          discipline,
         "project_description": project_description,
         "uploaded_at":         datetime.datetime.now().isoformat(),
     }
@@ -658,6 +662,7 @@ async def upload_drawing(
     file_name: str | None = Form(default=None),
     floor_category: str = Form(default="Other"),
     project_description: str = Form(default=""),
+    discipline: str = Form(default=""),
     strict: bool = False,
     _user: dict = Depends(require_auth),
 ):
@@ -695,7 +700,7 @@ async def upload_drawing(
 
     return StreamingResponse(
         run_pipeline(dest, display_name, drawing_id, size_mb, strict, floor_category,
-                     project_description),
+                     project_description, discipline),
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )

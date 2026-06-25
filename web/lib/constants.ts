@@ -12,6 +12,17 @@ export const FLOOR_CATEGORIES = [
   "Other",
 ];
 
+// Drawing discipline — drives the rigorous, per-discipline take-off reading.
+// "Auto-detect" lets the AI classify the sheets itself.
+export const DISCIPLINES = [
+  "Auto-detect",
+  "Electrical",
+  "Industrial",
+  "Civil / Structural",
+  "Plumbing & MEP",
+  "General",
+];
+
 export const MARQUEE_TAGS = [
   "Title Block",
   "Drawing Number",
