@@ -93,6 +93,27 @@ export default function UploadPage() {
     }
   }
 
+  // Accumulate picks across multiple "Choose files" clicks (dedupe by name+size),
+  // so a batch can be built a few files at a time as well as multi-selected at once.
+  function addFiles(picked: FileList | null) {
+    if (!picked || picked.length === 0) return;
+    setFiles((prev) => {
+      const seen = new Set(prev.map((f) => `${f.name}:${f.size}`));
+      const next = [...prev];
+      for (const f of Array.from(picked)) {
+        const key = `${f.name}:${f.size}`;
+        if (!seen.has(key)) {
+          seen.add(key);
+          next.push(f);
+        }
+      }
+      return next;
+    });
+  }
+  function removeFile(idx: number) {
+    setFiles((prev) => prev.filter((_, i) => i !== idx));
+  }
+
   const streaming = phase === "streaming";
   const busy = streaming || batch !== null;
 
@@ -274,20 +295,50 @@ export default function UploadPage() {
             type="file"
             multiple
             accept=".pdf,.jpg,.jpeg,.png,.tiff,.tif,.dwg,.dxf,.dwf"
-            onChange={(e) => setFiles(Array.from(e.target.files ?? []))}
-            className="mb-2 block w-full text-sm text-muted file:mr-3 file:rounded-[10px] file:border-0 file:bg-surface-2 file:px-3 file:py-2 file:text-sm file:text-text"
+            onChange={(e) => {
+              addFiles(e.target.files);
+              e.target.value = ""; // reset so re-picking the same file / adding more re-fires
+            }}
+            className="mb-1 block w-full text-sm text-muted file:mr-3 file:rounded-[10px] file:border-0 file:bg-surface-2 file:px-3 file:py-2 file:text-sm file:text-text"
           />
+          <p className="mb-2 text-xs text-dim">
+            Select several at once (Ctrl/Shift-click) — or add more in another pick. They process one by one.
+          </p>
 
           {files.length > 0 && (
             <div className="mb-3 max-h-32 space-y-1 overflow-y-auto rounded-[10px] border border-border bg-surface-2 px-3 py-2">
-              <p className="text-xs font-semibold text-muted">
-                {files.length} file{files.length > 1 ? "s" : ""} selected
-                {files.length > 1 ? " — processed one by one" : ""}
-              </p>
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-semibold text-muted">
+                  {files.length} file{files.length > 1 ? "s" : ""} selected
+                  {files.length > 1 ? " — processed one by one" : ""}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setFiles([])}
+                  disabled={busy}
+                  className="text-xs text-dim hover:text-accent-orange disabled:opacity-50"
+                >
+                  Clear all
+                </button>
+              </div>
               {files.map((f, i) => (
-                <div key={i} className="flex justify-between gap-2 text-xs text-muted">
+                <div
+                  key={`${f.name}:${f.size}:${i}`}
+                  className="flex items-center justify-between gap-2 text-xs text-muted"
+                >
                   <span className="min-w-0 truncate">{f.name}</span>
-                  <span className="shrink-0">{(f.size / (1024 * 1024)).toFixed(1)} MB</span>
+                  <span className="flex shrink-0 items-center gap-2">
+                    <span>{(f.size / (1024 * 1024)).toFixed(1)} MB</span>
+                    <button
+                      type="button"
+                      onClick={() => removeFile(i)}
+                      disabled={busy}
+                      title="Remove"
+                      className="text-dim hover:text-result-fail disabled:opacity-50"
+                    >
+                      ✕
+                    </button>
+                  </span>
                 </div>
               ))}
             </div>
