@@ -252,6 +252,13 @@ TITLE_BLOCK_KEYS = [
 ]
 
 
+# Upper bound on the user's BOQ description fed into the prompt. Generous
+# (~50k words) so detailed scope/requirements pass through intact; still bounded
+# to keep prompt size sane and limit prompt-injection blast radius. Mirrors the
+# frontend MAX_DESCRIPTION_CHARS so the two caps stay in sync.
+MAX_DESCRIPTION_CHARS = 350_000
+
+
 def _build_prompt(prepass_hints: dict, project_description: str = "") -> str:
     known = ""
     if prepass_hints:
@@ -264,13 +271,23 @@ def _build_prompt(prepass_hints: dict, project_description: str = "") -> str:
             )
     context = ""
     if project_description and project_description.strip():
-        # Bounded, non-overriding context from the user's free-text input. The
-        # length cap and explicit instructions limit prompt-injection / drift.
+        desc = project_description.strip()[:MAX_DESCRIPTION_CHARS]
+        # The user's description is BOQ-relevant scope/requirements. Treat it as
+        # authoritative for WHAT the Bill of Quantities must cover, layered on top
+        # of the drawing — but never as a source of title-block identity fields.
         context = (
-            "User-provided project context (use ONLY to disambiguate trade/scope and "
-            "interpret unclear items — do NOT let it override what the drawing actually "
-            "shows, and do NOT copy it into title-block fields):\n"
-            f"\"{project_description.strip()[:500]}\"\n"
+            "USER-PROVIDED BOQ REQUIREMENTS (read this together with the drawing and treat it "
+            "as authoritative for the SCOPE, ITEMS, QUANTITIES, MATERIALS, BRANDS and PRICING of "
+            "the Bill of Quantities):\n"
+            f'"""\n{desc}\n"""\n'
+            'Incorporate these requirements into "boq_items": add, refine, re-section, re-quantity '
+            "and re-price line items so the BOQ reflects BOTH what the drawing shows AND what this "
+            "text asks for. When the text specifies an item, quantity, unit, material/brand (origin) "
+            "or rate, honour it; if it conflicts with the drawing on scope, prefer the user's stated "
+            "requirement for the BOQ. Do NOT use this text to fill or change TITLE-BLOCK identity "
+            "fields (drawing number, drawing title, project name, location, plot, client, contractor, "
+            "drawn/checked/approved by, date, revision, sheet numbers, scale) — those come ONLY from "
+            "the drawing.\n"
         )
     return EXTRACTION_PROMPT_TEMPLATE.format(
         known_facts_section=known, project_context_section=context
