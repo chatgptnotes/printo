@@ -28,8 +28,12 @@ class BoqItem(BaseModel):
     description: Optional[str] = None    # work item description
     unit: Optional[str] = None           # e.g. nos, sq.m, cu.m, m, kg, lump sum
     quantity: Optional[str] = None       # quantity as read/derived from the drawing
+    rate: Optional[str] = None           # indicative Dubai 2026 unit rate (AED, number only)
+    origin: Optional[str] = None         # AVL approved brand / origin guidance
+    reference: Optional[str] = None      # drawing reference / detail tag
 
-    @field_validator("section", "description", "unit", "quantity", mode="before")
+    @field_validator("section", "description", "unit", "quantity",
+                     "rate", "origin", "reference", mode="before")
     @classmethod
     def _clean(cls, v):
         if v is None:

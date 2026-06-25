@@ -37,6 +37,22 @@ TITLE_BLOCK_ORDER = [
 ]
 
 
+def _num_rate(v):
+    """Leading numeric value from a rate string, else None (mirrors boq_excel._num)."""
+    if v is None:
+        return None
+    if isinstance(v, (int, float)):
+        return float(v)
+    import re as _re
+    m = _re.search(r"-?\d[\d,]*\.?\d*", str(v))
+    if not m:
+        return None
+    try:
+        return float(m.group(0).replace(",", ""))
+    except ValueError:
+        return None
+
+
 def _display_val(val):
     if val is None:
         return "—"
@@ -212,9 +228,22 @@ def _boq_table_html(extracted: dict) -> str:
                      if ((it.get("section") or "General").strip() or "General") == sec]
         rows = ""
         for k, it in enumerate(sec_items, 1):
+            rate = it.get("rate")
+            priced = _num_rate(rate) is not None
+            meta_bits = []
+            if it.get("reference"):
+                meta_bits.append(f'Ref {escape(str(it.get("reference")))}')
+            if it.get("origin"):
+                meta_bits.append(f'Brand: {escape(str(it.get("origin")))}')
+            meta_bits.append(
+                f'Indicative rate: AED {escape(str(rate))}/unit' if priced
+                else '<span style="color:#b45309;">Rate: to be priced</span>')
+            sub = (f'<div class="muted" style="font-size:8.5px;margin-top:2px;">'
+                   f'{" &middot; ".join(meta_bits)}</div>')
+            tr_style = '' if priced else ' style="background:#fff4e0;"'
             rows += (
-                f'<tr><td class="num">{bill_no}.{k}</td>'
-                f'<td>{escape(_display_val(it.get("description")))}</td>'
+                f'<tr{tr_style}><td class="num">{bill_no}.{k}</td>'
+                f'<td>{escape(_display_val(it.get("description")))}{sub}</td>'
                 f'<td class="calign">{escape(_display_val(it.get("unit")))}</td>'
                 f'<td class="ralign">{escape(_display_val(it.get("quantity")))}</td></tr>'
             )

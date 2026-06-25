@@ -33,6 +33,7 @@ FONT = "Arial"
 NAVY = "1F3864"     # title / section bands / bill & grand totals (white bold)
 BLUE = "2E75B6"     # column headers + sub-totals (white bold)
 YELLOW = "FFF3CD"   # editable Qty / Rate / Amount cells
+AMBER = "FFE0A3"    # unpriced Rate / Amount cells (flag for manual pricing)
 ZEBRA = "F8F9FA"    # alternating item rows
 CURRENCY_FMT = "#,##0.00"
 
@@ -366,11 +367,15 @@ def _build_bill_sheet(wb, used, bill_no, section, items, extracted, meta):
 
     reference = extracted.get("drawing_number") or "—"
     yellow = _fill(YELLOW)
+    amber = _fill(AMBER)
     first = header_row + 1
     row = first
     for k, it in enumerate(items, 1):
         z = _fill(ZEBRA) if k % 2 == 0 else None
         qty = _num(it.get("quantity"))
+        rate = _num(it.get("rate"))
+        priced = rate is not None
+        rate_fill = yellow if priced else amber   # amber = unpriced, flag for manual pricing
         _put(ws, row, 1, f"{bill_no}.{k}", font=_f(bold=True),
              align=Alignment(horizontal="left", vertical="top"), fill=z)
         _put(ws, row, 2, _val(it.get("description")), font=_f(),
@@ -382,12 +387,12 @@ def _build_bill_sheet(wb, used, bill_no, section, items, extracted, meta):
         _put(ws, row, 5, qty if qty is not None else _val(it.get("quantity")),
              font=_f(), align=Alignment(horizontal="right", vertical="top"),
              fill=yellow, numfmt=(CURRENCY_FMT if qty is not None else None))
-        _put(ws, row, 6, None, font=_f(),
+        _put(ws, row, 6, rate if priced else None, font=_f(),
              align=Alignment(horizontal="right", vertical="top"),
-             fill=yellow, numfmt=CURRENCY_FMT)
+             fill=rate_fill, numfmt=CURRENCY_FMT)
         _put(ws, row, 7, f'=IF(OR(E{row}="",F{row}=""),"",E{row}*F{row})',
              font=_f(), align=Alignment(horizontal="right", vertical="top"),
-             fill=yellow, numfmt=CURRENCY_FMT)
+             fill=rate_fill, numfmt=CURRENCY_FMT)
         _put(ws, row, 8, ("📋  " + (it.get("origin") or ORIGIN_PLACEHOLDER)),
              font=_f(), align=Alignment(horizontal="left", vertical="top", wrap_text=True), fill=z)
         row += 1
@@ -420,7 +425,7 @@ def _build_bill_sheet(wb, used, bill_no, section, items, extracted, meta):
 
     ws.auto_filter.ref = f"A{header_row}:{LAST_COL}{last}"
     ws.freeze_panes = f"A{first}"
-    _print_setup(ws, header_row, landscape=True)
+    _print_setup(ws, header_row, landscape=False)   # portrait, fit-to-width
     return title, total_row
 
 
@@ -534,6 +539,7 @@ def build_boq_workbook(report_data: dict, *, approved: bool = False,
 
     wb = openpyxl.Workbook()
     wb.remove(wb.active)
+    wb.calculation.fullCalcOnLoad = True   # force Excel to recompute every formula on open
 
     _build_cover(wb, extracted, meta, sections, approved=approved,
                  approved_by=approved_by, approved_at=approved_at,
@@ -561,6 +567,7 @@ def build_project_workbook(drawings: list[dict]) -> bytes:
     filterable line-item sheet, in the same tender-BOQ style."""
     generated_at = datetime.datetime.now().strftime("%d %b %Y, %H:%M")
     wb = openpyxl.Workbook()
+    wb.calculation.fullCalcOnLoad = True   # force Excel to recompute every formula on open
 
     ov = wb.active
     ov.title = "Overview"
@@ -596,6 +603,7 @@ def build_project_workbook(drawings: list[dict]) -> bytes:
     cons.row_dimensions[chr_].height = 28
 
     yellow = _fill(YELLOW)
+    amber = _fill(AMBER)
     crow, orow, z = chr_ + 1, hr + 1, 0
     for d in drawings:
         extracted = dict(d.get("extracted") or {})
@@ -613,6 +621,9 @@ def build_project_workbook(drawings: list[dict]) -> bytes:
         for k, it in enumerate(items, 1):
             rz = _fill(ZEBRA) if k % 2 == 0 else None
             qty = _num(it.get("quantity"))
+            rate = _num(it.get("rate"))
+            priced = rate is not None
+            rate_fill = yellow if priced else amber   # amber = unpriced, flag for manual pricing
             _put(cons, crow, 1, label, align=Alignment(horizontal="left", vertical="top"), fill=rz)
             _put(cons, crow, 2, it.get("section") or "General", align=Alignment(horizontal="left", vertical="top", wrap_text=True), fill=rz)
             _put(cons, crow, 3, k, align=Alignment(horizontal="center", vertical="top"), fill=rz)
@@ -622,9 +633,9 @@ def build_project_workbook(drawings: list[dict]) -> bytes:
             _put(cons, crow, 7, qty if qty is not None else _val(it.get("quantity")),
                  align=Alignment(horizontal="right", vertical="top"), fill=yellow,
                  numfmt=(CURRENCY_FMT if qty is not None else None))
-            _put(cons, crow, 8, None, align=Alignment(horizontal="right", vertical="top"), fill=yellow, numfmt=CURRENCY_FMT)
+            _put(cons, crow, 8, rate if priced else None, align=Alignment(horizontal="right", vertical="top"), fill=rate_fill, numfmt=CURRENCY_FMT)
             _put(cons, crow, 9, f'=IF(OR(G{crow}="",H{crow}=""),"",G{crow}*H{crow})',
-                 align=Alignment(horizontal="right", vertical="top"), fill=yellow, numfmt=CURRENCY_FMT)
+                 align=Alignment(horizontal="right", vertical="top"), fill=rate_fill, numfmt=CURRENCY_FMT)
             _put(cons, crow, 10, "📋  " + (it.get("origin") or ORIGIN_PLACEHOLDER),
                  align=Alignment(horizontal="left", vertical="top", wrap_text=True), fill=rz)
             crow += 1

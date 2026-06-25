@@ -93,14 +93,16 @@ def _mock_extract(file_path: str, floor_category: str = None,
         "dimensions":      "22m x 19m",
         "quantities":      "Doors: 8 nos | Windows: 12 nos | Columns: 16 nos",
         "boq_items": [
-            {"section": "Concrete / RCC", "description": "RCC M25 for columns, beams & slab (150mm)", "unit": "cu.m", "quantity": "—"},
-            {"section": "Concrete / RCC", "description": "Columns 4.5m × 4.5m grid", "unit": "nos", "quantity": "16"},
-            {"section": "Masonry", "description": "AAC block walls, 200mm external / 100mm internal", "unit": "sq.m", "quantity": "—"},
-            {"section": "Finishes", "description": "Cement plaster & painting to walls", "unit": "sq.m", "quantity": "—"},
-            {"section": "Finishes", "description": "Ceramic floor tiling", "unit": "sq.m", "quantity": "420"},
-            {"section": "Doors & Windows", "description": "Teak wood doors", "unit": "nos", "quantity": "8"},
-            {"section": "Doors & Windows", "description": "UPVC windows", "unit": "nos", "quantity": "12"},
-            {"section": "Miscellaneous", "description": "Rooms / spaces as per room schedule", "unit": "nos", "quantity": "6"},
+            {"section": "Concrete / RCC", "description": "RCC M25 for columns, beams & slab (150mm)", "unit": "cu.m", "quantity": "—", "rate": "1450", "origin": "Approved equal — contractor selection", "reference": "S-101"},
+            {"section": "Concrete / RCC", "description": "Columns 4.5m × 4.5m grid", "unit": "nos", "quantity": "16", "rate": "—", "origin": "Approved equal — contractor selection", "reference": "S-101"},
+            {"section": "Masonry", "description": "AAC block walls, 200mm external / 100mm internal", "unit": "sq.m", "quantity": "—", "rate": "62", "origin": "Bianco / Hamil / approved equal", "reference": "A-201"},
+            {"section": "Finishes", "description": "Cement plaster & painting to walls", "unit": "sq.m", "quantity": "—", "rate": "38", "origin": "Jotun / National Paints", "reference": "A-301"},
+            {"section": "Finishes", "description": "Ceramic floor tiling", "unit": "sq.m", "quantity": "420", "rate": "95", "origin": "RAK Ceramics / approved equal", "reference": "A-301"},
+            {"section": "Doors & Windows", "description": "Teak wood doors", "unit": "nos", "quantity": "8", "rate": "1850", "origin": "Approved joinery — contractor selection", "reference": "A-401"},
+            {"section": "Doors & Windows", "description": "UPVC windows", "unit": "nos", "quantity": "12", "rate": "1200", "origin": "Deceuninck / Veka / approved equal", "reference": "A-401"},
+            {"section": "LV Switchgear & Distribution", "description": "Final distribution board, 12-way TPN", "unit": "nos", "quantity": "4", "rate": "2400", "origin": "Schneider Electric / ABB / Siemens", "reference": "E-201"},
+            {"section": "Cables & Wiring", "description": "LV power cable 4C × 16 sq.mm XLPE/SWA/PVC", "unit": "m", "quantity": "—", "rate": "48", "origin": "Ducab / NCC / Oman Cables", "reference": "E-202"},
+            {"section": "Lighting", "description": "Recessed LED panel luminaire 600×600, 36W", "unit": "nos", "quantity": "60", "rate": "165", "origin": "Philips / approved equal", "reference": "E-301"},
         ],
         "approval_stamp":  True,
         "north_arrow":     True,
@@ -175,12 +177,12 @@ Return ONLY this exact JSON structure (null for any title-block field not visibl
   "materials":         ["RCC", "AAC Block", ...] or [],
   "dimensions":        "overall building dimensions e.g. 22m x 19m or null",
   "boq_items": [
-    {{"section": "Concrete / RCC", "description": "RCC for columns, beams and slab (M25)", "unit": "cu.m", "quantity": "—"}},
-    {{"section": "Masonry",        "description": "AAC block walls, 200mm thick",           "unit": "sq.m", "quantity": "—"}},
-    {{"section": "Finishes",       "description": "Internal wall plastering & painting",    "unit": "sq.m", "quantity": "—"}},
-    {{"section": "Finishes",       "description": "Floor tiling",                           "unit": "sq.m", "quantity": "420"}},
-    {{"section": "Doors & Windows","description": "Flush / teak doors",                     "unit": "nos",  "quantity": "8"}},
-    {{"section": "Doors & Windows","description": "UPVC windows",                           "unit": "nos",  "quantity": "12"}}
+    {{"section": "Concrete / RCC", "description": "RCC for columns, beams and slab (M25)", "unit": "cu.m", "quantity": "—",  "rate": "1450", "origin": "Approved equal — contractor selection", "reference": "S-101"}},
+    {{"section": "Finishes",       "description": "Floor tiling",                           "unit": "sq.m", "quantity": "420", "rate": "95",   "origin": "RAK Ceramics / approved equal",          "reference": "A-301"}},
+    {{"section": "Doors & Windows","description": "UPVC windows",                           "unit": "nos",  "quantity": "12",  "rate": "1200", "origin": "Deceuninck / Veka / approved equal",     "reference": "A-401"}},
+    {{"section": "LV Switchgear & Distribution", "description": "Final distribution board, 12-way TPN", "unit": "nos", "quantity": "4", "rate": "2400", "origin": "Schneider Electric / ABB / Siemens", "reference": "E-201"}},
+    {{"section": "Cables & Wiring", "description": "LV power cable 4C × 16 sq.mm XLPE/SWA/PVC", "unit": "m", "quantity": "—", "rate": "48", "origin": "Ducab / NCC / Oman Cables", "reference": "E-202"}},
+    {{"section": "Lighting",       "description": "Recessed LED panel 600×600, 36W",        "unit": "nos",  "quantity": "60",  "rate": "165",  "origin": "Philips / approved equal",               "reference": "E-301"}}
   ],
   "confidence": {{ "drawing_number": 0.0, "project_name": 0.0, "boq_items": 0.0 }}
 }}
@@ -188,13 +190,28 @@ Return ONLY this exact JSON structure (null for any title-block field not visibl
 INSTRUCTIONS:
 1. TITLE BLOCK (usually bottom-right): drawing number, drawing title, project name, project location, client name,
    contractor/consultant, drawn/checked/approved by, date, revision, sheet number, total sheets, scale.
-2. BOQ — group line items by trade SECTION. Use these sections where applicable, in this order:
-   "Concrete / RCC", "Masonry", "Finishes", "Doors & Windows", "Plumbing & Sanitary", "Electrical", "Miscellaneous".
+2. BOQ — group line items by trade SECTION. Use ONLY the sections this drawing actually implies, drawn from this
+   ordered list (civil first, then MEP, then electrical):
+   "Preliminaries / General", "Concrete / RCC", "Masonry", "Finishes", "Doors & Windows", "Waterproofing",
+   "Plumbing & Sanitary", "Drainage", "HVAC", "Fire Fighting",
+   "LV Switchgear & Distribution", "Cables & Wiring", "Containment (Trunking/Conduit/Tray)", "Lighting",
+   "Small Power & Accessories", "Earthing & Lightning Protection", "Fire Alarm", "ELV / Data / Telecom",
+   "Miscellaneous".
    For each item give a clear description, a sensible UNIT (nos, sq.m, cu.m, m, kg, lump sum) and a QUANTITY.
    - Read explicit quantities directly: door/window counts, room areas, schedules, dimension lines, area statements.
    - Derive obvious quantities: floor finishes ≈ total floor area; wall plaster/paint ≈ wall area when wall lengths/heights are shown.
    - If a quantity genuinely cannot be read or reasonably derived from THIS drawing, use "—" (do not invent precise figures).
    - Include every distinct work item the drawing implies; aim for a useful, complete BOQ (typically 6–20 lines).
+2a. PRICING & BRANDS (indicative budget guidance for Dubai — NOT a binding quotation):
+   - "rate": an indicative Dubai 2026 unit rate in AED for the item's UNIT, as a plain number only (no currency symbol,
+     no thousands separators, e.g. "1450" or "48.50"). Base it on prevailing Dubai market rates. If a line genuinely
+     cannot be reasonably priced, set "rate" to null — it will be flagged for manual pricing. Do NOT invent precise figures.
+   - "origin": Dubai AVL approved brand / origin guidance for the item. Examples: LV switchgear / MCCB / ACB / distribution
+     boards → "Schneider Electric / ABB / Siemens"; LV & MV cables → "Ducab / NCC / Oman Cables"; give the typical
+     AVL-approved makes for lighting, wiring accessories, sanitaryware, tiling, paints, etc. Where no specific brand
+     applies, use "Approved equal — contractor selection".
+   - "reference": the drawing reference / grid / detail tag the item is taken from (e.g. the sheet number or a detail
+     callout); null if not identifiable.
 3. Use the drawing's own units/scale. Return null for any title-block field not visible — do NOT fabricate title-block text.
 4. confidence: a single 0..1 self-rating per listed key is enough."""
 
