@@ -40,6 +40,7 @@ export default function UploadPage() {
   const setStrict = usePrintoStore((s) => s.setStrict);
 
   const [floor, setFloor] = useState(FLOOR_CATEGORIES[0]);
+  const [projectDescription, setProjectDescription] = useState("");
   const [files, setFiles] = useState<File[]>([]);
   // Batch progress (multi-file) — null when not running a batch.
   const [batch, setBatch] = useState<{ index: number; total: number; name: string } | null>(null);
@@ -50,12 +51,12 @@ export default function UploadPage() {
   // Process a list sequentially (the backend handles one drawing at a time).
   // A single file navigates straight to its result; multiple files show a batch
   // summary with a link to each.
-  async function processFiles(list: File[], floorCat: string) {
+  async function processFiles(list: File[], floorCat: string, desc: string) {
     if (!list.length) return;
     setBatchResults([]);
 
     if (list.length === 1) {
-      const r = await start(list[0], list[0].name, floorCat, strict);
+      const r = await start(list[0], list[0].name, floorCat, strict, desc);
       if (r) {
         setLastResult(r);
         router.push(`/results/${r.drawing_id}`);
@@ -66,7 +67,7 @@ export default function UploadPage() {
     const acc: BatchItem[] = [];
     for (let i = 0; i < list.length; i++) {
       setBatch({ index: i + 1, total: list.length, name: list[i].name });
-      const r = await start(list[i], list[i].name, floorCat, strict);
+      const r = await start(list[i], list[i].name, floorCat, strict, desc);
       if (r) {
         setLastResult(r);
         acc.push({ name: list[i].name, drawingId: r.drawing_id, verdict: r.verdict });
@@ -85,7 +86,7 @@ export default function UploadPage() {
       return;
     }
     const blob = await res.blob();
-    const r = await start(blob as File, s.file, s.floor, strict);
+    const r = await start(blob as File, s.file, s.floor, strict, projectDescription);
     if (r) {
       setLastResult(r);
       router.push(`/results/${r.drawing_id}`);
@@ -240,6 +241,21 @@ export default function UploadPage() {
         <Card>
           <h2 className="mb-4 font-bold">Upload drawings</h2>
           <label className="mb-1 block text-xs font-semibold text-muted">
+            Brief project description <span className="text-dim">(optional)</span>
+          </label>
+          <textarea
+            rows={3}
+            value={projectDescription}
+            onChange={(e) => setProjectDescription(e.target.value)}
+            maxLength={500}
+            placeholder="e.g. G+2 residential villa, Plot 14, Whitefield — RCC frame, interior fit-out scope"
+            className="mb-1 w-full resize-none rounded-[10px] border border-border bg-surface-2 px-3 py-2 text-sm text-text outline-none placeholder:text-dim focus:border-accent-orange"
+          />
+          <p className="mb-4 text-right text-xs text-dim">
+            {projectDescription.length}/500
+          </p>
+
+          <label className="mb-1 block text-xs font-semibold text-muted">
             Floor / Category
           </label>
           <select
@@ -290,7 +306,7 @@ export default function UploadPage() {
             variant="primary"
             fullWidth
             disabled={!files.length || busy}
-            onClick={() => processFiles(files, floor)}
+            onClick={() => processFiles(files, floor, projectDescription)}
           >
             {batch
               ? `Processing ${batch.index}/${batch.total}…`

@@ -133,11 +133,13 @@ def event(icon: str, step: str, message: str, etype: str = "info") -> str:
     line = f"  [{now()}]  {icon}  {step} — {message}"
     return f"data: {json.dumps({'line': line, 'type': etype})}\n\n"
 
-def save_drawing_record(file_name: str, file_path: str, floor_category: str) -> int:
+def save_drawing_record(file_name: str, file_path: str, floor_category: str,
+                         project_description: str = "") -> int:
     conn = get_conn()
     cur = conn.execute(
-        "INSERT INTO drawings (file_name, file_path, status, floor_category) VALUES (?,?,?,?)",
-        (file_name, str(file_path), "processing", floor_category)
+        "INSERT INTO drawings (file_name, file_path, status, floor_category, project_description) "
+        "VALUES (?,?,?,?,?)",
+        (file_name, str(file_path), "processing", floor_category, project_description)
     )
     conn.commit()
     rec_id = cur.lastrowid
@@ -440,7 +442,8 @@ def _rebuild_report_html(drawing_id: int) -> str | None:
 # ── Main SSE Pipeline ─────────────────────────────────────────────────────
 
 async def run_pipeline(file_path: Path, file_name: str, drawing_id: int,
-                        file_size_mb: float, strict: bool, floor_category: str):
+                        file_size_mb: float, strict: bool, floor_category: str,
+                        project_description: str = ""):
     start       = time.time()
     errors      = []
     warnings    = []
@@ -522,7 +525,7 @@ async def run_pipeline(file_path: Path, file_name: str, drawing_id: int,
             asyncio.get_event_loop().run_in_executor(
                 None,
                 lambda: extract_drawing_with_prepass(
-                    str(work_path), floor_category, file_name
+                    str(work_path), floor_category, file_name, project_description
                 ),
             ),
             timeout=EXTRACT_TIMEOUT
@@ -565,7 +568,8 @@ async def run_pipeline(file_path: Path, file_name: str, drawing_id: int,
     # ── Map to RealSoft Format (title block + BOQ) ───────────────────────
     yield event("🗺️ ", "ERP Mapping", "Converting title block + BOQ to RealSoft ERP format...", "info")
     avg_conf = average_confidence(extracted)
-    realsoft_payload = map_to_realsoft(extracted, drawing_id, file_name, "GENERATED", avg_conf)
+    realsoft_payload = map_to_realsoft(extracted, drawing_id, file_name, "GENERATED", avg_conf,
+                                       project_description)
     gw_data = gateway_erp_map(extracted)
     if gw_data:
         realsoft_payload["data"] = gw_data
@@ -582,10 +586,11 @@ async def run_pipeline(file_path: Path, file_name: str, drawing_id: int,
     # ── Stage for review (review/edit the BOQ, then approve to push) ──────
     elapsed = round(time.time() - start, 1)
     drawing_meta = {
-        "file_name":      file_name,
-        "drawing_id":     drawing_id,
-        "floor_category": floor_category,
-        "uploaded_at":    datetime.datetime.now().isoformat(),
+        "file_name":           file_name,
+        "drawing_id":          drawing_id,
+        "floor_category":      floor_category,
+        "project_description": project_description,
+        "uploaded_at":         datetime.datetime.now().isoformat(),
     }
     _store_report_data(drawing_id, {
         "drawing_meta":  drawing_meta,
@@ -647,6 +652,7 @@ async def upload_drawing(
     upload_id: str | None = Form(default=None),
     file_name: str | None = Form(default=None),
     floor_category: str = Form(default="Other"),
+    project_description: str = Form(default=""),
     strict: bool = False,
     _user: dict = Depends(require_auth),
 ):
@@ -680,10 +686,11 @@ async def upload_drawing(
         raise HTTPException(400, "No file or upload_id provided")
 
     size_mb    = dest.stat().st_size / (1024 * 1024)
-    drawing_id = save_drawing_record(display_name, dest, floor_category)
+    drawing_id = save_drawing_record(display_name, dest, floor_category, project_description)
 
     return StreamingResponse(
-        run_pipeline(dest, display_name, drawing_id, size_mb, strict, floor_category),
+        run_pipeline(dest, display_name, drawing_id, size_mb, strict, floor_category,
+                     project_description),
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
@@ -808,6 +815,7 @@ def get_review(drawing_id: int, _user: dict = Depends(require_auth)):
         "elapsed":          data.get("elapsed", 0),
         "extracted":        extracted,
         "boq_items":        extracted.get("boq_items") or [],
+        "project_description": (data.get("drawing_meta") or {}).get("project_description", ""),
         "summary_draft":    summary_draft,
         "summary_override": data.get("summary_override") or row[5],
         "erp_payload":      data.get("erp_payload", {}),
@@ -857,9 +865,12 @@ def approve_drawing(drawing_id: int, body: dict, user: dict = Depends(require_au
         extracted["boq_items"] = body["boq_items"]
 
     # Re-map to ERP on the reviewed data, then push (or simulate).
-    file_name = (data.get("drawing_meta") or {}).get("file_name", "")
+    _meta = data.get("drawing_meta") or {}
+    file_name = _meta.get("file_name", "")
+    project_description = _meta.get("project_description", "")
     avg_conf = average_confidence(extracted)
-    realsoft_payload = map_to_realsoft(extracted, drawing_id, file_name, "GENERATED", avg_conf)
+    realsoft_payload = map_to_realsoft(extracted, drawing_id, file_name, "GENERATED", avg_conf,
+                                       project_description)
     gw_data = gateway_erp_map(extracted)
     if gw_data:
         realsoft_payload["data"] = gw_data

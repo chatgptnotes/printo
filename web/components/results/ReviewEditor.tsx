@@ -151,6 +151,15 @@ export function ReviewEditor({
         and Bill of Quantities below, adjust any line, then approve to push to RealSoft.
       </div>
 
+      {data.project_description && data.project_description.trim() && (
+        <Card>
+          <SectionRule>Project Description</SectionRule>
+          <p className="whitespace-pre-line text-sm text-muted">
+            {data.project_description}
+          </p>
+        </Card>
+      )}
+
       {/* Bill of Quantities — editable */}
       <Card>
         <div className="mb-3 flex items-center justify-between">

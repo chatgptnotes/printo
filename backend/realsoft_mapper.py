@@ -192,7 +192,8 @@ def _null():
 
 
 def map_to_realsoft(extracted: dict, drawing_id: int, file_name: str,
-                    validation_verdict: str, ai_confidence_avg: float) -> dict:
+                    validation_verdict: str, ai_confidence_avg: float,
+                    project_description: str = "") -> dict:
     data = {}
     warnings = []
 
@@ -268,6 +269,7 @@ def map_to_realsoft(extracted: dict, drawing_id: int, file_name: str,
         "metadata": {
             "source":                 "PRINTO_AI",
             "source_file":            file_name,
+            "project_description":    project_description or "",
             "printo_record_id":       drawing_id,
             "ai_confidence_avg":      round(ai_confidence_avg, 3),
             "status":                 validation_verdict,

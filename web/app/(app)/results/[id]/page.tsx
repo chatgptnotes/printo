@@ -156,6 +156,15 @@ export default function ResultsPage({ params }: { params: { id: string } }) {
         </Button>
       </div>
 
+      {review.project_description && review.project_description.trim() && (
+        <Card>
+          <SectionRule>Project Description</SectionRule>
+          <p className="whitespace-pre-line text-sm text-muted">
+            {review.project_description}
+          </p>
+        </Card>
+      )}
+
       <Card>
         <SectionRule>Bill of Quantities</SectionRule>
         <BoqDisplay items={boqItems} />

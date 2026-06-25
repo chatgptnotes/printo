@@ -87,6 +87,7 @@ export interface ReviewData {
   elapsed: number;
   extracted: Extracted;
   boq_items: BoqItem[];
+  project_description?: string;
   summary_draft: string;
   summary_override: string | null;
   erp_payload: RealsoftPayload;

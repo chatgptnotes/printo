@@ -89,6 +89,8 @@ def init_db():
         ("approved_by",     "TEXT"),
         ("approved_at",     "TIMESTAMP"),
         ("summary_override","TEXT"),
+        # User-provided brief project description captured at upload time.
+        ("project_description", "TEXT"),
     ]:
         if col not in existing_cols:
             conn.execute(f"ALTER TABLE drawings ADD COLUMN {col} {typedef}")

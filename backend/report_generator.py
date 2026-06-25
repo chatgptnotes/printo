@@ -270,6 +270,15 @@ def generate_report(drawing_meta, extracted, rule_results, verdict, elapsed,
     file_name = drawing_meta.get("file_name", "—")
     drawing_id = drawing_meta.get("drawing_id", "—")
 
+    # User-provided project description (captured at upload) — shown only if given.
+    proj_desc = (drawing_meta.get("project_description") or "").strip()
+    proj_desc_html = ""
+    if proj_desc:
+        proj_desc_html = (
+            '<div class="section"><h2 class="section-title">Project Description</h2>'
+            f'<p class="summary">{escape(proj_desc).replace(chr(10), "<br>")}</p></div>'
+        )
+
     boq = _boq_items(extracted)
     sections = _boq_sections(extracted)
 
@@ -354,6 +363,8 @@ def generate_report(drawing_meta, extracted, rule_results, verdict, elapsed,
     <p class="summary">{summary}</p>
     <table style="margin-top:10px;"><tr class="stat">{stat_cells}</tr></table>
   </div>
+
+  {proj_desc_html}
 
   <div class="section">
     <h2 class="section-title">Title Block</h2>

@@ -51,6 +51,7 @@ export function useUploadStream() {
     fileName: string,
     floorCategory: string,
     strict: boolean,
+    projectDescription = "",
   ): Promise<DonePayload | null> {
     if (busy.current) return null;
     busy.current = true;
@@ -70,6 +71,7 @@ export function useUploadStream() {
       form.append("file", file, fileName);
       form.append("floor_category", floorCategory);
       form.append("strict", String(strict));
+      form.append("project_description", projectDescription);
 
       let resp: Response;
       if (file.size <= VERCEL_BODY_LIMIT) {
@@ -110,6 +112,7 @@ export function useUploadStream() {
         finForm.append("file_name", fileName);
         finForm.append("floor_category", floorCategory);
         finForm.append("strict", String(strict));
+        finForm.append("project_description", projectDescription);
         try {
           resp = await fetch("/api/upload", { method: "POST", body: finForm });
         } catch (e) {
