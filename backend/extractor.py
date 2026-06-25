@@ -63,9 +63,10 @@ def _mock_extract(file_path: str, floor_category: str = None,
         "drawing_number":    f"CT-A-{code}",
         "drawing_title":     f"{floor.upper()} PLAN",
         "project_name":      "CORAL TOWERS RESIDENTIAL COMPLEX",
-        "project_location":  "",
-        "client_name":       "",
-        "contractor_name":   "",
+        "project_location":  "Business Bay, Dubai, UAE",
+        "plot_number":       "Plot 345-1023",
+        "client_name":       "Coral Real Estate Development LLC",
+        "contractor_name":   "Gulf Premier Contracting LLC",
         "drawn_by":          "S. Kumar",
         "checked_by":        "B. K. Murali",
         "approved_by":       "M. Varghese",
@@ -155,7 +156,8 @@ Return ONLY this exact JSON structure (null for any title-block field not visibl
   "drawing_number":    "e.g. A-001 or null",
   "drawing_title":     "e.g. GROUND FLOOR PLAN or null",
   "project_name":      "full project name or null",
-  "project_location":  "city or address or null",
+  "project_location":  "city / area / full site address or null",
+  "plot_number":       "e.g. Plot 345-1023, Plot No. 17, Makani/parcel no. or null",
   "client_name":       "owner/client name or null",
   "contractor_name":   "contractor or consultant firm name or null",
   "drawn_by":          "name or initials or null",
@@ -188,8 +190,11 @@ Return ONLY this exact JSON structure (null for any title-block field not visibl
 }}
 
 INSTRUCTIONS:
-1. TITLE BLOCK (usually bottom-right): drawing number, drawing title, project name, project location, client name,
-   contractor/consultant, drawn/checked/approved by, date, revision, sheet number, total sheets, scale.
+1. TITLE BLOCK (usually bottom-right): drawing number, drawing title, project name, project location, plot number,
+   client name, contractor/consultant, drawn/checked/approved by, date, revision, sheet number, total sheets, scale.
+   Read the title block carefully — the PROJECT LOCATION (site address / area / city), the PLOT NUMBER
+   (plot / parcel / Makani no.), the CLIENT / OWNER name and the CONTRACTOR / CONSULTANT firm are often present
+   in the title block, a project header or a key plan. Extract them when shown; use null only if genuinely absent.
 2. BOQ — group line items by trade SECTION. Use ONLY the sections this drawing actually implies, drawn from this
    ordered list (civil first, then MEP, then electrical):
    "Preliminaries / General", "Concrete / RCC", "Masonry", "Finishes", "Doors & Windows", "Waterproofing",
@@ -241,7 +246,7 @@ PREPASS_GROUND_TRUTH = [
 
 # Fields owned by the title-block crop pass during multi-pass extraction.
 TITLE_BLOCK_KEYS = [
-    "drawing_number", "drawing_title", "project_name", "project_location",
+    "drawing_number", "drawing_title", "project_name", "project_location", "plot_number",
     "client_name", "contractor_name", "drawn_by", "checked_by", "approved_by",
     "date_of_issue", "revision_number", "sheet_number", "total_sheets", "scale",
 ]

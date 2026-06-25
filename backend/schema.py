@@ -51,6 +51,7 @@ class DrawingExtraction(BaseModel):
     drawing_title: Optional[str] = None
     project_name: Optional[str] = None
     project_location: Optional[str] = None
+    plot_number: Optional[str] = None
     client_name: Optional[str] = None
     contractor_name: Optional[str] = None
     drawn_by: Optional[str] = None
@@ -173,7 +174,7 @@ def extraction_json_schema() -> dict:
 # Plain field list (handy for prompts / benchmarks / UI ordering).
 SCALAR_FIELDS = [
     "drawing_number", "drawing_title", "project_name", "project_location",
-    "client_name", "contractor_name", "drawn_by", "checked_by", "approved_by",
+    "plot_number", "client_name", "contractor_name", "drawn_by", "checked_by", "approved_by",
     "date_of_issue", "revision_number", "sheet_number", "total_sheets", "scale",
     "floor_level", "total_floor_area", "building_type", "number_of_rooms",
     "door_count", "window_count", "dimensions", "structural_notes",

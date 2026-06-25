@@ -17,6 +17,7 @@ from html import escape
 FIELD_LABELS = {
     "drawing_number": "Drawing Number", "drawing_title": "Drawing Title",
     "project_name": "Project Name", "project_location": "Project Location",
+    "plot_number": "Plot No.",
     "client_name": "Client Name", "contractor_name": "Contractor / Consultant",
     "drawn_by": "Drawn By", "checked_by": "Checked By", "approved_by": "Approved By",
     "date_of_issue": "Date of Issue", "revision_number": "Revision Number",
@@ -29,7 +30,7 @@ FIELD_LABELS = {
 
 # Title-block fields, in report display order.
 TITLE_BLOCK_ORDER = [
-    "project_name", "client_name", "project_location", "contractor_name",
+    "project_name", "client_name", "project_location", "plot_number", "contractor_name",
     "drawing_number", "drawing_title", "floor_level", "building_type",
     "scale", "dimensions", "total_floor_area", "date_of_issue",
     "revision_number", "sheet_number", "total_sheets",

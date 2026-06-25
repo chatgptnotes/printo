@@ -56,6 +56,7 @@ export const FIELD_GROUPS: Record<string, [string, string][]> = {
     ["drawing_title", "Drawing Title"],
     ["project_name", "Project Name"],
     ["project_location", "Project Location"],
+    ["plot_number", "Plot No."],
     ["client_name", "Client Name"],
     ["contractor_name", "Contractor Name"],
     ["date_of_issue", "Date of Issue"],

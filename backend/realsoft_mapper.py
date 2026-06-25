@@ -149,6 +149,7 @@ FIELD_MAP = [
     ("drawing_title",    "DrawingTitle",    norm_text),
     ("project_name",     "ProjectName",     norm_text),
     ("project_location", "ProjectLocation", norm_text),
+    ("plot_number",      "PlotNo",          norm_text),
     ("client_name",      "ClientName",      norm_text),
     ("contractor_name",  "ContractorName",  norm_text),
     ("drawn_by",         "DrawnBy",         norm_text),
@@ -173,6 +174,7 @@ FIELD_MAP = [
 CONF_SOURCE = {
     "DrawingNo": "drawing_number", "DrawingTitle": "drawing_title",
     "ProjectName": "project_name", "ProjectLocation": "project_location",
+    "PlotNo": "plot_number",
     "ClientName": "client_name", "ContractorName": "contractor_name",
     "DrawnBy": "drawn_by", "CheckedBy": "checked_by", "ApprovedBy": "approved_by",
     "DateOfIssue": "date_of_issue", "RevisionNo": "revision_number",

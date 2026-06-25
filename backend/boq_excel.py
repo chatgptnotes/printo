@@ -214,6 +214,7 @@ def _build_cover(wb, extracted, meta, sections, *, approved, approved_by,
     r = 6
     for label, key in (("Project", "project_name"), ("Owner / Client", "client_name"),
                        ("Location", "project_location"),
+                       ("Plot No.", "plot_number"),
                        ("Consultant / Contractor", "contractor_name"),
                        ("Building Type", "building_type")):
         kv(r, label, extracted.get(key)); r += 1
