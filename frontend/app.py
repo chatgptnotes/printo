@@ -855,7 +855,7 @@ if st.session_state.active_tab == "Upload":
         )
         st.markdown('<div class="sample-cap">Max 20 MB · PDF, image, or CAD (DWG/DXF/DWF) · floor plans, sections, elevations</div>',
                     unsafe_allow_html=True)
-        if st.button("🚀  Process Drawing", type="primary", use_container_width=True,
+        if st.button("🚀  Process Files and Drawings", type="primary", use_container_width=True,
                      disabled=uploaded is None):
             start_job(uploaded.getvalue(), uploaded.name,
                       uploaded.type or _guess_media_type(uploaded.name), floor_cat)

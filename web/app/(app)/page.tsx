@@ -27,6 +27,17 @@ const Hero3D = dynamic(() => import("@/components/upload/Hero3D"), {
   ),
 });
 
+// The project description is BOQ context the AI reads alongside the drawing, so
+// allow long, detailed scope/requirements. Bounded in words to match the user's
+// mental model; the char cap gives ~7 chars/word of headroom and stays in sync
+// with the backend prompt cap.
+const MAX_DESCRIPTION_WORDS = 50_000;
+const MAX_DESCRIPTION_CHARS = 350_000;
+const countWords = (s: string): number => {
+  const t = s.trim();
+  return t ? t.split(/\s+/).length : 0;
+};
+
 interface BatchItem {
   name: string;
   drawingId: number | null;
@@ -262,18 +273,19 @@ export default function UploadPage() {
         <Card>
           <h2 className="mb-4 font-bold">Upload drawings</h2>
           <label className="mb-1 block text-xs font-semibold text-muted">
-            Brief project description <span className="text-dim">(optional)</span>
+            BOQ description / scope <span className="text-dim">(optional)</span>
           </label>
           <textarea
-            rows={3}
+            rows={4}
             value={projectDescription}
             onChange={(e) => setProjectDescription(e.target.value)}
-            maxLength={500}
-            placeholder="e.g. G+2 residential villa, Plot 14, Whitefield — RCC frame, interior fit-out scope"
-            className="mb-1 w-full resize-none rounded-[10px] border border-border bg-surface-2 px-3 py-2 text-sm text-text outline-none placeholder:text-dim focus:border-accent-orange"
+            maxLength={MAX_DESCRIPTION_CHARS}
+            placeholder="Describe the scope, work items, materials, brands, quantities or any BOQ requirements — the AI reads this alongside the drawing when building the Bill of Quantities."
+            className="mb-1 max-h-72 w-full resize-y rounded-[10px] border border-border bg-surface-2 px-3 py-2 text-sm text-text outline-none placeholder:text-dim focus:border-accent-orange"
           />
           <p className="mb-4 text-right text-xs text-dim">
-            {projectDescription.length}/500
+            {countWords(projectDescription).toLocaleString()}/
+            {MAX_DESCRIPTION_WORDS.toLocaleString()} words
           </p>
 
           <label className="mb-1 block text-xs font-semibold text-muted">
@@ -363,9 +375,7 @@ export default function UploadPage() {
               ? `Processing ${batch.index}/${batch.total}…`
               : streaming
                 ? "Processing…"
-                : files.length > 1
-                  ? `Process ${files.length} drawings`
-                  : "Process Drawing"}
+                : "Process Files and Drawings"}
           </Button>
         </Card>
 
