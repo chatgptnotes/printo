@@ -633,13 +633,18 @@ def _end_failed(errors, warnings, extracted, payload, drawing_id, start, status=
 # ── Endpoints ─────────────────────────────────────────────────────────────
 
 @app.post("/upload/chunk")
-async def upload_chunk(
+def upload_chunk(
     upload_id: str = Form(...),
     index: int = Form(...),
     chunk: UploadFile = File(...),
     _user: dict = Depends(require_auth),
 ):
-    """Append one ordered chunk of a large upload. index 0 starts a fresh file."""
+    """Append one ordered chunk of a large upload. index 0 starts a fresh file.
+
+    Sync def on purpose: FastAPI runs it in the threadpool so the synchronous disk
+    write never blocks the single worker's event loop while other requests (the
+    next chunk, health, review) are in flight.
+    """
     part = CHUNK_DIR / f"{_safe_upload_id(upload_id)}.part"
     with open(part, "wb" if index == 0 else "ab") as f:
         shutil.copyfileobj(chunk.file, f)

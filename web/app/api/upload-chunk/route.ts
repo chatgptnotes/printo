@@ -3,7 +3,9 @@ import { API_URL } from "@/lib/api";
 import { getSessionToken } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 60;
+// Match /api/upload (300s) so a slow cross-region chunk POST isn't cut off at the
+// function timeout and surfaced to the client as an HTTP 504.
+export const maxDuration = 300;
 
 /**
  * Forwards one chunk of a large upload to the backend. Each chunk is kept well

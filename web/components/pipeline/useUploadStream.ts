@@ -11,6 +11,14 @@ import type { DonePayload, EventType, StreamEvent } from "@/lib/types";
 const VERCEL_BODY_LIMIT = 4 * 1024 * 1024; // 4 MB (margin under Vercel's 4.5 MB)
 const CHUNK_SIZE = 3.5 * 1024 * 1024; // 3.5 MB per chunk
 
+// A chunk POST can hit a transient gateway timeout (504) even when the backend
+// actually succeeds, so we retry the WHOLE chunk sequence (not a single part):
+// each attempt uses a fresh upload_id, and chunk 0 opens the .part in "wb" which
+// truncates — so a restart never double-appends and corrupts the assembled file.
+const CHUNK_MAX_ATTEMPTS = 3;
+const CHUNK_TRANSIENT_STATUS = new Set([502, 503, 504]);
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
 function newUploadId(): string {
   try {
     return crypto.randomUUID().replace(/-/g, "");
@@ -86,27 +94,55 @@ export function useUploadStream() {
         }
       } else {
         // Large file: upload in sub-cap chunks, then finalize (assemble + run).
-        const uploadId = newUploadId();
         const total = Math.ceil(file.size / CHUNK_SIZE);
         push(`Large file (${sizeMB} MB) — uploading in ${total} parts…`);
-        for (let i = 0; i < total; i++) {
-          const cForm = new FormData();
-          cForm.append("upload_id", uploadId);
-          cForm.append("index", String(i));
-          cForm.append("chunk", file.slice(i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE), fileName);
-          let cRes: Response;
-          try {
-            cRes = await fetch("/api/upload-chunk", { method: "POST", body: cForm });
-          } catch (e) {
-            throw new Error(
-              `Upload interrupted at part ${i + 1}/${total}` +
-                (e instanceof Error && e.message ? ` (${e.message})` : "") + ".",
-            );
+
+        // Upload all chunks; on a transient failure restart the whole sequence
+        // with a fresh upload_id (chunk 0 truncates, so no double-append).
+        // Returns the upload_id of the successful sequence for the finalize step.
+        const uploadAllChunks = async (): Promise<string> => {
+          for (let attempt = 1; attempt <= CHUNK_MAX_ATTEMPTS; attempt++) {
+            const uploadId = newUploadId();
+            try {
+              for (let i = 0; i < total; i++) {
+                const cForm = new FormData();
+                cForm.append("upload_id", uploadId);
+                cForm.append("index", String(i));
+                cForm.append("chunk", file.slice(i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE), fileName);
+                const cRes = await fetch("/api/upload-chunk", { method: "POST", body: cForm });
+                if (!cRes.ok) {
+                  // Transient gateway timeouts are retried; hard rejections fail fast.
+                  if (CHUNK_TRANSIENT_STATUS.has(cRes.status) && attempt < CHUNK_MAX_ATTEMPTS) {
+                    throw { transient: true as const, part: i + 1, status: cRes.status };
+                  }
+                  throw new Error(`Part ${i + 1}/${total} rejected (HTTP ${cRes.status}).`);
+                }
+                setProgress(Math.min(2 + Math.round(((i + 1) / total) * 10), 12));
+                push(`Uploaded ${i + 1}/${total} parts…`);
+              }
+              return uploadId; // whole sequence succeeded
+            } catch (e) {
+              // A thrown TypeError is a network failure (also transient).
+              const transient =
+                (typeof e === "object" && e !== null && "transient" in e) || e instanceof TypeError;
+              if (transient && attempt < CHUNK_MAX_ATTEMPTS) {
+                push(
+                  `Network hiccup — retrying upload (attempt ${attempt + 1}/${CHUNK_MAX_ATTEMPTS})…`,
+                  "warning",
+                );
+                setProgress(2);
+                await sleep(800 * attempt);
+                continue; // restart the sequence with a fresh upload_id
+              }
+              if (e instanceof Error) throw e;
+              throw new Error(`Upload interrupted while sending parts to the server.`);
+            }
           }
-          if (!cRes.ok) throw new Error(`Part ${i + 1}/${total} rejected (HTTP ${cRes.status}).`);
-          setProgress(Math.min(2 + Math.round(((i + 1) / total) * 10), 12));
-          push(`Uploaded ${i + 1}/${total} parts…`);
-        }
+          throw new Error("Upload failed after several attempts — please try again.");
+        };
+
+        const uploadId = await uploadAllChunks();
+
         const finForm = new FormData();
         finForm.append("upload_id", uploadId);
         finForm.append("file_name", fileName);
