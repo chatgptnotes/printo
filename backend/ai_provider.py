@@ -22,6 +22,7 @@ Sidecar contract (see tools/mock_sidecar.py):
 import base64
 import os
 import socket
+import time
 from dataclasses import dataclass
 from urllib.parse import urlparse
 
@@ -97,6 +98,17 @@ class MockProvider:
         # Lazy import avoids a circular dependency with extractor.py.
         from extractor import _mock_extract
         return _mock_extract(req.file_path or "", req.floor_category, req.original_name)
+
+
+class UnavailableProvider:
+    name = "unavailable"
+    mode = "unavailable"
+
+    def __init__(self, reason: str):
+        self.reason = reason
+
+    def extract(self, req: ExtractRequest) -> dict:
+        raise SidecarError(self.reason)
 
 
 class SidecarProvider:
@@ -209,11 +221,25 @@ class AnthropicProvider:
             "anthropic-version": ANTHROPIC_VERSION,
             "content-type": "application/json",
         }
-        try:
-            r = requests.post(ANTHROPIC_URL, json=body, headers=headers,
-                              timeout=_vision_timeout())
-        except Exception as e:
-            raise SidecarError(f"anthropic unreachable: {e}") from e
+        r = None
+        last_error = ""
+        for attempt in range(3):
+            try:
+                r = requests.post(ANTHROPIC_URL, json=body, headers=headers,
+                                  timeout=_vision_timeout())
+            except Exception as e:
+                last_error = f"anthropic unreachable: {e}"
+                if attempt < 2:
+                    time.sleep(2 ** attempt)
+                    continue
+                raise SidecarError(last_error) from e
+            if r.status_code in (502, 503, 504, 529) and attempt < 2:
+                last_error = f"anthropic HTTP {r.status_code}: {r.text[:300]}"
+                time.sleep(2 ** attempt)
+                continue
+            break
+        if r is None:
+            raise SidecarError(last_error or "anthropic request failed")
         if r.status_code in (401, 403):
             # Invalid/placeholder key — stop trying Anthropic this process (fall back
             # to the sidecar). Re-enabled after the key is fixed + a restart.
@@ -283,7 +309,13 @@ def gateway_vision_extract(system_prompt: str, sheets: list[bytes],
             return _json.loads(_repair_json(raw))
         except Exception:
             pass
-    raise SidecarError("gateway vision returned no parseable JSON")
+    stderr = (resp.get("stderr") if isinstance(resp, dict) else "") or ""
+    stdout = (raw or "")[:500]
+    raise SidecarError(
+        "gateway vision returned no parseable JSON"
+        + (f"; stdout={stdout!r}" if stdout else "")
+        + (f"; stderr={stderr[:500]!r}" if stderr else "")
+    )
 
 
 def vision_extract(system: str, prompt: str, sheets: list[bytes],
@@ -291,11 +323,24 @@ def vision_extract(system: str, prompt: str, sheets: list[bytes],
     """Multi-sheet vision dispatcher: gateway (Claude CLI, no key) first, then a
     direct Anthropic call if a key is configured. Raises SidecarError if neither
     is available (caller falls back to the legacy single-image path)."""
-    if gateway_vision_ready() and sheets:
-        return gateway_vision_extract(system + "\n\n" + prompt, sheets)
-    if anthropic_ready() and sheets:
-        return anthropic_vision_extract(system, prompt, schema or {}, sheets, media_type)
-    raise SidecarError("no vision provider available")
+    errors = []
+    choice = (_cfg("AI_PROVIDER", "auto") or "auto").lower()
+    if choice == "anthropic" and anthropic_ready() and sheets:
+        try:
+            return anthropic_vision_extract(system, prompt, schema or {}, sheets, media_type)
+        except SidecarError as e:
+            errors.append(str(e))
+    if choice != "anthropic" and gateway_vision_ready() and sheets:
+        try:
+            return gateway_vision_extract(system + "\n\n" + prompt, sheets)
+        except SidecarError as e:
+            errors.append(str(e))
+    if choice != "anthropic" and anthropic_ready() and sheets:
+        try:
+            return anthropic_vision_extract(system, prompt, schema or {}, sheets, media_type)
+        except SidecarError as e:
+            errors.append(str(e))
+    raise SidecarError("no vision provider available" + (": " + " | ".join(errors) if errors else ""))
 
 
 # ── Printo Gateway (Hostinger VPS via printo_gateway_client) ──────────────────
@@ -344,13 +389,31 @@ class GatewayProvider:
         client = _gateway_client()
         if client is None:
             raise SidecarError("printo_gateway_client not installed")
-        if not req.file_path:
-            raise SidecarError("gateway extract requires a file path")
+        image = req.image
+        if not image and req.file_path:
+            try:
+                with open(req.file_path, "rb") as f:
+                    image = f.read()
+            except Exception as e:
+                raise SidecarError(f"gateway extract could not read file: {e}") from e
+        if not image:
+            raise SidecarError("gateway extract requires an image or file path")
         try:
-            fields = client.extract_drawing(req.file_path)   # gateway runs vision server-side
+            resp = client.invoke_vision(
+                GATEWAY_VISION_TASK,
+                image,
+                payload={"systemPrompt": (req.system or "") + "\n\n" + req.prompt},
+                mime=req.media_type,
+                filename=req.original_name or "drawing.png",
+                use_json=True,
+                timeout=int(_vision_timeout()),
+            )
         except Exception as e:
             raise SidecarError(f"gateway extract failed: {e}") from e
-        return fields if isinstance(fields, dict) else {}
+        parsed = resp.get("parsed") if isinstance(resp, dict) else None
+        if isinstance(parsed, dict) and parsed:
+            return parsed
+        raise SidecarError("gateway extract returned no parseable JSON")
 
 
 def gateway_erp_map(extracted: dict) -> dict | None:
@@ -382,6 +445,10 @@ def resolve_provider():
         if anthropic_ready():
             return AnthropicProvider(), {"ai_provider": "anthropic", "sidecar_reachable": True,
                                          "mode": "vision", "model": _anthropic_model()}
+        reason = "ANTHROPIC_API_KEY is missing or failed authentication"
+        return UnavailableProvider(reason), {"ai_provider": "unavailable", "sidecar_reachable": False,
+                                             "mode": "unavailable", "model": _anthropic_model(),
+                                             "note": reason}
         return MockProvider(), {"ai_provider": "mock", "sidecar_reachable": False,
                                 "mode": "mock", "model": "builtin-demo",
                                 "note": "ANTHROPIC_API_KEY unset — using mock"}
@@ -391,6 +458,10 @@ def resolve_provider():
             return GatewayProvider(), {"ai_provider": "gateway",
                                        "sidecar_reachable": _gateway_reachable(),
                                        "mode": "gateway", "model": "printo-gateway"}
+        reason = "gateway client/URL unavailable"
+        return UnavailableProvider(reason), {"ai_provider": "unavailable", "sidecar_reachable": False,
+                                             "mode": "unavailable", "model": "printo-gateway",
+                                             "note": reason}
         return MockProvider(), {"ai_provider": "mock", "sidecar_reachable": False,
                                 "mode": "mock", "model": "builtin-demo",
                                 "note": "gateway client/URL unavailable — using mock"}
@@ -412,6 +483,11 @@ def resolve_provider():
         prov = SidecarProvider(mode=mode_cfg, health=health)
         return prov, {"ai_provider": "sidecar", "sidecar_reachable": True,
                       "mode": prov.mode, "model": health.get("model", "unknown")}
+    if _cfg("ALLOW_MOCK_EXTRACTION").lower() != "true":
+        reason = "no real AI extraction provider is available"
+        return UnavailableProvider(reason), {"ai_provider": "unavailable", "sidecar_reachable": False,
+                                             "mode": "unavailable", "model": "none",
+                                             "note": reason}
     return MockProvider(), {"ai_provider": "mock", "sidecar_reachable": False,
                             "mode": "mock", "model": "builtin-demo",
                             "note": "no gateway/sidecar reachable — using mock"}
