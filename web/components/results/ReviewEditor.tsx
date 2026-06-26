@@ -151,6 +151,13 @@ export function ReviewEditor({
         and Bill of Quantities below, adjust any line, then approve for ERP/export.
       </div>
 
+      {data.failure_reason && (
+        <div className="rounded-xl border border-result-fail/40 bg-result-fail/10 px-5 py-4 text-sm text-[#fca5a5]">
+          <span className="font-bold">Reason: </span>
+          {data.failure_reason}
+        </div>
+      )}
+
       {data.project_description && data.project_description.trim() && (
         <Card>
           <SectionRule>Project Description</SectionRule>

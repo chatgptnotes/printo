@@ -12,6 +12,16 @@ from ai_provider import (resolve_provider, ExtractRequest, SidecarError,
 from boq_quality import BoqQualityError, infer_discipline, validate_boq_quality
 
 
+class PartialExtractionError(RuntimeError):
+    """Raised when title/scope data exists but BOQ quality is not report-ready."""
+
+    def __init__(self, reason: str, extracted: dict, prepass_hints: dict):
+        super().__init__(reason)
+        self.reason = reason
+        self.extracted = extracted
+        self.prepass_hints = prepass_hints
+
+
 def _env_bool(name: str, default: bool = False) -> bool:
     return (os.getenv(name, str(default)) or "").strip().lower() in ("1", "true", "yes", "on")
 
@@ -483,10 +493,11 @@ def extract_drawing_with_prepass(file_path: str, floor_category: str = None,
                 )
                 extracted = retry_extracted
             except BoqQualityError as retry_error:
-                raise BoqQualityError(
+                reason = (
                     f"{first_error}. Retried with automatic/general discipline guidance, "
                     f"but the result was still not report-ready: {retry_error}"
-                ) from retry_error
+                )
+                raise PartialExtractionError(reason, retry_extracted, prepass_hints) from retry_error
         else:
-            raise
+            raise PartialExtractionError(str(first_error), extracted, prepass_hints) from first_error
     return extracted, prepass_hints

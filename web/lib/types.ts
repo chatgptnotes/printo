@@ -1,6 +1,6 @@
 // Shared types mirroring the FastAPI backend contract.
 
-export type Verdict = "PASSED" | "WARNING" | "FAILED" | "TIMEOUT" | "ERROR" | "GENERATED";
+export type Verdict = "PASSED" | "WARNING" | "FAILED" | "TIMEOUT" | "ERROR" | "GENERATED" | "LIMITED";
 
 /** One Bill-of-Quantities line, grouped by trade `section`. */
 export interface BoqItem {

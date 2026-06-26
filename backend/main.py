@@ -19,7 +19,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from database        import init_db, get_conn, DB_PATH
-from extractor       import extract_drawing_with_prepass
+from extractor       import PartialExtractionError, extract_drawing_with_prepass
 from ai_provider     import provider_status
 from realsoft_mapper import map_to_realsoft, average_confidence
 from realsoft_client import push_to_realsoft, ping_realsoft, RealSoftAPIError
@@ -421,14 +421,14 @@ def _save_fields(drawing_id: int, fields: dict, corrected_by: str) -> int:
     return saved
 
 
-def set_pending_review(drawing_id: int, extracted: dict):
+def set_pending_review(drawing_id: int, extracted: dict, failure_reason: str | None = None):
     """Park a freshly-extracted drawing in the human verification queue."""
     conn = get_conn()
     conn.execute(
         "UPDATE drawings SET status='pending_review', review_status='pending_review', "
-        "drawing_number=?, project_name=?, drawing_title=?, failure_reason=NULL WHERE id=?",
+        "drawing_number=?, project_name=?, drawing_title=?, failure_reason=? WHERE id=?",
         (extracted.get("drawing_number"), extracted.get("project_name"),
-         extracted.get("drawing_title"), drawing_id)
+         extracted.get("drawing_title"), failure_reason, drawing_id)
     )
     conn.commit()
     conn.close()
@@ -568,6 +568,7 @@ async def run_pipeline(file_path: Path, file_name: str, drawing_id: int,
     yield event("🤖", "AI Vision", "Sending drawing for intelligent field extraction...", "info")
     yield event("⏳", "AI Processing", "Reading title block, floor plan, dimensions, materials, stamps...", "info")
 
+    limited_reason = None
     try:
         extracted, prepass_hints = await asyncio.wait_for(
             asyncio.get_event_loop().run_in_executor(
@@ -579,6 +580,12 @@ async def run_pipeline(file_path: Path, file_name: str, drawing_id: int,
             timeout=VISION_EXTRACT_TIMEOUT
         )
         prepass_count = len(prepass_hints)
+    except PartialExtractionError as e:
+        limited_reason = e.reason
+        extracted = e.extracted
+        prepass_hints = e.prepass_hints
+        prepass_count = len(prepass_hints)
+        yield event("⚠️", "Limited Result", e.reason, "warning")
     except asyncio.TimeoutError:
         msg = f"AI extraction timed out (>{int(EXTRACT_TIMEOUT)}s) — drawing saved, please retry"
         yield event("⏱️", "Timeout", msg, "error")
@@ -612,6 +619,10 @@ async def run_pipeline(file_path: Path, file_name: str, drawing_id: int,
     yield event("📐", "Bill of Quantities",
                 f"Generated {len(boq)} BOQ line item(s) across {len(sections)} trade section(s)"
                 + (f": {', '.join(sections)}" if sections else ""), "success")
+    if limited_reason:
+        yield event("!", "BOQ Requires Manual Review",
+                    "A limited result was generated. Review/edit or add BOQ lines before approval.",
+                    "warning")
 
     # ── Map to RealSoft Format (title block + BOQ) ───────────────────────
     yield event("🗺️ ", "ERP Mapping", "Converting title block + BOQ to RealSoft ERP format...", "info")
@@ -644,12 +655,13 @@ async def run_pipeline(file_path: Path, file_name: str, drawing_id: int,
     _store_report_data(drawing_id, {
         "drawing_meta":  drawing_meta,
         "extracted":     extracted,
-        "verdict":       "GENERATED",
+        "verdict":       "LIMITED" if limited_reason else "GENERATED",
         "elapsed":       elapsed,
         "erp_payload":   realsoft_payload,
         "file_path":     str(file_path),
+        "failure_reason": limited_reason,
     })
-    set_pending_review(drawing_id, extracted)
+    set_pending_review(drawing_id, extracted, limited_reason)
     yield event("🧐", "Review BOQ",
                 "BOQ ready — review/edit the quantities, then approve to push to ERP", "info")
     yield event("🏁", "Ready for Review",
@@ -657,10 +669,10 @@ async def run_pipeline(file_path: Path, file_name: str, drawing_id: int,
 
     yield "data: " + json.dumps({
         "type":             "done",
-        "verdict":          "GENERATED",
+        "verdict":          "LIMITED" if limited_reason else "GENERATED",
         "elapsed":          elapsed,
         "errors":           [],
-        "warnings":         [],
+        "warnings":         [limited_reason] if limited_reason else [],
         "boq_count":        len(boq),
         "sections":         sections,
         "extracted":        extracted,
@@ -670,6 +682,7 @@ async def run_pipeline(file_path: Path, file_name: str, drawing_id: int,
         "review_status":    "pending_review",
         "drawing_id":       drawing_id,
         "prepass_count":    prepass_count,
+        "failure_reason":   limited_reason,
     }) + "\n\n"
 
 
@@ -997,7 +1010,7 @@ def get_review(drawing_id: int, _user: dict = Depends(require_auth)):
         "review_status":    review_status,
         "approved_by":      row[3],
         "approved_at":      row[4],
-        "verdict":          "GENERATED",
+        "verdict":          data.get("verdict", "GENERATED"),
         "elapsed":          data.get("elapsed", 0),
         "extracted":        extracted,
         "boq_items":        extracted.get("boq_items") or [],
@@ -1006,6 +1019,7 @@ def get_review(drawing_id: int, _user: dict = Depends(require_auth)):
         "summary_override": data.get("summary_override") or row[5],
         "erp_payload":      data.get("erp_payload", {}),
         "thumbnail_uri":    thumb,
+        "failure_reason":   data.get("failure_reason") or row[6],
     }
 
 
