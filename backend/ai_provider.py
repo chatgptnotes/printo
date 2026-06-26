@@ -20,10 +20,14 @@ Sidecar contract (see tools/mock_sidecar.py):
 """
 
 import base64
+import json
 import os
 import socket
+import subprocess
+import tempfile
 import time
 from dataclasses import dataclass
+from pathlib import Path
 from urllib.parse import urlparse
 
 import requests
@@ -272,6 +276,107 @@ def anthropic_vision_extract(system: str, prompt: str, schema: dict,
     return AnthropicProvider().extract(req)
 
 
+# ── Codex CLI vision provider ────────────────────────────────────────────────
+def _codex_bin() -> str:
+    return _cfg("CODEX_BIN", "codex")
+
+
+def _codex_model() -> str:
+    return _cfg("CODEX_MODEL", "gpt-5.5")
+
+
+def codex_ready() -> bool:
+    try:
+        r = subprocess.run(
+            [_codex_bin(), "login", "status"],
+            capture_output=True, text=True, timeout=8,
+        )
+        return r.returncode == 0 and "Logged in" in ((r.stdout or "") + (r.stderr or ""))
+    except Exception:
+        return False
+
+
+def _codex_media_suffix(media_type: str) -> str:
+    mt = (media_type or "image/png").lower()
+    if "jpeg" in mt or "jpg" in mt:
+        return ".jpg"
+    if "webp" in mt:
+        return ".webp"
+    return ".png"
+
+
+def codex_vision_extract(system: str, prompt: str, schema: dict,
+                         images: list[bytes], media_type: str = "image/png") -> dict:
+    if not images:
+        raise SidecarError("codex vision requires at least one image")
+    suffix = _codex_media_suffix(media_type)
+    with tempfile.TemporaryDirectory(prefix="printo-codex-") as td:
+        tmp = Path(td)
+        paths: list[str] = []
+        for i, img in enumerate(images):
+            if not img:
+                continue
+            p = tmp / f"sheet_{i + 1}{suffix}"
+            p.write_bytes(img)
+            paths.append(str(p))
+        if not paths:
+            raise SidecarError("codex vision requires non-empty image data")
+
+        output_path = tmp / "codex-output.txt"
+        full_prompt = (
+            f"{system}\n\n{prompt}\n\n"
+            "Inspect every attached drawing image. Return only one valid JSON object "
+            "matching this schema. Do not include markdown or explanation.\n"
+            f"JSON schema: {json.dumps(schema or {}, ensure_ascii=False)}"
+        )
+        cmd = [
+            _codex_bin(),
+            "--ask-for-approval", "never",
+            "exec",
+            "--skip-git-repo-check",
+            "--sandbox", "read-only",
+            "--model", _codex_model(),
+            "-o", str(output_path),
+        ]
+        for path in paths:
+            cmd.extend(["-i", path])
+        cmd.append("-")
+        try:
+            r = subprocess.run(
+                cmd, input=full_prompt, capture_output=True, text=True,
+                timeout=_vision_timeout(),
+            )
+        except subprocess.TimeoutExpired as e:
+            raise SidecarError(f"codex timed out after {_vision_timeout()}s") from e
+        except Exception as e:
+            raise SidecarError(f"codex failed to start: {e}") from e
+        text = ""
+        if output_path.exists():
+            text = output_path.read_text(encoding="utf-8", errors="replace")
+        if not text:
+            text = r.stdout or ""
+        if r.returncode != 0 and not text:
+            raise SidecarError(
+                f"codex failed (exit {r.returncode}): {(r.stderr or '')[:500]}"
+            )
+        from extractor import _repair_json
+        try:
+            return json.loads(_repair_json(text))
+        except Exception as e:
+            detail = ((r.stderr or "") + "\n" + (r.stdout or ""))[:500]
+            raise SidecarError(f"codex returned non-JSON: {e}; output={text[:500]!r}; detail={detail!r}") from e
+
+
+class CodexProvider:
+    name = "codex"
+    mode = "vision"
+
+    def extract(self, req: ExtractRequest) -> dict:
+        images = req.images if req.images else ([req.image] if req.image else [])
+        return codex_vision_extract(req.system or "", req.prompt, req.schema,
+                                    images, req.media_type)
+
+
 # ── Unified multi-sheet vision: prefer the Printo Gateway (Claude CLI, no API key) ──
 GATEWAY_VISION_TASK = "DRAWTOBOQ_ELECTRICAL_EXTRACT"  # honours a consumer systemPrompt
 
@@ -325,17 +430,27 @@ def vision_extract(system: str, prompt: str, sheets: list[bytes],
     is available (caller falls back to the legacy single-image path)."""
     errors = []
     choice = (_cfg("AI_PROVIDER", "auto") or "auto").lower()
+    if choice == "codex" and codex_ready() and sheets:
+        try:
+            return codex_vision_extract(system, prompt, schema or {}, sheets, media_type)
+        except SidecarError as e:
+            errors.append(str(e))
     if choice == "anthropic" and anthropic_ready() and sheets:
         try:
             return anthropic_vision_extract(system, prompt, schema or {}, sheets, media_type)
         except SidecarError as e:
             errors.append(str(e))
-    if choice != "anthropic" and gateway_vision_ready() and sheets:
+    if choice not in ("anthropic", "codex") and gateway_vision_ready() and sheets:
         try:
             return gateway_vision_extract(system + "\n\n" + prompt, sheets)
         except SidecarError as e:
             errors.append(str(e))
-    if choice != "anthropic" and anthropic_ready() and sheets:
+    if choice not in ("anthropic", "codex") and codex_ready() and sheets:
+        try:
+            return codex_vision_extract(system, prompt, schema or {}, sheets, media_type)
+        except SidecarError as e:
+            errors.append(str(e))
+    if choice not in ("anthropic", "codex") and anthropic_ready() and sheets:
         try:
             return anthropic_vision_extract(system, prompt, schema or {}, sheets, media_type)
         except SidecarError as e:
@@ -453,6 +568,15 @@ def resolve_provider():
                                 "mode": "mock", "model": "builtin-demo",
                                 "note": "ANTHROPIC_API_KEY unset — using mock"}
 
+    if choice == "codex":
+        if codex_ready():
+            return CodexProvider(), {"ai_provider": "codex", "sidecar_reachable": True,
+                                     "mode": "vision", "model": _codex_model()}
+        reason = "Codex CLI is not logged in or not available"
+        return UnavailableProvider(reason), {"ai_provider": "unavailable", "sidecar_reachable": False,
+                                             "mode": "unavailable", "model": _codex_model(),
+                                             "note": reason}
+
     if choice == "gateway":
         if _gateway_client() is not None and _gateway_url():
             return GatewayProvider(), {"ai_provider": "gateway",
@@ -476,6 +600,9 @@ def resolve_provider():
     if anthropic_ready():
         return AnthropicProvider(), {"ai_provider": "anthropic", "sidecar_reachable": True,
                                      "mode": "vision", "model": _anthropic_model()}
+    if codex_ready():
+        return CodexProvider(), {"ai_provider": "codex", "sidecar_reachable": True,
+                                 "mode": "vision", "model": _codex_model()}
     if gateway_ready():
         return GatewayProvider(), {"ai_provider": "gateway", "sidecar_reachable": True,
                                    "mode": "gateway", "model": "printo-gateway"}

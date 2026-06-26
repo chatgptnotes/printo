@@ -634,7 +634,7 @@ async def run_pipeline(file_path: Path, file_name: str, drawing_id: int,
         # prepass happens inside extract_drawing_with_prepass — results reported after
 
     # ── AI Extraction ────────────────────────────────────────────────────
-    yield event("🤖", "Claude Vision AI", "Sending drawing for intelligent field extraction...", "info")
+    yield event("🤖", "AI Vision", "Sending drawing for intelligent field extraction...", "info")
     yield event("⏳", "AI Processing", "Reading title block, floor plan, dimensions, materials, stamps...", "info")
 
     try:
