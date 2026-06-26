@@ -336,6 +336,64 @@ def _gap_fill(raw: dict, sheets: list, media_type: str) -> dict:
     return raw
 
 
+def _schedule_legend_prompt(discipline: str | None, project_description: str = "") -> str:
+    context = f"\nProject context: {project_description.strip()}\n" if project_description else ""
+    return (
+        "You are doing a second, focused BOQ extraction pass on the same construction drawing set. "
+        "Ignore marketing text and do not invent scope.\n"
+        f"{context}"
+        f"Discipline focus already detected: {discipline or 'general'}.\n"
+        "Open only the schedules, legends, notes, symbols, risers, single-line diagrams, panel schedules, "
+        "room schedules, door/window schedules, material legends, equipment schedules and title blocks. "
+        "Return ONLY additional or better-detailed BOQ rows that can be read from those schedule/legend areas. "
+        "Use one row per tag/item/type per floor/area. Preserve exact ratings, cable sizes, materials, quantities, "
+        "references and floors when visible. If a schedule is absent or unreadable, return an empty boq_items list. "
+        "Return valid JSON using the normal extraction schema."
+    )
+
+
+def _schedule_legend_pass(raw: dict, sheets: list, media_type: str,
+                          discipline: str | None, project_description: str = "") -> dict:
+    """Focused second pass for dense schedule/legend information.
+
+    This supplements, never replaces, the main plan take-off. It catches rows that
+    are often missed because schedules and legends are text-dense.
+    """
+    if not isinstance(raw, dict) or not sheets or not _env_bool("SCHEDULE_LEGEND_PASS", True):
+        return raw
+    limit = max(1, _env_int("SCHEDULE_LEGEND_MAX_SHEETS", 8))
+    selected = sheets[:limit]
+    try:
+        supplement = _coerce_raw(vision_extract(
+            SYSTEM_PROMPT,
+            _schedule_legend_prompt(discipline, project_description),
+            selected,
+            media_type,
+            extraction_json_schema(),
+        ))
+    except SidecarError:
+        return raw
+    if not isinstance(supplement, dict) or not supplement.get("boq_items"):
+        return raw
+    return _merge_extractions([raw, supplement])
+
+
+def _collect_ocr_text(full_image: bytes | None, crops: list[bytes]) -> str | None:
+    """OCR the full sheet and title-block crops when PDF text is missing or thin."""
+    parts: list[str] = []
+    if full_image:
+        text = ocr_text(full_image)
+        if text:
+            parts.append(text)
+    crop_limit = max(0, _env_int("OCR_CROP_MAX", 3))
+    for crop in crops[:crop_limit]:
+        text = ocr_text(crop)
+        if text:
+            parts.append(text)
+    joined = "\n".join(parts).strip()
+    return joined or None
+
+
 def _merge_extractions(results: list[dict]) -> dict:
     """Merge per-batch vision results: title-block scalars (first non-empty wins),
     boq_items concatenated (per-area, no aggregation) with exact dups removed, and
@@ -391,11 +449,14 @@ def extract_drawing_with_prepass(file_path: str, floor_category: str = None,
     crops = img_set.get("crops") or []
     media_type = img_set.get("media_type", "image/png")
 
-    # ── prepass: text layer, else OCR of the rendered image ──
+    # ── prepass: text layer plus OCR when the text layer is absent or thin ──
     prepass_hints = {}
     pdf_text = extract_pdf_text(file_path)
-    if not pdf_text and full_image:
-        pdf_text = ocr_text(full_image)
+    min_text_chars = _env_int("OCR_MIN_TEXT_CHARS", 250)
+    if len((pdf_text or "").strip()) < min_text_chars:
+        ocr = _collect_ocr_text(full_image, crops)
+        if ocr:
+            pdf_text = ((pdf_text or "").strip() + "\n" + ocr).strip()
     if pdf_text:
         prepass_hints = prepass_extract(pdf_text)
 
@@ -430,6 +491,8 @@ def extract_drawing_with_prepass(file_path: str, floor_category: str = None,
         # the background job (no request ceiling), so it's on by default.
         if raw is not None and _env_bool("VISION_GAPFILL", True):
             raw = _gap_fill(raw, sheets, media_type)
+        if raw is not None:
+            raw = _schedule_legend_pass(raw, sheets, media_type, effective_discipline, project_description)
     except SidecarError as e:
         vision_error = e
         raw = None  # no vision provider / call failed - degrade below

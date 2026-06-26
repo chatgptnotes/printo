@@ -1062,6 +1062,9 @@ def approve_drawing(drawing_id: int, body: dict, user: dict = Depends(require_au
     # Apply any edited BOQ from the review screen (full replacement list).
     if isinstance(body.get("boq_items"), list):
         extracted["boq_items"] = body["boq_items"]
+    boq_items = [b for b in (extracted.get("boq_items") or []) if isinstance(b, dict)]
+    if not boq_items:
+        raise HTTPException(400, "Add at least one BOQ line item before approval.")
 
     # Re-map to ERP on the reviewed data, then push (or simulate).
     _meta = data.get("drawing_meta") or {}

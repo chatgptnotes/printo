@@ -33,6 +33,23 @@ ELECTRICAL_HINTS = (
     "meter", "generator", "ats", "transformer",
 )
 
+CIVIL_ARCH_HINTS = (
+    "architectural", "floor plan", "layout", "section", "elevation",
+    "villa", "room", "door", "window", "masonry", "blockwork",
+    "rcc", "concrete", "column", "beam", "slab", "stair",
+    "finish", "finishes", "tile", "paint", "waterproofing",
+)
+
+PLUMBING_HINTS = (
+    "plumbing", "sanitary", "drainage", "water supply", "soil pipe",
+    "waste pipe", "pipe", "pump", "valve", "manhole", "fixture",
+)
+
+INDUSTRIAL_HINTS = (
+    "p&id", "piping and instrumentation", "process", "equipment layout",
+    "tank", "vessel", "compressor", "conveyor", "instrumentation",
+)
+
 ELECTRICAL_GROUPS = {
     "incoming_hv_lv": (
         "incoming", "hv", "lv main", "transformer", "generator", "ats",
@@ -74,13 +91,28 @@ def _text_blob(extracted: dict, source_name: str = "", discipline: str = "",
 
 def infer_discipline(source_name: str = "", source_text: str = "",
                      requested: str | None = None) -> str:
-    """Best-effort discipline inference used only to select stricter guidance."""
+    """Best-effort discipline inference used to select guidance and quality gates.
+
+    Frontend selections are treated as a hint, not a fact. A file uploaded under
+    the wrong discipline should still be extracted with the drawing evidence.
+    """
     req = (requested or "").strip().lower()
+    blob = f"{Path(source_name or '').name} {source_text[:20000] if source_text else ''}".lower()
+    electrical_hits = sum(1 for h in ELECTRICAL_HINTS if h in blob)
+    civil_hits = sum(1 for h in CIVIL_ARCH_HINTS if h in blob)
+    plumbing_hits = sum(1 for h in PLUMBING_HINTS if h in blob)
+    industrial_hits = sum(1 for h in INDUSTRIAL_HINTS if h in blob)
+
+    if electrical_hits >= 2 or (electrical_hits >= 1 and civil_hits == 0):
+        return "electrical"
+    if industrial_hits >= 2:
+        return "industrial"
+    if plumbing_hits >= 2 and plumbing_hits > civil_hits:
+        return "plumbing & mep"
+    if civil_hits >= 2:
+        return "civil / structural"
     if req and req not in ("auto", "auto-detect", "general", "other"):
         return req
-    blob = f"{Path(source_name or '').name} {source_text[:20000] if source_text else ''}".lower()
-    if any(h in blob for h in ELECTRICAL_HINTS):
-        return "electrical"
     return req or "general"
 
 
@@ -110,17 +142,34 @@ def validate_boq_quality(extracted: dict, *, source_name: str = "",
         errors.append("no BOQ line items were extracted")
 
     inferred = infer_discipline(source_name, source_text, discipline)
-    is_electrical = inferred == "electrical" or any(h in blob for h in ELECTRICAL_HINTS)
+    source_blob = f"{Path(source_name or '').name} {source_text[:20000] if source_text else ''}".lower()
+    source_electrical_hits = sum(1 for h in ELECTRICAL_HINTS if h in source_blob)
+    item_electrical_groups = _electrical_group_hits(blob)
+    is_electrical = (
+        inferred == "electrical"
+        or source_electrical_hits >= 2
+        or len(item_electrical_groups) >= 3
+    )
 
     if is_electrical:
-        min_items = _env_int("ELECTRICAL_MIN_BOQ_ITEMS", 25)
+        try:
+            sheet_count = int(str(extracted.get("total_sheets") or "1").split()[0])
+        except (TypeError, ValueError):
+            sheet_count = 1
+        complex_electrical = any(
+            h in source_blob
+            for h in ("power", "sld", "single line", "mdb", "smdb", "substation", "generator", "transformer")
+        )
+        default_min_items = 25 if complex_electrical or sheet_count > 2 else 12
+        min_items = _env_int("ELECTRICAL_MIN_BOQ_ITEMS", default_min_items)
         if len(items) < min_items:
             errors.append(
                 f"electrical BOQ has only {len(items)} line item(s); expected at least {min_items}"
             )
 
-        hits = _electrical_group_hits(blob)
-        min_groups = _env_int("ELECTRICAL_MIN_SECTION_GROUPS", 5)
+        hits = item_electrical_groups
+        default_min_groups = 5 if complex_electrical or sheet_count > 2 else 3
+        min_groups = _env_int("ELECTRICAL_MIN_SECTION_GROUPS", default_min_groups)
         if len(hits) < min_groups:
             missing = sorted(set(ELECTRICAL_GROUPS) - hits)
             errors.append(
@@ -135,4 +184,3 @@ def validate_boq_quality(extracted: dict, *, source_name: str = "",
 
     if errors:
         raise BoqQualityError("; ".join(errors))
-
