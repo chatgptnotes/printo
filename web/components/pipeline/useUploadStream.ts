@@ -203,6 +203,12 @@ export function useUploadStream() {
         }
         if (typeof j.next === "number") since = j.next;
         if (j.done && j.done.verdict) {
+          if (["FAILED", "ERROR", "TIMEOUT"].includes(String(j.done.verdict))) {
+            const lastError = [...(j.lines || [])]
+              .reverse()
+              .find((ln) => ln?.type === "error" && ln?.text);
+            throw new Error(lastError?.text || `Processing failed (${j.done.verdict}).`);
+          }
           setProgress(100);
           setPhase("done");
           busy.current = false;
