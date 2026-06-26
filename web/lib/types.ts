@@ -84,6 +84,7 @@ export interface ReviewData {
   summary_override: string | null;
   erp_payload: RealsoftPayload;
   thumbnail_uri: string | null;
+  failure_reason?: string | null;
 }
 
 export interface ApproveResult {
@@ -105,6 +106,7 @@ export interface DrawingSummary {
   drawing_title: string | null;
   project_name: string | null;
   floor_category: string | null;
+  failure_reason?: string | null;
 }
 
 export interface DrawingDetail {

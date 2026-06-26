@@ -177,7 +177,13 @@ async def _run_job(file_path, file_name, drawing_id, size_mb, strict,
     except Exception as e:
         job["phase"] = "error"
         job["lines"].append({"text": f"Pipeline error: {e}", "type": "error"})
-        job["done"] = {"type": "done", "verdict": "ERROR", "drawing_id": drawing_id}
+        mark_drawing_failed(drawing_id, "error", f"Pipeline error: {e}")
+        job["done"] = {
+            "type": "done",
+            "verdict": "ERROR",
+            "drawing_id": drawing_id,
+            "errors": [f"Pipeline error: {e}"],
+        }
     finally:
         if job.get("phase") not in ("done", "error"):
             job["phase"] = "done"
@@ -201,8 +207,19 @@ def update_drawing_status(drawing_id: int, status: str,
                            drawing_title: str = None):
     conn = get_conn()
     conn.execute(
-        "UPDATE drawings SET status=?, drawing_number=?, project_name=?, drawing_title=? WHERE id=?",
+        "UPDATE drawings SET status=?, drawing_number=?, project_name=?, drawing_title=?, "
+        "failure_reason=NULL WHERE id=?",
         (status, drawing_number, project_name, drawing_title, drawing_id)
+    )
+    conn.commit()
+    conn.close()
+
+
+def mark_drawing_failed(drawing_id: int, status: str, reason: str):
+    conn = get_conn()
+    conn.execute(
+        "UPDATE drawings SET status=?, review_status='pending_review', failure_reason=? WHERE id=?",
+        (status, reason[:2000], drawing_id),
     )
     conn.commit()
     conn.close()
@@ -263,7 +280,7 @@ def _clear_generated_data(drawing_id: int):
     conn.execute(
         "UPDATE drawings SET status='processing', review_status='pending_review', "
         "drawing_number=NULL, project_name=NULL, drawing_title=NULL, "
-        "approved_by=NULL, approved_at=NULL, summary_override=NULL "
+        "approved_by=NULL, approved_at=NULL, summary_override=NULL, failure_reason=NULL "
         "WHERE id=?",
         (drawing_id,),
     )
@@ -409,7 +426,7 @@ def set_pending_review(drawing_id: int, extracted: dict):
     conn = get_conn()
     conn.execute(
         "UPDATE drawings SET status='pending_review', review_status='pending_review', "
-        "drawing_number=?, project_name=?, drawing_title=? WHERE id=?",
+        "drawing_number=?, project_name=?, drawing_title=?, failure_reason=NULL WHERE id=?",
         (extracted.get("drawing_number"), extracted.get("project_name"),
          extracted.get("drawing_title"), drawing_id)
     )
@@ -565,14 +582,14 @@ async def run_pipeline(file_path: Path, file_name: str, drawing_id: int,
     except asyncio.TimeoutError:
         msg = f"AI extraction timed out (>{int(EXTRACT_TIMEOUT)}s) — drawing saved, please retry"
         yield event("⏱️", "Timeout", msg, "error")
-        update_drawing_status(drawing_id, "timeout")
-        yield f"data: {json.dumps({'type': 'done', 'verdict': 'TIMEOUT'})}\n\n"
+        mark_drawing_failed(drawing_id, "timeout", msg)
+        yield f"data: {json.dumps({'type': 'done', 'verdict': 'TIMEOUT', 'drawing_id': drawing_id, 'errors': [msg]})}\n\n"
         return
     except Exception as e:
         msg = f"AI extraction failed: {str(e)}"
         yield event("❌", "AI Error", msg, "error")
-        update_drawing_status(drawing_id, "error")
-        yield f"data: {json.dumps({'type': 'done', 'verdict': 'ERROR'})}\n\n"
+        mark_drawing_failed(drawing_id, "error", msg)
+        yield f"data: {json.dumps({'type': 'done', 'verdict': 'ERROR', 'drawing_id': drawing_id, 'errors': [msg]})}\n\n"
         return
 
     if prepass_count:
@@ -657,7 +674,7 @@ async def run_pipeline(file_path: Path, file_name: str, drawing_id: int,
 
 
 def _end_failed(errors, warnings, extracted, payload, drawing_id, start, status="error") -> str:
-    update_drawing_status(drawing_id, status)
+    mark_drawing_failed(drawing_id, status, "; ".join(errors) or "Processing failed")
     elapsed = round(time.time() - start, 1)
     return f"data: {json.dumps({'type': 'done', 'verdict': 'FAILED', 'elapsed': elapsed, 'errors': errors, 'warnings': warnings, 'extracted': extracted, 'realsoft_payload': payload, 'drawing_id': drawing_id})}\n\n"
 
@@ -747,7 +764,7 @@ def drawing_events(drawing_id: int, since: int = 0, _user: dict = Depends(requir
 
     conn = get_conn()
     row = conn.execute(
-        "SELECT status, review_status FROM drawings WHERE id=?", (drawing_id,)
+        "SELECT status, review_status, failure_reason FROM drawings WHERE id=?", (drawing_id,)
     ).fetchone()
     conn.close()
     if not row:
@@ -755,12 +772,16 @@ def drawing_events(drawing_id: int, since: int = 0, _user: dict = Depends(requir
     status = row[0] or ""
     if status in ("pending_review", "approved", "done", "error", "blurred", "timeout"):
         verdict = "GENERATED" if status in ("pending_review", "approved", "done") else status.upper()
-        return {"lines": [], "next": since, "phase": "done",
+        reason = row[2] or ""
+        lines = [{"text": reason, "type": "error"}] if reason and status in ("error", "blurred", "timeout") else []
+        return {"lines": lines[since:], "next": len(lines), "phase": "done",
                 "done": {"type": "done", "verdict": verdict, "drawing_id": drawing_id,
-                         "review_status": row[1] or "pending_review"}}
+                         "review_status": row[1] or "pending_review",
+                         "errors": [reason] if reason else []}}
     # 'processing' but no live job → orphaned by a worker restart.
     return {"lines": [], "next": since, "phase": "error",
-            "done": {"type": "done", "verdict": "ERROR", "drawing_id": drawing_id},
+            "done": {"type": "done", "verdict": "ERROR", "drawing_id": drawing_id,
+                     "errors": ["Processing was interrupted - please re-upload."]},
             "detail": "Processing was interrupted — please re-upload."}
 
 
@@ -768,14 +789,14 @@ def drawing_events(drawing_id: int, since: int = 0, _user: dict = Depends(requir
 def list_drawings(_user: dict = Depends(require_auth)):
     conn = get_conn()
     rows = conn.execute(
-        "SELECT id, file_name, uploaded_at, status, drawing_number, drawing_title, project_name, floor_category "
+        "SELECT id, file_name, uploaded_at, status, drawing_number, drawing_title, project_name, floor_category, failure_reason "
         "FROM drawings ORDER BY id DESC"
     ).fetchall()
     conn.close()
     return [
         {"id": r[0], "file_name": r[1], "uploaded_at": r[2], "status": r[3],
          "drawing_number": r[4], "drawing_title": r[5], "project_name": r[6],
-         "floor_category": r[7]}
+         "floor_category": r[7], "failure_reason": r[8]}
         for r in rows
     ]
 
@@ -947,7 +968,7 @@ def get_review(drawing_id: int, _user: dict = Depends(require_auth)):
     editable summary, the ERP payload preview, source thumbnail, and approval state."""
     conn = get_conn()
     row = conn.execute(
-        "SELECT file_name, status, review_status, approved_by, approved_at, summary_override "
+        "SELECT file_name, status, review_status, approved_by, approved_at, summary_override, failure_reason "
         "FROM drawings WHERE id=?", (drawing_id,)
     ).fetchone()
     conn.close()
@@ -963,6 +984,7 @@ def get_review(drawing_id: int, _user: dict = Depends(require_auth)):
             "review_status": review_status, "approved_by": row[3], "approved_at": row[4],
             "verdict": None, "elapsed": 0, "extracted": {}, "summary_draft": "",
             "summary_override": row[5], "erp_payload": {}, "thumbnail_uri": None,
+            "failure_reason": row[6],
         }
 
     extracted = _apply_corrections(drawing_id, dict(data.get("extracted") or {}))
@@ -1066,7 +1088,7 @@ def approve_drawing(drawing_id: int, body: dict, user: dict = Depends(require_au
     conn = get_conn()
     conn.execute(
         "UPDATE drawings SET review_status='approved', approved_by=?, approved_at=?, "
-        "summary_override=?, status='done' WHERE id=?",
+        "summary_override=?, status='done', failure_reason=NULL WHERE id=?",
         (approved_by, approved_at, summary_override, drawing_id)
     )
     conn.commit()
@@ -1092,7 +1114,7 @@ def reopen_drawing(drawing_id: int, _user: dict = Depends(require_auth)):
         raise HTTPException(404, "Drawing not found")
     conn.execute(
         "UPDATE drawings SET review_status='pending_review', status='pending_review', "
-        "approved_by=NULL, approved_at=NULL WHERE id=?", (drawing_id,)
+        "approved_by=NULL, approved_at=NULL, failure_reason=NULL WHERE id=?", (drawing_id,)
     )
     conn.commit()
     conn.close()

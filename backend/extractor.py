@@ -9,7 +9,7 @@ from prepass import (extract_pdf_text, prepass_extract,
 from schema import validate_and_repair, extraction_json_schema
 from ai_provider import (resolve_provider, ExtractRequest, SidecarError,
                          vision_extract)
-from boq_quality import infer_discipline, validate_boq_quality
+from boq_quality import BoqQualityError, infer_discipline, validate_boq_quality
 
 
 def _env_bool(name: str, default: bool = False) -> bool:
@@ -393,7 +393,20 @@ def extract_drawing_with_prepass(file_path: str, floor_category: str = None,
     prompt = _build_prompt(prepass_hints, project_description, effective_discipline)
     schema = extraction_json_schema()
     raw: dict | None = None
+    sheets: list[bytes] = []
     vision_error: Exception | None = None
+
+    def _run_vision(prompt_text: str) -> dict | None:
+        if not sheets:
+            return None
+        batch_size = _env_int("VISION_BATCH_SIZE", 5)
+        if len(sheets) <= batch_size:
+            return _coerce_raw(vision_extract(SYSTEM_PROMPT, prompt_text, sheets, media_type, schema))
+        results = []
+        for i in range(0, len(sheets), batch_size):
+            results.append(_coerce_raw(vision_extract(
+                SYSTEM_PROMPT, prompt_text, sheets[i:i + batch_size], media_type, schema)))
+        return _merge_extractions(results)
 
     # ── Preferred: multi-sheet vision — send every sheet at once. The dispatcher
     #    prefers the AI Gateway (Claude CLI, no API key), else a direct key. ──
@@ -402,15 +415,7 @@ def extract_drawing_with_prepass(file_path: str, floor_category: str = None,
         batch_size = _env_int("VISION_BATCH_SIZE", 5)     # gateway accepts up to 5 per call
         sheet_set = preprocess.build_sheet_images(file_path, max_sheets=total)
         sheets = sheet_set.get("sheets") or ([full_image] if full_image else [])
-        if sheets and len(sheets) <= batch_size:
-            raw = _coerce_raw(vision_extract(SYSTEM_PROMPT, prompt, sheets, media_type, schema))
-        elif sheets:
-            # >batch_size sheets: analyse in groups (gateway 5-file cap) and merge.
-            results = []
-            for i in range(0, len(sheets), batch_size):
-                results.append(_coerce_raw(vision_extract(
-                    SYSTEM_PROMPT, prompt, sheets[i:i + batch_size], media_type, schema)))
-            raw = _merge_extractions(results)
+        raw = _run_vision(prompt)
         # Gap-fill re-reads any floor the model listed but left empty. Now runs in
         # the background job (no request ceiling), so it's on by default.
         if raw is not None and _env_bool("VISION_GAPFILL", True):
@@ -452,10 +457,36 @@ def extract_drawing_with_prepass(file_path: str, floor_category: str = None,
     extracted = validate_and_repair(raw)
     extracted = _merge_prepass_ground_truth(extracted, prepass_hints)
     extracted = calibrate_confidence(extracted, prepass_hints)
-    validate_boq_quality(
-        extracted,
-        source_name=original_name or file_path,
-        discipline=effective_discipline,
-        source_text=pdf_text,
-    )
+    try:
+        validate_boq_quality(
+            extracted,
+            source_name=original_name or file_path,
+            discipline=effective_discipline,
+            source_text=pdf_text,
+        )
+    except BoqQualityError as first_error:
+        retry_raw = None
+        retry_discipline = "General"
+        if sheets and _env_bool("BOQ_QUALITY_RETRY", True):
+            retry_prompt = _build_prompt(prepass_hints, project_description, retry_discipline)
+            retry_raw = _run_vision(retry_prompt)
+        if retry_raw:
+            retry_extracted = validate_and_repair(retry_raw)
+            retry_extracted = _merge_prepass_ground_truth(retry_extracted, prepass_hints)
+            retry_extracted = calibrate_confidence(retry_extracted, prepass_hints)
+            try:
+                validate_boq_quality(
+                    retry_extracted,
+                    source_name=original_name or file_path,
+                    discipline=retry_discipline,
+                    source_text=pdf_text,
+                )
+                extracted = retry_extracted
+            except BoqQualityError as retry_error:
+                raise BoqQualityError(
+                    f"{first_error}. Retried with automatic/general discipline guidance, "
+                    f"but the result was still not report-ready: {retry_error}"
+                ) from retry_error
+        else:
+            raise
     return extracted, prepass_hints

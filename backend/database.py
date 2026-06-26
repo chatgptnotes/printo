@@ -94,6 +94,8 @@ def init_db():
         ("summary_override","TEXT"),
         # User-provided brief project description captured at upload time.
         ("project_description", "TEXT"),
+        # Human-readable reason when processing fails.
+        ("failure_reason", "TEXT"),
     ]:
         if col not in existing_cols:
             conn.execute(f"ALTER TABLE drawings ADD COLUMN {col} {typedef}")

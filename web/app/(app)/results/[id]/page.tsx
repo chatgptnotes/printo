@@ -121,8 +121,14 @@ export default function ResultsPage({ params }: { params: { id: string } }) {
         </div>
         <p className="text-muted">
           This drawing could not be processed{review.status ? ` (status: ${review.status})` : ""}.
-          Please re-upload and try again.
         </p>
+        {review.failure_reason && (
+          <div className="rounded-[10px] border border-result-fail/40 bg-result-fail/10 px-4 py-3 text-sm text-[#fca5a5]">
+            <span className="font-semibold">Reason: </span>
+            {review.failure_reason}
+          </div>
+        )}
+        <p className="text-muted">Please re-upload and try again.</p>
         <Link href="/">
           <Button variant="primary">← Upload another drawing</Button>
         </Link>

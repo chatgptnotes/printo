@@ -144,6 +144,13 @@ export default function HistoryPage() {
               </div>
             </div>
 
+            {d.failure_reason && (
+              <div className="mt-3 rounded-[10px] border border-result-fail/40 bg-result-fail/10 px-3 py-2 text-sm text-[#fca5a5]">
+                <span className="font-semibold">Unable to process: </span>
+                {d.failure_reason}
+              </div>
+            )}
+
             <div className="mt-3 flex flex-wrap gap-3">
               <Link href={`/results/${d.id}`}>
                 <Button variant="secondary">View Results</Button>
