@@ -267,6 +267,72 @@ def _load_report_data(drawing_id: int) -> dict | None:
         return None
 
 
+def _clear_generated_data(drawing_id: int):
+    """Remove stale generated output before reprocessing an existing upload."""
+    conn = get_conn()
+    for table in ("extractions", "exceptions", "corrections", "erp_pushes"):
+        conn.execute(f"DELETE FROM {table} WHERE drawing_id=?", (drawing_id,))
+    conn.execute(
+        "UPDATE drawings SET status='processing', review_status='pending_review', "
+        "drawing_number=NULL, project_name=NULL, drawing_title=NULL, "
+        "approved_by=NULL, approved_at=NULL, summary_override=NULL "
+        "WHERE id=?",
+        (drawing_id,),
+    )
+    conn.commit()
+    conn.close()
+    (REPORT_DIR / f"{drawing_id}.json").unlink(missing_ok=True)
+
+
+def _regeneration_target(drawing_id: int) -> dict | None:
+    conn = get_conn()
+    row = conn.execute(
+        "SELECT id, file_name, file_path, floor_category, project_description "
+        "FROM drawings WHERE id=?",
+        (drawing_id,),
+    ).fetchone()
+    conn.close()
+    if not row:
+        return None
+    path = Path(row[2])
+    return {
+        "id": row[0],
+        "file_name": row[1],
+        "file_path": path,
+        "floor_category": row[3] or "Other",
+        "project_description": row[4] or "",
+        "size_mb": path.stat().st_size / (1024 * 1024) if path.exists() else 0,
+    }
+
+
+async def _run_regeneration_queue(targets: list[dict], strict: bool = False):
+    """Regenerate stored drawings sequentially so AI/gateway capacity is not flooded."""
+    for target in targets:
+        drawing_id = target["id"]
+        path = target["file_path"]
+        if not path.exists():
+            update_drawing_status(drawing_id, "error")
+            job = JOBS.setdefault(drawing_id, {"lines": [], "phase": "error", "done": None})
+            job["phase"] = "error"
+            job["lines"].append({"text": f"Source file missing: {path}", "type": "error"})
+            job["done"] = {"type": "done", "verdict": "ERROR", "drawing_id": drawing_id}
+            job["ended"] = time.time()
+            continue
+
+        _clear_generated_data(drawing_id)
+        JOBS[drawing_id] = {"lines": [], "phase": "streaming", "done": None}
+        await _run_job(
+            path,
+            target["file_name"],
+            drawing_id,
+            target["size_mb"],
+            strict,
+            target["floor_category"],
+            target["project_description"],
+            "",
+        )
+
+
 def _corrections_for(drawing_id: int) -> list:
     conn = get_conn()
     rows = conn.execute(
@@ -798,6 +864,71 @@ def list_drawings(_user: dict = Depends(require_auth)):
          "floor_category": r[7]}
         for r in rows
     ]
+
+
+@app.post("/drawings/regenerate-all")
+async def regenerate_all_drawings(strict: bool = False, _user: dict = Depends(require_auth)):
+    """Re-run extraction/report generation for every stored upload.
+
+    Existing generated rows and report JSON are cleared per drawing immediately
+    before that drawing is reprocessed. The queue runs sequentially in the
+    background; clients can poll /drawings/{id}/events for individual progress.
+    """
+    conn = get_conn()
+    ids = [r[0] for r in conn.execute("SELECT id FROM drawings ORDER BY id").fetchall()]
+    conn.close()
+    targets = []
+    missing = []
+    busy = []
+    for drawing_id in ids:
+        if drawing_id in JOBS and JOBS[drawing_id].get("phase") == "streaming":
+            busy.append(drawing_id)
+            continue
+        target = _regeneration_target(drawing_id)
+        if not target:
+            continue
+        if not target["file_path"].exists():
+            missing.append(drawing_id)
+        targets.append(target)
+    if not targets:
+        return {"queued": 0, "drawing_ids": [], "missing_source_ids": missing, "busy_ids": busy}
+
+    _prune_jobs()
+    for target in targets:
+        JOBS[target["id"]] = {
+            "lines": [{"text": "Queued for report regeneration", "type": "info"}],
+            "phase": "queued",
+            "done": None,
+        }
+    asyncio.create_task(_run_regeneration_queue(targets, strict))
+    return {
+        "queued": len(targets),
+        "drawing_ids": [t["id"] for t in targets],
+        "missing_source_ids": missing,
+        "busy_ids": busy,
+    }
+
+
+@app.post("/drawings/{drawing_id:int}/regenerate")
+async def regenerate_drawing(drawing_id: int, strict: bool = False,
+                             _user: dict = Depends(require_auth)):
+    """Re-run extraction/report generation for one stored upload."""
+    if drawing_id in JOBS and JOBS[drawing_id].get("phase") == "streaming":
+        raise HTTPException(409, "Drawing is already processing")
+    target = _regeneration_target(drawing_id)
+    if not target:
+        raise HTTPException(404, "Drawing not found")
+    if not target["file_path"].exists():
+        raise HTTPException(404, f"Source file missing: {target['file_path']}")
+
+    _prune_jobs()
+    JOBS[drawing_id] = {
+        "lines": [{"text": "Queued for report regeneration", "type": "info"}],
+        "phase": "queued",
+        "done": None,
+    }
+    asyncio.create_task(_run_regeneration_queue([target], strict))
+    return {"queued": True, "drawing_id": drawing_id}
 
 
 @app.get("/drawings/{drawing_id}")

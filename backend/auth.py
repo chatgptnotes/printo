@@ -90,7 +90,8 @@ def get_user_by_login(identifier: str) -> dict | None:
     conn = get_conn()
     row = conn.execute(
         "SELECT id, username, email, password_hash, role FROM users "
-        "WHERE username = ? OR email = ?", (identifier, identifier)
+        "WHERE lower(username) = lower(?) OR lower(email) = lower(?)",
+        (identifier, identifier),
     ).fetchone()
     conn.close()
     if not row:
