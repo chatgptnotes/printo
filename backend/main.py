@@ -53,7 +53,7 @@ def _safe_upload_id(upload_id: str) -> str:
 # Raster formats handled directly + CAD formats rendered to raster (DWG/DXF/DWF).
 RASTER_EXTENSIONS = {".pdf", ".jpg", ".jpeg", ".png", ".tiff", ".tif"}
 ALLOWED_EXTENSIONS = RASTER_EXTENSIONS | cad_convert.CAD_SUFFIXES
-MAX_FILE_SIZE_MB    = 20
+MAX_FILE_SIZE_MB    = int(os.getenv("MAX_FILE_SIZE_MB", "100"))
 # Extraction timeout — the gateway runs Claude CLI on the VPS, which is slower
 # than a direct API, so allow more headroom than the original 55s. Configurable.
 EXTRACT_TIMEOUT     = float(os.getenv("EXTRACT_TIMEOUT", "110"))

@@ -305,6 +305,46 @@ def _codex_media_suffix(media_type: str) -> str:
     return ".png"
 
 
+def _parse_json_object(raw: str) -> dict:
+    from extractor import _repair_json
+    data = json.loads(_repair_json(raw))
+    if not isinstance(data, dict):
+        raise ValueError("expected a JSON object")
+    return data
+
+
+def _codex_repair_json(raw: str, schema: dict, workdir: Path) -> dict:
+    output_path = workdir / "codex-repaired.json"
+    prompt = (
+        "Repair the following model output into one valid JSON object. "
+        "Preserve all fields and BOQ rows. Do not summarize. Do not use markdown.\n\n"
+        f"Invalid output:\n{raw[:120000]}"
+    )
+    cmd = [
+        _codex_bin(),
+        "--ask-for-approval", "never",
+        "exec",
+        "--skip-git-repo-check",
+        "--sandbox", "read-only",
+        "--model", _codex_model(),
+        "-o", str(output_path),
+        "-",
+    ]
+    try:
+        r = subprocess.run(
+            cmd, input=prompt, capture_output=True, text=True,
+            timeout=min(_vision_timeout(), 180),
+        )
+    except Exception as e:
+        raise SidecarError(f"codex JSON repair failed to start: {e}") from e
+    repaired = output_path.read_text(encoding="utf-8", errors="replace") if output_path.exists() else ""
+    if not repaired:
+        repaired = r.stdout or ""
+    if r.returncode != 0 and not repaired:
+        raise SidecarError(f"codex JSON repair failed (exit {r.returncode}): {(r.stderr or '')[:500]}")
+    return _parse_json_object(repaired)
+
+
 def codex_vision_extract(system: str, prompt: str, schema: dict,
                          images: list[bytes], media_type: str = "image/png") -> dict:
     if not images:
@@ -359,12 +399,17 @@ def codex_vision_extract(system: str, prompt: str, schema: dict,
             raise SidecarError(
                 f"codex failed (exit {r.returncode}): {(r.stderr or '')[:500]}"
             )
-        from extractor import _repair_json
         try:
-            return json.loads(_repair_json(text))
+            return _parse_json_object(text)
         except Exception as e:
-            detail = ((r.stderr or "") + "\n" + (r.stdout or ""))[:500]
-            raise SidecarError(f"codex returned non-JSON: {e}; output={text[:500]!r}; detail={detail!r}") from e
+            try:
+                return _codex_repair_json(text, schema, tmp)
+            except Exception as repair_error:
+                detail = ((r.stderr or "") + "\n" + (r.stdout or ""))[:500]
+                raise SidecarError(
+                    f"codex returned non-JSON: {e}; repair failed: {repair_error}; "
+                    f"output={text[:500]!r}; detail={detail!r}"
+                ) from repair_error
 
 
 class CodexProvider:
