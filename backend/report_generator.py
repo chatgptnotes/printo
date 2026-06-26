@@ -6,8 +6,8 @@ block + a trade-grouped Bill of Quantities + the ERP payload — and a
 project-level aggregate. Table-based markup (no flexbox/gradients/CSS vars) so
 the same HTML renders correctly in the browser and through xhtml2pdf.
 
-Drawings are taken as correct: there is NO validation / compliance section and
-NO confidence scoring in the report.
+The report focuses on extraction + BOQ only; it does not include drawing
+compliance review or confidence scoring.
 """
 
 import datetime
@@ -110,7 +110,7 @@ def plain_summary(drawing_meta, extracted) -> str:
         f"Bill of Quantities for drawing {num}{title_part} — project {proj}.{area_part} "
         f"{len(boq)} line item(s) across {len(sections)} trade section(s)"
         f"{': ' + ', '.join(sections) if sections else ''}. "
-        f"Quantities are taken off the approved drawing; rates to be applied by the estimator / ERP."
+        f"Quantities are taken off the uploaded drawing; rates to be applied by the estimator / ERP."
     )
 
 
@@ -292,7 +292,7 @@ def _boq_table_html(extracted: dict) -> str:
         '<div class="section"><h2 class="section-title">Bill of Quantities '
         f'<span class="muted">({len(items)} item(s) &middot; {len(sections)} bill(s))</span></h2>'
         '<p class="muted" style="margin:0 0 8px;font-size:9.5px;">'
-        'Quantities taken off the approved drawing, grouped into priced Bills by trade. '
+        'Quantities taken off the uploaded drawing, grouped into priced Bills by trade. '
         'Unit rates, line amounts and Bill totals are in the downloadable Excel '
         'workbook (live auto-totalling formulas); the Summary of Bills below shows the '
         'commercial roll-up.</p>'
@@ -306,8 +306,7 @@ def generate_report(drawing_meta, extracted, rule_results, verdict, elapsed,
                     approved_by=None, approved_at=None):
     """BOQ report: title block + trade-grouped Bill of Quantities + ERP payload.
 
-    rule_results / verdict are accepted for signature compatibility but unused —
-    drawings are taken as correct, so no validation is shown.
+    rule_results / verdict are accepted for signature compatibility but unused.
     """
     generated_at = datetime.datetime.now().strftime("%d %b %Y, %H:%M")
     file_name = drawing_meta.get("file_name", "—")
@@ -330,7 +329,7 @@ def generate_report(drawing_meta, extracted, rule_results, verdict, elapsed,
         f"{(', ' + escape(str(extracted.get('drawing_title')))) if extracted.get('drawing_title') else ''} — "
         f"project <strong>{escape(_display_val(extracted.get('project_name')))}</strong>. "
         f"<strong>{len(boq)}</strong> line item(s) across <strong>{len(sections)}</strong> trade section(s). "
-        f"Quantities are taken off the approved drawing; rates to be applied by the estimator / ERP."
+        f"Quantities are taken off the uploaded drawing; rates to be applied by the estimator / ERP."
     )
     if summary_override:
         summary = escape(str(summary_override)).replace("\n", "<br>")

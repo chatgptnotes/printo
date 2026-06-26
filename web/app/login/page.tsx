@@ -49,7 +49,7 @@ export default function LoginPage() {
             ERP <span className="text-accent-orange">RealSoft</span>
           </div>
           <p className="mt-1 text-sm text-muted">
-            AI Drawing-to-ERP Compliance Gateway
+            AI drawing-to-BOQ extraction gateway
           </p>
         </div>
 

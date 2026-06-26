@@ -21,7 +21,6 @@ load_dotenv()
 from database        import init_db, get_conn, DB_PATH
 from extractor       import extract_drawing_with_prepass
 from ai_provider     import provider_status
-from rules           import run_all_rules, verdict
 from realsoft_mapper import map_to_realsoft, average_confidence
 from realsoft_client import push_to_realsoft, ping_realsoft, RealSoftAPIError
 from report_generator import (generate_report, generate_project_report,
@@ -225,17 +224,6 @@ def save_extractions(drawing_id: int, extracted: dict):
     conn.commit()
     conn.close()
 
-def save_exceptions(drawing_id: int, rule_results):
-    conn = get_conn()
-    for r in rule_results:
-        if not r.passed:
-            conn.execute(
-                "INSERT INTO exceptions (drawing_id, rule_id, field_name, reason, severity) VALUES (?,?,?,?,?)",
-                (drawing_id, r.rule_id, r.field_name, r.message, r.severity)
-            )
-    conn.commit()
-    conn.close()
-
 def save_erp_push(drawing_id: int, payload: dict, status: str, response: str):
     conn = get_conn()
     conn.execute(
@@ -415,92 +403,8 @@ def set_pending_review(drawing_id: int, extracted: dict):
     conn.close()
 
 
-_MARK_RED = (217, 25, 25)          # Pratyaya-style mistake red (#D91919)
-
-
-def _failing_fields(rule_results) -> list[tuple]:
-    """(rule_id, field_name, message) for failed ERROR/WARNING rules. Robust to
-    RuleResult objects or plain dicts."""
-    out = []
-    for r in rule_results or []:
-        passed   = getattr(r, "passed", None) if not isinstance(r, dict) else r.get("passed")
-        severity = getattr(r, "severity", "") if not isinstance(r, dict) else r.get("severity", "")
-        field    = getattr(r, "field_name", "") if not isinstance(r, dict) else r.get("field_name", "")
-        rule_id  = getattr(r, "rule_id", "") if not isinstance(r, dict) else r.get("rule_id", "")
-        message  = getattr(r, "message", "") if not isinstance(r, dict) else r.get("message", "")
-        if not passed and severity in ("ERROR", "WARNING"):
-            out.append((rule_id, field, message))
-    return out
-
-
-def _load_font(size: int):
-    from PIL import ImageFont
-    for name in ("arialbd.ttf", "arial.ttf", "DejaVuSans-Bold.ttf", "DejaVuSans.ttf"):
-        try:
-            return ImageFont.truetype(name, size)
-        except Exception:
-            continue
-    return ImageFont.load_default()
-
-
-def _annotate_mistakes(img, extracted: dict, rule_results) -> None:
-    """Draw red boxes (Pratyaya-style) on `img` for failed ERROR/WARNING fields.
-    Boxes use normalised field_locations; failures without a location are stacked
-    as red notes top-left. Mutates `img` in place; never raises to the caller."""
-    from PIL import ImageDraw
-    if not rule_results:                       # no validation → clean image, no marks
-        return
-    failing = _failing_fields(rule_results)
-    if not failing:
-        return
-    locations = (extracted or {}).get("field_locations") or {}
-    w, h = img.size
-    lw = max(2, round(w / 350))
-    font = _load_font(max(13, w // 70))
-    draw = ImageDraw.Draw(img)
-
-    def text_wh(s):
-        l, t, r, b = draw.textbbox((0, 0), s, font=font)
-        return r - l, b - t
-
-    # group rule_ids per field so one box can carry several findings
-    by_field: dict[str, list[str]] = {}
-    unlocated: list[tuple] = []
-    for rule_id, field, message in failing:
-        box = locations.get(field)
-        if box and len(box) == 4:
-            by_field.setdefault(field, []).append(rule_id)
-        else:
-            unlocated.append((rule_id, field, message))
-
-    # located boxes
-    for field, rule_ids in by_field.items():
-        x1, y1, x2, y2 = locations[field]
-        px = [int(x1 * w), int(y1 * h), int(x2 * w), int(y2 * h)]
-        px = [min(max(0, px[0]), w - 1), min(max(0, px[1]), h - 1),
-              min(max(1, px[2]), w),     min(max(1, px[3]), h)]
-        draw.rectangle(px, outline=_MARK_RED, width=lw)
-        label = ",".join(dict.fromkeys(rule_ids))          # unique, order-kept
-        tw, th = text_wh(label)
-        tx1, ty1 = px[0], max(0, px[1] - th - 6)
-        draw.rectangle([tx1, ty1, tx1 + tw + 8, ty1 + th + 6], fill=_MARK_RED)
-        draw.text((tx1 + 4, ty1 + 3), label, fill="white", font=font)
-
-    # unlocated findings → stacked red notes, top-left
-    y = 10
-    for rule_id, field, message in unlocated:
-        note = f"{rule_id} {field}: {message}"[:90]
-        tw, th = text_wh(note)
-        draw.rectangle([10, y, 10 + tw + 8, y + th + 6], fill=_MARK_RED)
-        draw.text((14, y + 3), note, fill="white", font=font)
-        y += th + 10
-
-
-def _thumbnail_data_uri(file_path: str, extracted: dict = None,
-                        rule_results=None, max_w: int = 1000) -> str | None:
-    """Render/downscale the source drawing to a base64 PNG data URI for embedding.
-    When `extracted` + `rule_results` are supplied, draw red markings on the
-    locations of failed ERROR/WARNING fields (Pratyaya-style)."""
+def _thumbnail_data_uri(file_path: str, max_w: int = 1000) -> str | None:
+    """Render/downscale the source drawing to a clean base64 PNG preview."""
     try:
         img_set = preprocess.build_images(file_path, dpi=150)
         raw = img_set.get("full")
@@ -511,10 +415,6 @@ def _thumbnail_data_uri(file_path: str, extracted: dict = None,
         img = Image.open(_io.BytesIO(raw)).convert("RGB")
         if img.width > max_w:
             img = img.resize((max_w, int(img.height * max_w / img.width)), Image.LANCZOS)
-        try:
-            _annotate_mistakes(img, extracted, rule_results)
-        except Exception:
-            pass                                            # plain image on any draw failure
         buf = _io.BytesIO()
         img.save(buf, format="PNG")
         return "data:image/png;base64," + base64.standard_b64encode(buf.getvalue()).decode()
@@ -671,7 +571,7 @@ async def run_pipeline(file_path: Path, file_name: str, drawing_id: int,
     save_extractions(drawing_id, extracted)
 
     # ── Build Bill of Quantities ─────────────────────────────────────────
-    # Drawings are taken as correct — no validation. The deliverable is a BOQ.
+    # The deliverable is extraction + BOQ generation; no drawing-compliance review is run.
     boq = [b for b in (extracted.get("boq_items") or []) if isinstance(b, dict)]
     sections = []
     for it in boq:
@@ -996,10 +896,8 @@ def save_correction(drawing_id: int, body: dict, _user: dict = Depends(require_a
 
 @app.get("/drawings/{drawing_id}/review")
 def get_review(drawing_id: int, _user: dict = Depends(require_auth)):
-    """Everything the cross-verification screen needs: the extracted fields (with
-    any saved edits applied), per-field confidence, the validation findings, an
-    editable draft summary, the ERP payload preview, the source drawing thumbnail
-    (with red mistake markings), and the current approval state."""
+    """Everything the BOQ review screen needs: extracted fields, BOQ rows, an
+    editable summary, the ERP payload preview, source thumbnail, and approval state."""
     conn = get_conn()
     row = conn.execute(
         "SELECT file_name, status, review_status, approved_by, approved_at, summary_override "
@@ -1017,7 +915,7 @@ def get_review(drawing_id: int, _user: dict = Depends(require_auth)):
             "drawing_id": drawing_id, "file_name": row[0], "status": row[1],
             "review_status": review_status, "approved_by": row[3], "approved_at": row[4],
             "verdict": None, "elapsed": 0, "extracted": {}, "summary_draft": "",
-            "summary_override": row[5], "erp_payload": {}, "thumbnail_uri": None, "rules": [],
+            "summary_override": row[5], "erp_payload": {}, "thumbnail_uri": None,
         }
 
     extracted = _apply_corrections(drawing_id, dict(data.get("extracted") or {}))
@@ -1039,7 +937,6 @@ def get_review(drawing_id: int, _user: dict = Depends(require_auth)):
         "summary_override": data.get("summary_override") or row[5],
         "erp_payload":      data.get("erp_payload", {}),
         "thumbnail_uri":    thumb,
-        "rules":            [],
     }
 
 
@@ -1397,29 +1294,6 @@ def export_project_excel(_user: dict = Depends(require_auth)):
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={"Content-Disposition": 'attachment; filename="Project_BOQ.xlsx"'},
     )
-
-
-@app.get("/exceptions")
-def list_exceptions(resolved: bool = False, _user: dict = Depends(require_auth)):
-    conn = get_conn()
-    rows = conn.execute(
-        "SELECT id, drawing_id, rule_id, field_name, reason, severity, resolved, created_at "
-        "FROM exceptions WHERE resolved=?",
-        (1 if resolved else 0,)
-    ).fetchall()
-    conn.close()
-    return [{"id": r[0], "drawing_id": r[1], "rule_id": r[2], "field_name": r[3],
-             "reason": r[4], "severity": r[5], "resolved": r[6], "created_at": r[7]} for r in rows]
-
-
-@app.patch("/exceptions/{exc_id}/resolve")
-def resolve_exception(exc_id: int, resolved_by: str = "admin",
-                      _user: dict = Depends(require_auth)):
-    conn = get_conn()
-    conn.execute("UPDATE exceptions SET resolved=1, resolved_by=? WHERE id=?", (resolved_by, exc_id))
-    conn.commit()
-    conn.close()
-    return {"message": f"Exception {exc_id} resolved"}
 
 
 @app.get("/health")

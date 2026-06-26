@@ -130,7 +130,7 @@ export default function ResultsPage({ params }: { params: { id: string } }) {
     );
   }
 
-  // Pending verification — editable cross-verify screen (no ERP push / summary yet).
+  // Pending review — editable BOQ screen (no ERP push / summary yet).
   if (review.review_status === "pending_review") {
     return <ReviewEditor data={review} username={username} onApproved={handleApproved} />;
   }

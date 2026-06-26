@@ -22,7 +22,7 @@ export function VerdictBanner({
   if (verdict === "PASSED")
     return (
       <div className={`${base} border-result-pass/40 bg-result-pass/10 text-[#6ee7b7]`}>
-        ✅ EXTRACTION COMPLETE — ALL RULES PASSED · {elapsed}s · ERP:{" "}
+        ✅ BOQ EXTRACTION COMPLETE · {elapsed}s · ERP:{" "}
         {(erpStatus || "—").toUpperCase()}
       </div>
     );
@@ -35,7 +35,7 @@ export function VerdictBanner({
     );
   return (
     <div className={`${base} border-result-fail/40 bg-result-fail/10 text-[#fca5a5]`}>
-      ❌ VALIDATION FAILED — {errors.length} ERROR(S) · {elapsed}s
+      ❌ BOQ EXTRACTION FAILED — {errors.length} ERROR(S) · {elapsed}s
     </div>
   );
 }
@@ -68,7 +68,7 @@ export function MetricsScorecard({
   const cards = [
     { val: String(fieldCount), label: "Fields" },
     { val: `${Math.round(avg * 100)}%`, label: "Avg Confidence" },
-    { val: verdict, label: "Verdict", color: vcolor },
+    { val: verdict, label: "Status", color: vcolor },
     { val: String(errors.length), label: "Errors", color: "#fca5a5" },
     { val: String(warnings.length), label: "Warnings", color: "#fcd34d" },
   ];
@@ -190,41 +190,6 @@ export function RoomScheduleTable({
           })}
         </tbody>
       </table>
-    </div>
-  );
-}
-
-export function ValidationResults({
-  errors,
-  warnings,
-}: {
-  errors: string[];
-  warnings: string[];
-}) {
-  if (errors.length === 0 && warnings.length === 0)
-    return (
-      <div className="rounded-lg border border-result-pass/40 bg-result-pass/10 px-3 py-2 text-sm text-[#6ee7b7]">
-        ✅ All validation rules passed
-      </div>
-    );
-  return (
-    <div className="space-y-1.5">
-      {errors.map((e, i) => (
-        <div
-          key={`e${i}`}
-          className="rounded-lg border border-result-fail/40 bg-result-fail/10 px-3 py-2 text-sm text-[#fca5a5]"
-        >
-          ❌ {e}
-        </div>
-      ))}
-      {warnings.map((w, i) => (
-        <div
-          key={`w${i}`}
-          className="rounded-lg border border-result-warn/40 bg-result-warn/10 px-3 py-2 text-sm text-[#fcd34d]"
-        >
-          ⚠️ {w}
-        </div>
-      ))}
     </div>
   );
 }

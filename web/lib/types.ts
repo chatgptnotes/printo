@@ -67,15 +67,7 @@ export interface DonePayload {
 // ── Human-in-the-loop verification ──────────────────────────────────────────
 export type ReviewStatus = "pending_review" | "approved";
 
-export interface RuleRow {
-  rule_id: string;
-  field_name: string;
-  message: string;
-  severity: string;
-  passed: boolean;
-}
-
-/** Payload for the cross-verification / approval screen (GET /drawings/:id/review). */
+/** Payload for the BOQ review / approval screen (GET /drawings/:id/review). */
 export interface ReviewData {
   drawing_id: number;
   file_name: string;
@@ -92,7 +84,6 @@ export interface ReviewData {
   summary_override: string | null;
   erp_payload: RealsoftPayload;
   thumbnail_uri: string | null;
-  rules: RuleRow[];
 }
 
 export interface ApproveResult {

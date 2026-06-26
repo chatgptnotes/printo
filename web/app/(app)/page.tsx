@@ -137,28 +137,28 @@ export default function UploadPage() {
         <div className="flex flex-col justify-center">
           <span className="mb-4 inline-flex w-fit items-center gap-2 rounded-full border border-accent-orange/40 px-3 py-1 text-xs font-semibold text-accent-orange">
             <span className="h-2 w-2 animate-pulse2 rounded-full bg-accent-orange" />
-            AI Compliance &amp; Extraction Gateway
+            AI BOQ Extraction Gateway
           </span>
           <h1 className="text-4xl font-black leading-tight md:text-5xl">
             Construction Drawings,{" "}
-            <span className="text-grad">Read &amp; Verified</span> by AI
+            <span className="text-grad">Converted to BOQ</span> by AI
           </h1>
           <p className="mt-3 max-w-md text-muted">
-            Upload an approved drawing — ERP RealSoft extracts the title block, validates
-            it against 18 rules, and pushes clean data to RealSoft.
+            Upload drawings or PDFs — Printo extracts scope from every sheet, generates
+            a fresh BOQ, and prepares it for review, ERP, and Excel export.
           </p>
           <div className="mt-5 flex gap-6 text-sm">
             <div>
-              <div className="text-xl font-bold text-accent-orange">~14s</div>
-              <div className="text-muted">per drawing</div>
+              <div className="text-xl font-bold text-accent-orange">100MB</div>
+              <div className="text-muted">file limit</div>
             </div>
             <div>
-              <div className="text-xl font-bold text-accent-orange">26+</div>
-              <div className="text-muted">fields</div>
+              <div className="text-xl font-bold text-accent-orange">200+</div>
+              <div className="text-muted">BOQ rows</div>
             </div>
             <div>
-              <div className="text-xl font-bold text-accent-orange">18</div>
-              <div className="text-muted">rules</div>
+              <div className="text-xl font-bold text-accent-orange">Fresh</div>
+              <div className="text-muted">per upload</div>
             </div>
           </div>
         </div>
@@ -203,7 +203,7 @@ export default function UploadPage() {
       {(streaming || lines.length > 0) && (
         <Card>
           <div className="mb-2 flex items-center justify-between">
-            <h2 className="font-bold">Compilation in progress</h2>
+            <h2 className="font-bold">BOQ extraction in progress</h2>
             {batch && (
               <span className="rounded-full bg-surface-2 px-3 py-1 text-xs font-semibold text-accent-orange">
                 Drawing {batch.index} of {batch.total}
@@ -273,7 +273,7 @@ export default function UploadPage() {
       {/* Upload + samples */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <Card>
-          <h2 className="mb-4 font-bold">Upload drawings</h2>
+          <h2 className="mb-4 font-bold">Upload files for BOQ</h2>
           <label className="mb-1 block text-xs font-semibold text-muted">
             BOQ description / scope <span className="text-dim">(optional)</span>
           </label>
@@ -305,7 +305,7 @@ export default function UploadPage() {
             ))}
           </select>
           <p className="mb-4 text-xs text-dim">
-            Runs the rigorous, per-area take-off for that discipline. Auto-detect lets the AI classify the sheets.
+            Helps the AI choose the right take-off method. Auto-detect lets the AI classify the sheets.
           </p>
 
           <label className="mb-1 block text-xs font-semibold text-muted">
@@ -382,7 +382,7 @@ export default function UploadPage() {
               checked={strict}
               onChange={(e) => setStrict(e.target.checked)}
             />
-            Strict mode (treat warnings as errors)
+            Strict extraction mode (fail if the BOQ is incomplete)
           </label>
 
           <Button
@@ -395,7 +395,7 @@ export default function UploadPage() {
               ? `Processing ${batch.index}/${batch.total}…`
               : streaming
                 ? "Processing…"
-                : "Process Files and Drawings"}
+                : "Generate BOQ"}
           </Button>
         </Card>
 

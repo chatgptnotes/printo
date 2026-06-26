@@ -57,7 +57,7 @@ web/
   app/
     (app)/            # authenticated route group (sidebar shell)
       page.tsx        # Upload (hero + 3D + samples + uploader + live SSE log)
-      results/[id]/   # extraction results, heatmap, validation, corrections, exports
+      results/[id]/   # extraction results, BOQ review, corrections, exports
       report/[id]/    # inline report iframe + PDF (id="project" → project report)
       history/        # drawings list
     api/              # BFF proxy routes (auth, upload-SSE, drawings, report, export, health)

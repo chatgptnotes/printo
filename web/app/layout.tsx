@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "ERP RealSoft — Drawing Intelligence",
-  description: "AI compliance & extraction gateway for construction drawings.",
+  title: "Printo — AI BOQ Generator",
+  description: "AI BOQ extraction and export workflow for construction drawings.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

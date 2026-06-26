@@ -26,17 +26,17 @@ export const DISCIPLINES = [
 export const MARQUEE_TAGS = [
   "Title Block",
   "Drawing Number",
-  "Floor Area",
-  "Room Schedule",
+  "BOQ Items",
+  "Trade Sections",
   "Dimensions",
   "Materials",
-  "Approval Stamp",
+  "Rates",
   "Revision",
   "Scale",
-  "Door / Window Count",
-  "Grid Lines",
-  "North Arrow",
-  "18 Validation Rules",
+  "Quantities",
+  "Excel Export",
+  "Fresh Extraction",
+  "AI Take-off",
   "RealSoft ERP",
 ];
 
@@ -54,10 +54,10 @@ export const SAMPLE_DRAWINGS: Sample[] = [
 ];
 
 export const STEP_CARDS = [
-  { n: "1", title: "Upload", body: "Drop an approved construction drawing (PDF or image)." },
-  { n: "2", title: "AI Extract", body: "Claude Vision reads the title block, plan, dimensions and stamps." },
-  { n: "3", title: "Validate", body: "18 rules check completeness, confidence and format." },
-  { n: "4", title: "Review & Approve", body: "Cross-verify, edit any mistakes, then approve to push to ERP and generate the summary." },
+  { n: "1", title: "Upload", body: "Upload a drawing set or file for a fresh AI take-off." },
+  { n: "2", title: "AI Extract", body: "Codex Vision reads the sheets and extracts title-block and scope data." },
+  { n: "3", title: "Generate BOQ", body: "The system builds trade sections, BOQ rows, quantities, rates and references." },
+  { n: "4", title: "Review & Approve", body: "Review and edit the BOQ, then approve it for ERP/export." },
 ];
 
 // field key -> display label, grouped

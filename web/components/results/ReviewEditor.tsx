@@ -148,7 +148,7 @@ export function ReviewEditor({
     <div className="space-y-6">
       <div className="rounded-xl border border-result-warn/40 bg-result-warn/10 px-5 py-4 text-sm font-extrabold text-[#fcd34d]">
         ⏸️ BOQ READY FOR REVIEW — nothing has been pushed to ERP yet. Review the title block
-        and Bill of Quantities below, adjust any line, then approve to push to RealSoft.
+        and Bill of Quantities below, adjust any line, then approve for ERP/export.
       </div>
 
       {data.project_description && data.project_description.trim() && (
@@ -267,7 +267,7 @@ export function ReviewEditor({
             <p className="text-sm text-muted">Preview unavailable.</p>
           )}
           <p className="mt-2 text-xs text-muted">
-            Cross-check the title block and quantities against the drawing before approving.
+            Review the extracted title block and quantities against the drawing before approving.
           </p>
         </Card>
       </div>
@@ -290,7 +290,7 @@ export function ReviewEditor({
           {msg && <span className="text-xs text-muted">{msg}</span>}
         </div>
         <p className="mt-2 text-xs text-muted">
-          Approving pushes the title block + BOQ to RealSoft ERP and unlocks the report.
+          Approving finalizes the title block + BOQ for RealSoft ERP and report export.
         </p>
       </Card>
     </div>

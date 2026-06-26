@@ -39,7 +39,7 @@ function progressFor(text: string, current: number): number {
   if (/Blur Check/i.test(text)) return Math.min(current + 3, 18);
   if (/Pre-pass/i.test(text)) return Math.min(current + 5, 25);
   if (/Claude|AI Processing|Extraction/i.test(text)) return Math.min(current + 15, 70);
-  if (/Validation|R1\d/.test(text)) return Math.min(current + 4, 85);
+  if (/BOQ|Quantit|Take-off|Extraction Complete/i.test(text)) return Math.min(current + 4, 85);
   if (/ERP|Mapping/i.test(text)) return Math.min(current + 3, 92);
   if (/Verification|Approval|Review|Report/i.test(text)) return Math.min(current + 3, 97);
   return Math.min(current + 1, 96);

@@ -5,10 +5,10 @@ Talks to the Printo AI Gateway (task-routed Claude-CLI gateway), which exposes
 every AI capability behind a single auth key and a `taskID`:
 
     DRAWING_EXTRACT   vision  -> all structured fields + per-field confidence
-    DRAWING_ANALYZE   vision  -> extract + validate (18 rules) + issues + summary
-    DRAWING_VALIDATE  text    -> validate an already-extracted field set
+    DRAWING_ANALYZE   vision  -> legacy drawing analysis task
+    DRAWING_VALIDATE  text    -> legacy field-check task
     ERP_MAP           text    -> normalized RealSoft ERP payload
-    REPORT_HTML       text    -> standalone HTML validation report
+    REPORT_HTML       text    -> standalone HTML report
     GENERIC_ASK       text    -> free-form passthrough
 
 Config via environment variables (set these in the Printo .env):
