@@ -232,6 +232,19 @@ def _boq_table_html(extracted: dict) -> str:
             rate = it.get("rate")
             priced = _num_rate(rate) is not None
             meta_bits = []
+            if it.get("tag"):
+                meta_bits.append(f'Tag {escape(str(it.get("tag")))}')
+            if it.get("rating"):
+                meta_bits.append(f'Rating: {escape(str(it.get("rating")))}')
+            if it.get("cable_size"):
+                meta_bits.append(f'Cable: {escape(str(it.get("cable_size")))}')
+            if it.get("from_ref") or it.get("to_ref"):
+                meta_bits.append(
+                    f'From/To: {escape(str(it.get("from_ref") or "—"))} → '
+                    f'{escape(str(it.get("to_ref") or "—"))}'
+                )
+            if it.get("floor"):
+                meta_bits.append(f'Area: {escape(str(it.get("floor")))}')
             if it.get("reference"):
                 meta_bits.append(f'Ref {escape(str(it.get("reference")))}')
             if it.get("origin"):

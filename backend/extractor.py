@@ -9,6 +9,7 @@ from prepass import (extract_pdf_text, prepass_extract,
 from schema import validate_and_repair, extraction_json_schema
 from ai_provider import (resolve_provider, ExtractRequest, SidecarError,
                          vision_extract)
+from boq_quality import infer_discipline, validate_boq_quality
 
 
 def _env_bool(name: str, default: bool = False) -> bool:
@@ -388,9 +389,11 @@ def extract_drawing_with_prepass(file_path: str, floor_category: str = None,
     if pdf_text:
         prepass_hints = prepass_extract(pdf_text)
 
-    prompt = _build_prompt(prepass_hints, project_description, discipline)
+    effective_discipline = infer_discipline(original_name or file_path, pdf_text, discipline)
+    prompt = _build_prompt(prepass_hints, project_description, effective_discipline)
     schema = extraction_json_schema()
     raw: dict | None = None
+    vision_error: Exception | None = None
 
     # ── Preferred: multi-sheet vision — send every sheet at once. The dispatcher
     #    prefers the Printo Gateway (Claude CLI, no API key), else a direct key. ──
@@ -412,12 +415,16 @@ def extract_drawing_with_prepass(file_path: str, floor_category: str = None,
         # the background job (no request ceiling), so it's on by default.
         if raw is not None and _env_bool("VISION_GAPFILL", True):
             raw = _gap_fill(raw, sheets, media_type)
-    except SidecarError:
-        raw = None  # no vision provider / call failed — degrade below
+    except SidecarError as e:
+        vision_error = e
+        raw = None  # no vision provider / call failed - degrade below
 
     # ── Fallback: legacy single-image sidecar / mock ──
     if raw is None:
         provider, _status = resolve_provider()
+        if getattr(provider, "name", "") == "mock" and not _env_bool("ALLOW_MOCK_EXTRACTION", False):
+            detail = f" Previous vision error: {vision_error}" if vision_error else ""
+            raise SidecarError("No real AI extraction provider is available; refusing to generate mock BOQ." + detail)
 
         def _call(image):
             req = ExtractRequest(
@@ -425,11 +432,7 @@ def extract_drawing_with_prepass(file_path: str, floor_category: str = None,
                 text=pdf_text, file_path=file_path, system=SYSTEM_PROMPT,
                 floor_category=floor_category, original_name=original_name,
             )
-            try:
-                return _coerce_raw(provider.extract(req))
-            except SidecarError:
-                from ai_provider import MockProvider
-                return _coerce_raw(MockProvider().extract(req))
+            return _coerce_raw(provider.extract(req))
 
         multipass = _env_bool("MULTIPASS", False)
         if (multipass and getattr(provider, "mode", "") == "vision" and crops):
@@ -439,10 +442,20 @@ def extract_drawing_with_prepass(file_path: str, floor_category: str = None,
                 if raw_crop.get(k):
                     raw[k] = raw_crop[k]
         else:
-            raw = _call(full_image)
+            try:
+                raw = _call(full_image)
+            except SidecarError as e:
+                detail = f" Previous vision error: {vision_error}" if vision_error else ""
+                raise SidecarError(f"AI extraction provider failed: {e}.{detail}") from e
 
     # ── validate → merge ground truth → calibrate ──
     extracted = validate_and_repair(raw)
     extracted = _merge_prepass_ground_truth(extracted, prepass_hints)
     extracted = calibrate_confidence(extracted, prepass_hints)
+    validate_boq_quality(
+        extracted,
+        source_name=original_name or file_path,
+        discipline=effective_discipline,
+        source_text=pdf_text,
+    )
     return extracted, prepass_hints

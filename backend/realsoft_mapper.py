@@ -257,6 +257,12 @@ def map_to_realsoft(extracted: dict, drawing_id: int, file_name: str,
             "rate":        b.get("rate"),
             "origin":      b.get("origin"),
             "reference":   b.get("reference"),
+            "floor":       b.get("floor"),
+            "tag":         b.get("tag"),
+            "rating":      b.get("rating"),
+            "cable_size":  b.get("cable_size"),
+            "from_ref":    b.get("from_ref"),
+            "to_ref":      b.get("to_ref"),
         }
         for b in (extracted.get("boq_items") or []) if isinstance(b, dict)
     ]

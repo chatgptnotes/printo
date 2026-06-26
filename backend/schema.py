@@ -33,9 +33,15 @@ class BoqItem(BaseModel):
     reference: Optional[str] = None      # source drawing number / detail tag
     floor: Optional[str] = None          # area/level this row was counted on (per-area take-off)
     provisional: Optional[bool] = None   # True = estimated/unread row (flagged amber, not read)
+    tag: Optional[str] = None            # electrical/equipment tag: SMDB-1F, DB-A1, L1, etc.
+    rating: Optional[str] = None         # A, kA, kW, kVA, pole/phase rating as drawn
+    cable_size: Optional[str] = None     # e.g. 4C x 16 sq.mm XLPE/SWA/PVC
+    from_ref: Optional[str] = None       # feeder/cable origin panel or equipment
+    to_ref: Optional[str] = None         # feeder/cable destination panel or equipment
 
     @field_validator("section", "description", "unit", "quantity",
-                     "rate", "origin", "reference", "floor", mode="before")
+                     "rate", "origin", "reference", "floor", "tag", "rating",
+                     "cable_size", "from_ref", "to_ref", mode="before")
     @classmethod
     def _clean(cls, v):
         if v is None:

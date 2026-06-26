@@ -105,6 +105,25 @@ D. READ AS DRAWN + cross-reference. Record each item's specification EXACTLY as 
 """
 
 
+_ELECTRICAL_POWER_RULES = """
+ELECTRICAL POWER BOQ RULES:
+
+1. Never return a civil/architectural BOQ for a power/electrical drawing set.
+2. Read every SLD, DB schedule, panel schedule, cable schedule, riser, legend and plan sheet.
+3. Organise electrical power BOQs into industry bill sections when present:
+   Preliminaries / General; Incoming Supply; HV / LV Main Distribution; Sub-Main Distribution Boards (SMDBs);
+   Distribution Boards & Consumer Units; LV Cables; Containment (Trunking/Conduit/Tray);
+   Wiring Devices / Small Power; Lighting Fixtures; Earthing & Lightning Protection; Emergency Lighting;
+   ELV / Data / Telecom Containment; Metering; Test & Commissioning.
+4. Emit one row per tagged MDB/SMDB/DB/panel, one row per cable/feeder schedule item, and one row per
+   fixture/accessory type per floor or area. Do not aggregate ranges such as "all DBs", "typical sockets",
+   or "SMDB-1F to SMDB-8F".
+5. Fill optional electrical row fields when available: tag, rating, cable_size, from_ref, to_ref.
+6. A 5-10 row BOQ is not acceptable for a multi-sheet electrical set; keep reading until schedules and
+   legends are represented line by line.
+"""
+
+
 EXTRACTION_PROMPT_TEMPLATE = """Analyse this construction drawing SET (every sheet is attached as an image). Extract the
 complete TITLE BLOCK and produce a complete, audit-ready, trade-grouped BILL OF QUANTITIES (BOQ) of the work shown.
 Assume the drawings are correct and approved — do NOT validate or flag them.
@@ -144,7 +163,7 @@ Return ONLY this exact JSON structure (null for any title-block field not visibl
   "boq_items": [
     {{"section": "Concrete / RCC", "description": "RCC for columns, beams and slab (M25)", "unit": "cu.m", "quantity": "—",  "rate": "1450", "origin": "Approved equal — contractor selection", "reference": "S-101", "floor": "Ground Floor", "provisional": false}},
     {{"section": "Lighting",       "description": "Recessed LED panel 600×600, 36W",        "unit": "nos",  "quantity": "60",  "rate": "165",  "origin": "Philips / approved equal", "reference": "E-301", "floor": "First Floor", "provisional": false}},
-    {{"section": "LV Switchgear & Distribution", "description": "Final distribution board DB-1F-01, 12-way TPN", "unit": "nos", "quantity": "1", "rate": "2400", "origin": "Schneider Electric / ABB / Siemens", "reference": "E-201", "floor": "First Floor", "provisional": false}}
+    {{"section": "LV Switchgear & Distribution", "description": "Final distribution board DB-1F-01, 12-way TPN", "unit": "nos", "quantity": "1", "rate": "2400", "origin": "Schneider Electric / ABB / Siemens", "reference": "E-201", "floor": "First Floor", "provisional": false, "tag": "DB-1F-01", "rating": "12-way TPN", "cable_size": null, "from_ref": "SMDB-1F", "to_ref": "Final circuits"}}
   ],
   "confidence": {{ "drawing_number": 0.0, "project_name": 0.0, "boq_items": 0.0 }}
 }}
@@ -174,4 +193,4 @@ INSTRUCTIONS:
    - "reference": the SOURCE drawing number / detail tag the item is taken from; null if not identifiable.
 3. Use the drawings' own units/scale. Return null for any title-block field not visible — do NOT fabricate it.
 4. confidence: a single 0..1 self-rating per listed key is enough.
-""" + _GOVERNING_RULES
+""" + _GOVERNING_RULES + _ELECTRICAL_POWER_RULES

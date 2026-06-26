@@ -12,3 +12,11 @@ Every drawing/file upload must generate a fresh report.
   - `POST /drawings/{id}/regenerate`
   - `POST /drawings/regenerate-all`
 
+## BOQ quality policy
+
+Production BOQ generation must fail closed.
+
+- Do not generate a report from mock/demo extraction data.
+- If the AI provider or gateway fails, show an extraction error instead of producing a plausible but wrong BOQ.
+- Electrical/power drawing sets must produce an electrical BOQ, not a generic civil BOQ.
+- Multi-sheet electrical sets must include line-level rows for panels/DBs/SMDBs, cables/feeders, containment, wiring devices, lighting, earthing, metering, and testing where shown.

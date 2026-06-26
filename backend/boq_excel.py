@@ -92,6 +92,29 @@ def _sections(items: list[dict]) -> list[str]:
     return out
 
 
+def _line_description(it: dict) -> str:
+    desc = _val(it.get("description"))
+    details = []
+    for label, key in (
+        ("Tag", "tag"),
+        ("Rating", "rating"),
+        ("Cable", "cable_size"),
+        ("From", "from_ref"),
+        ("To", "to_ref"),
+    ):
+        val = it.get(key)
+        if val not in (None, ""):
+            details.append(f"{label}: {val}")
+    return desc if not details else desc + "\n" + " | ".join(details)
+
+
+def _line_reference(it: dict, fallback: str) -> str:
+    refs = [str(it.get("reference") or fallback)]
+    if it.get("floor"):
+        refs.append(f"Area: {it.get('floor')}")
+    return "\n".join(r for r in refs if r and r != "None")
+
+
 def _sheet_title(prefix: str, name: str, used: set[str]) -> str:
     clean = re.sub(r"[\[\]:*?/\\]", " ", name).strip()
     title = f"{prefix} {clean}".strip()[:31].rstrip()
@@ -379,9 +402,9 @@ def _build_bill_sheet(wb, used, bill_no, section, items, extracted, meta):
         rate_fill = yellow if priced else amber   # amber = unpriced, flag for manual pricing
         _put(ws, row, 1, f"{bill_no}.{k}", font=_f(bold=True),
              align=Alignment(horizontal="left", vertical="top"), fill=z)
-        _put(ws, row, 2, _val(it.get("description")), font=_f(),
+        _put(ws, row, 2, _line_description(it), font=_f(),
              align=Alignment(horizontal="left", vertical="top", wrap_text=True), fill=z)
-        _put(ws, row, 3, it.get("reference") or reference, font=_f(),
+        _put(ws, row, 3, _line_reference(it, reference), font=_f(),
              align=Alignment(horizontal="left", vertical="top", wrap_text=True), fill=z)
         _put(ws, row, 4, _val(it.get("unit")), font=_f(),
              align=Alignment(horizontal="center", vertical="top"), fill=z)
@@ -628,8 +651,8 @@ def build_project_workbook(drawings: list[dict]) -> bytes:
             _put(cons, crow, 1, label, align=Alignment(horizontal="left", vertical="top"), fill=rz)
             _put(cons, crow, 2, it.get("section") or "General", align=Alignment(horizontal="left", vertical="top", wrap_text=True), fill=rz)
             _put(cons, crow, 3, k, align=Alignment(horizontal="center", vertical="top"), fill=rz)
-            _put(cons, crow, 4, _val(it.get("description")), align=Alignment(horizontal="left", vertical="top", wrap_text=True), fill=rz)
-            _put(cons, crow, 5, it.get("reference") or reference, align=Alignment(horizontal="left", vertical="top", wrap_text=True), fill=rz)
+            _put(cons, crow, 4, _line_description(it), align=Alignment(horizontal="left", vertical="top", wrap_text=True), fill=rz)
+            _put(cons, crow, 5, _line_reference(it, reference), align=Alignment(horizontal="left", vertical="top", wrap_text=True), fill=rz)
             _put(cons, crow, 6, _val(it.get("unit")), align=Alignment(horizontal="center", vertical="top"), fill=rz)
             _put(cons, crow, 7, qty if qty is not None else _val(it.get("quantity")),
                  align=Alignment(horizontal="right", vertical="top"), fill=yellow,
