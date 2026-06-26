@@ -1,7 +1,10 @@
 import sqlite3
 import os
 
-DB_PATH = os.path.join(os.path.dirname(__file__), "..", "printo.db")
+DB_PATH = os.getenv(
+    "ERP_REALSOFT_DB_PATH",
+    os.path.join(os.path.dirname(__file__), "..", "erp_realsoft.db"),
+)
 
 
 def get_conn():
@@ -116,7 +119,7 @@ def _seed_admin():
     count = conn.execute("SELECT COUNT(*) FROM users").fetchone()[0]
     if count == 0:
         username = os.getenv("ADMIN_USERNAME", "Admin")
-        email    = os.getenv("ADMIN_EMAIL", "admin@printo.local")
+        email    = os.getenv("ADMIN_EMAIL", "admin@erp-realsoft.local")
         password = os.getenv("ADMIN_PASSWORD", "Admin@123")
         pw_hash  = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
         conn.execute(

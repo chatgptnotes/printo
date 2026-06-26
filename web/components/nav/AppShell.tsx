@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { usePrintoStore } from "@/lib/store";
+import { useErpRealSoftStore } from "@/lib/store";
 import type { CurrentUser, Health } from "@/lib/types";
 import { Button } from "@/components/ui/Button";
 
@@ -59,7 +59,7 @@ export function AppShell({
 }) {
   const pathname = usePathname();
   const router = useRouter();
-  const lastId = usePrintoStore((s) => s.lastResult?.drawing_id);
+  const lastId = useErpRealSoftStore((s) => s.lastResult?.drawing_id);
 
   async function logout() {
     await fetch("/api/auth/logout", { method: "POST" });

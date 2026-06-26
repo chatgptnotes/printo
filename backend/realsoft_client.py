@@ -15,7 +15,7 @@ HEADERS = {
     "Content-Type":  "application/json",
     "Accept":        "application/json",
     "Authorization": f"Bearer {REALSOFT_API_KEY}",
-    "X-Source":      "Printo-AI",
+    "X-Source":      "ERP-RealSoft-AI",
 }
 
 

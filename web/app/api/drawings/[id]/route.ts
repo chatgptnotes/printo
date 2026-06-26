@@ -6,3 +6,10 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
   const resp = await backendFetch(`/drawings/${encodeURIComponent(params.id)}`);
   return passThrough(resp);
 }
+
+export async function DELETE(_req: Request, { params }: { params: { id: string } }) {
+  const resp = await backendFetch(`/drawings/${encodeURIComponent(params.id)}`, {
+    method: "DELETE",
+  });
+  return passThrough(resp);
+}

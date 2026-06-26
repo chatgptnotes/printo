@@ -1,68 +1,74 @@
-# Printo Web (Next.js frontend)
+# ERP RealSoft Web (Next.js frontend)
 
-The Next.js / Vercel frontend for Printo. It replaces the Streamlit UI with full
-feature parity and talks to the **existing Python FastAPI backend** (on the VPS) —
-the backend is unchanged.
+The Next.js / Vercel frontend for ERP RealSoft. It talks to the Python FastAPI
+backend on the VPS and provides drawing upload, fresh AI extraction, BOQ review,
+approval, Excel export, and ERP handoff.
 
 ## Architecture
 
+```text
+Browser -- same-origin HttpOnly cookie --> Next.js on Vercel
+                                        app/api/* BFF proxy
+                                        attaches Authorization: Bearer <JWT cookie>
+                                        FastAPI backend on VPS
 ```
-Browser ──(same-origin, HttpOnly cookie)──▶ Next.js (this app, on Vercel)
-                                              app/api/*  →  BFF proxy
-                                              attaches Authorization: Bearer <JWT cookie>
-                                              ▼
-                                     FastAPI backend (VPS) — SQLite, storage, AI pipeline
+
+- The browser calls same-origin `/api/*` routes only.
+- The BFF proxy attaches the JWT from the HttpOnly cookie server-side.
+- Upload streaming is proxied through `/api/upload`; large files use chunked upload.
+
+## Local Development
+
+Prereqs: Node 20 or newer, and the Python backend running:
+
+```bash
+python -m uvicorn main:app --app-dir backend --port 8000
 ```
 
-- The browser only ever calls **same-origin** `/api/*` routes. Those proxy to the
-  Python backend server-side and attach the JWT (kept in an **HttpOnly cookie**, never
-  exposed to client JS). This also lets the report HTML render in an `<iframe>` and PDFs/
-  Excel download without putting a token in the URL.
-- SSE upload streaming is proxied through `/api/upload` (route has `maxDuration = 300`).
-
-## Local development
-
-Prereqs: Node ≥ 20, and the Python backend running (e.g.
-`python -m uvicorn main:app --app-dir backend --port 8000` from the repo root).
+Frontend:
 
 ```bash
 cd web
-cp .env.local.example .env.local       # set PRINTO_API_URL=http://127.0.0.1:8000
+cp .env.local.example .env.local
 npm install
-npm run dev                            # http://localhost:3000
+npm run dev
 ```
 
-Log in with the backend's seeded admin (default `Admin` / `Admin@123` — change in prod).
+Set `ERP_REALSOFT_API_URL=http://127.0.0.1:8000` in `.env.local`.
 
-## Deploy to Vercel
+Log in with the backend seeded admin credentials, then change them for production.
 
-1. Import the Git repo into Vercel; set **Root Directory = `web`** (framework auto-detects Next.js).
-2. Set environment variables:
-   - `PRINTO_API_URL` — the VPS backend base URL (use **https**), e.g. `https://api.printo.example.com`.
-   - `SESSION_COOKIE` — optional; defaults to `printo_session`.
-3. Deploy. `npm run build` must pass (strict TypeScript).
+## Deploy To Vercel
 
-### Backend prerequisites (one-time, on the VPS)
-- Serve the FastAPI backend over **HTTPS** (domain + certbot) so `Secure` cookies work.
-- Set **`ALLOWED_ORIGINS`** on the backend to the Vercel domain(s), e.g.
-  `ALLOWED_ORIGINS=https://printo.vercel.app,http://localhost:3000` (CORS is otherwise `*`).
+1. Import the Git repo into Vercel.
+2. Set Root Directory to `web`.
+3. Set environment variables:
+   - `ERP_REALSOFT_API_URL`: VPS backend base URL, preferably HTTPS.
+   - `SESSION_COOKIE`: optional; defaults to `erp_realsoft_session`.
+   - `PRINTO_API_URL`: legacy fallback only, retained for existing deployments.
+4. Deploy after `npm run build` passes.
+
+## Backend Prerequisites
+
+- Serve the FastAPI backend over HTTPS so Secure cookies work.
+- Set `ALLOWED_ORIGINS` to the Vercel domain and local development origin.
 - Set a strong `AUTH_SECRET` and change the seeded `ADMIN_PASSWORD`.
-- ⚠️ `maxDuration = 300` on `/api/upload` requires Vercel **Pro**; on Hobby (60s cap) a long
-  extraction can be cut off — see the SSE fallback note in the migration plan.
+- Keep `/api/upload` on a Vercel plan that allows enough function duration for
+  long drawing extraction jobs.
 
 ## Structure
 
-```
+```text
 web/
   app/
-    (app)/            # authenticated route group (sidebar shell)
-      page.tsx        # Upload (hero + 3D + samples + uploader + live SSE log)
-      results/[id]/   # extraction results, BOQ review, corrections, exports
-      report/[id]/    # inline report iframe + PDF (id="project" → project report)
-      history/        # drawings list
-    api/              # BFF proxy routes (auth, upload-SSE, drawings, report, export, health)
-    login/            # login page
-  components/         # ui / nav / upload / pipeline / results
-  lib/                # api (proxy), auth (cookie/JWT), store (zustand), types, constants, format
-  middleware.ts       # redirects unauthenticated page requests to /login
+    (app)/            authenticated route group
+      page.tsx        upload, samples, uploader, live SSE log
+      results/[id]/   extraction results, BOQ review, corrections, exports
+      report/[id]/    inline report iframe and PDF
+      history/        drawings list
+    api/              BFF proxy routes
+    login/            login page
+  components/         UI, navigation, upload, pipeline, results
+  lib/                API proxy, auth, store, types, constants, formatting
+  middleware.ts       redirects unauthenticated page requests to /login
 ```

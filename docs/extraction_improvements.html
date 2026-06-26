@@ -1,8 +1,8 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Improving Feature Extraction from Construction Drawings — Printo</title>
+<title>Improving Feature Extraction from Construction Drawings â€” ERP RealSoft</title>
 <style>
   @page { size: A4; margin: 1.6cm 1.5cm; }
   body { font-family: Helvetica, Arial, sans-serif; font-size: 10.5pt; color: #1e293b; line-height: 1.5; }
@@ -37,18 +37,18 @@
 <div class="cover">
   <span class="badge">TECHNICAL STRATEGY</span>
   <h1 style="margin-top:8pt;">Improving Feature Extraction<br>from Construction Drawings</h1>
-  <div class="sub" style="color:#cbd5e1;">PRIN<span class="accent">TO</span> — AI Drawing-to-ERP Platform</div>
+  <div class="sub" style="color:#cbd5e1;">PRIN<span class="accent">TO</span> â€” AI Drawing-to-ERP Platform</div>
   <div class="meta">Coral Business Solutions &nbsp;|&nbsp; RealSoft ERP &nbsp;|&nbsp; June 2026 &nbsp;|&nbsp; Phase 2</div>
 </div>
 
 <h2>1. Executive Summary</h2>
-<p>Printo reads construction drawings and extracts ~26 structured fields (title block, room
+<p>ERP RealSoft reads construction drawings and extracts ~26 structured fields (title block, room
 schedule, dimensions, materials), validates them against 18 rules, and pushes them to RealSoft
 ERP. This document explains <strong>how we improve extraction accuracy</strong> and which
 improvements are <strong>now integrated</strong> into the pipeline.</p>
 <p>Two architectural decisions shape this phase: (1) all AI inference is routed through a
 <strong>pluggable AI sidecar</strong> (the Pratyaya / Ampris AI-aaS pattern) rather than calling a
-model API directly from Printo; and (2) every improvement is made <strong>measurable</strong> by a
+model API directly from ERP RealSoft; and (2) every improvement is made <strong>measurable</strong> by a
 field-level benchmark harness so gains are provable, not assumed.</p>
 
 <h2>2. Current Pipeline &amp; Gaps Addressed</h2>
@@ -63,7 +63,7 @@ trusted the model's self-reported confidence. Three concrete gaps were found and
       <td>Rules always warned; field always blank</td>
       <td>Added to schema, prompt, and prepass regex</td></tr>
   <tr><td>Raw self-reported confidence</td>
-      <td>Unreliable; confidence rules (R12–R15) noisy</td>
+      <td>Unreliable; confidence rules (R12â€“R15) noisy</td>
       <td>Replaced with a calibrated score (Section 5)</td></tr>
 </table>
 
@@ -100,8 +100,8 @@ versus the roadmap (<span class="tier3">Tier&nbsp;3</span>, Section 7).</p>
 <h3>D. Reliability &amp; trustworthy confidence</h3>
 <table>
   <tr><th>#</th><th>Technique</th><th>Why it helps</th><th>Tier</th></tr>
-  <tr><td>11</td><td>Confidence calibration (multi-signal)</td><td>Confidence reflects reality, driving rules R12–R15</td><td class="tier2">2</td></tr>
-  <tr><td>12</td><td>Self-consistency voting (run N×, reconcile)</td><td>Stabilises uncertain fields</td><td class="tier3">3</td></tr>
+  <tr><td>11</td><td>Confidence calibration (multi-signal)</td><td>Confidence reflects reality, driving rules R12â€“R15</td><td class="tier2">2</td></tr>
+  <tr><td>12</td><td>Self-consistency voting (run NÃ—, reconcile)</td><td>Stabilises uncertain fields</td><td class="tier3">3</td></tr>
   <tr><td>13</td><td>Cross-sheet aggregation of project-level fields</td><td>Project / client agree across a sheet set</td><td class="tier3">3</td></tr>
 </table>
 
@@ -115,7 +115,7 @@ versus the roadmap (<span class="tier3">Tier&nbsp;3</span>, Section 7).</p>
 <h2>4. What We Integrated (Tier 1 + Tier 2)</h2>
 <table>
   <tr><th>Capability</th><th>Module / file</th></tr>
-  <tr><td>PDF→PNG render, title-block crop, image cleanup, tiling</td><td><code>backend/preprocess.py</code></td></tr>
+  <tr><td>PDFâ†’PNG render, title-block crop, image cleanup, tiling</td><td><code>backend/preprocess.py</code></td></tr>
   <tr><td>Text-layer + OCR prepass, expanded regex, <code>quantities</code></td><td><code>backend/prepass.py</code></td></tr>
   <tr><td>Structured output, schema validation &amp; repair</td><td><code>backend/schema.py</code></td></tr>
   <tr><td>Pluggable AI provider (mock / sidecar; vision &amp; text)</td><td><code>backend/ai_provider.py</code></td></tr>
@@ -125,17 +125,17 @@ versus the roadmap (<span class="tier3">Tier&nbsp;3</span>, Section 7).</p>
 </table>
 
 <h2>5. Confidence Calibration</h2>
-<p>Self-reported confidence is unreliable, so Printo computes a calibrated per-field score by
+<p>Self-reported confidence is unreliable, so ERP RealSoft computes a calibrated per-field score by
 combining independent signals:</p>
 <ul>
-  <li><strong>Prepass agreement</strong> — a deterministic text-layer/OCR match sets the field to near-certain (0.97).</li>
-  <li><strong>Format validity</strong> — drawing-number pattern, revision pattern, <code>1:NN</code> scale: small boost if valid, penalty if not.</li>
-  <li><strong>Cross-field consistency</strong> — e.g. <code>sheet_number &le; total_sheets</code>; violations lower both scores.</li>
-  <li><strong>Coverage floor</strong> — every populated field gets a sensible minimum so the UI always shows a score.</li>
+  <li><strong>Prepass agreement</strong> â€” a deterministic text-layer/OCR match sets the field to near-certain (0.97).</li>
+  <li><strong>Format validity</strong> â€” drawing-number pattern, revision pattern, <code>1:NN</code> scale: small boost if valid, penalty if not.</li>
+  <li><strong>Cross-field consistency</strong> â€” e.g. <code>sheet_number &le; total_sheets</code>; violations lower both scores.</li>
+  <li><strong>Coverage floor</strong> â€” every populated field gets a sensible minimum so the UI always shows a score.</li>
 </ul>
 
 <h2>6. Sidecar Architecture</h2>
-<p>Printo never embeds a model key. <code>ai_provider.py</code> routes inference to a local sidecar
+<p>ERP RealSoft never embeds a model key. <code>ai_provider.py</code> routes inference to a local sidecar
 (<code>SIDECAR_URL</code>, default <code>http://localhost:8787</code>) and falls back to built-in
 mock data when the sidecar is unreachable (<code>AI_PROVIDER=auto</code>). It supports a
 <strong>vision</strong> mode (sends the rendered image) and a <strong>text</strong> mode (sends OCR
@@ -146,15 +146,15 @@ text), auto-selected from the sidecar's advertised capability.</p>
   <tr><td><code>POST /v1/extract</code></td><td>body <code>{ prompt, schema, image?{media_type,data(b64)}, text? }</code> &rarr; <code>{ "data": { fields..., confidence } }</code></td></tr>
 </table>
 <div class="note"><strong>Swap-in ready:</strong> point <code>SIDECAR_URL</code> at the real
-Pratyaya AI-aaS (or any service implementing this contract) for genuine vision extraction — no
-Printo code change required. <code>tools/mock_sidecar.py</code> documents and stubs the contract.</div>
+Pratyaya AI-aaS (or any service implementing this contract) for genuine vision extraction â€” no
+ERP RealSoft code change required. <code>tools/mock_sidecar.py</code> documents and stubs the contract.</div>
 
 <h2>7. Benchmark Methodology &amp; Roadmap</h2>
 <p><code>benchmark.py</code> runs the pipeline over the sample drawings and scores each field against
 <code>ground_truth.json</code> (bools by equality, lists by overlap, strings normalised with
 substring tolerance), printing per-file and overall accuracy. Run it before and after a change, or
 across providers, to quantify impact. Example: the mock provider scores 100% on the filename-aware
-samples; a fixed stub sidecar scores ~81%, correctly flagging the floor mismatches — demonstrating
+samples; a fixed stub sidecar scores ~81%, correctly flagging the floor mismatches â€” demonstrating
 the harness detects real differences.</p>
 <p><strong>Tier-3 roadmap (next phase):</strong> golden-template matching, drawing-type routing,
 self-consistency voting, cross-sheet aggregation, and a human-in-the-loop feedback loop fed by the
@@ -162,9 +162,10 @@ existing <code>corrections</code> table. Real accuracy figures require pointing 
 vision model.</p>
 
 <div class="footer">
-  Printo — Feature Extraction Improvement &nbsp;|&nbsp; Coral Business Solutions &nbsp;|&nbsp;
+  ERP RealSoft â€” Feature Extraction Improvement &nbsp;|&nbsp; Coral Business Solutions &nbsp;|&nbsp;
   Confidential &nbsp;|&nbsp; June 2026
 </div>
 
 </body>
 </html>
+

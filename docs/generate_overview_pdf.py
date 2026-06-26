@@ -1,20 +1,20 @@
-"""
-Generate the "Printo - Project Overview" PDF from the branded HTML.
+﻿"""
+Generate the "ERP RealSoft - Project Overview" PDF from the branded HTML.
 
 Pure-Python (xhtml2pdf) - no system libraries required.
 
 Usage:
     python docs/generate_overview_pdf.py
 
-Fallback if generation fails for any reason: open docs/printo_overview.html in a
+Fallback if generation fails for any reason: open docs/erp_realsoft_overview.html in a
 browser and use Print -> Save as PDF.
 """
 
 from pathlib import Path
 
 HERE = Path(__file__).parent
-SRC = HERE / "printo_overview.html"
-OUT = HERE / "Printo_Project_Overview.pdf"
+SRC = HERE / "erp_realsoft_overview.html"
+OUT = HERE / "ERP_RealSoft_Project_Overview.pdf"
 
 
 def main() -> int:
@@ -31,3 +31,4 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
+

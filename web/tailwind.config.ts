@@ -1,6 +1,6 @@
 import type { Config } from "tailwindcss";
 
-// Printo design tokens — navy + orange, ported from the Streamlit theme and the
+// ERP RealSoft design tokens - navy + orange, ported from the Streamlit theme and the
 // Pratyaya design system (sibling repo) so the two products stay visually aligned.
 const config: Config = {
   content: [

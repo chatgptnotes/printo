@@ -3,7 +3,7 @@
 import { create } from "zustand";
 import type { DonePayload } from "./types";
 
-interface PrintoState {
+interface ErpRealSoftState {
   // The result of the most recent upload pipeline (mirrors Streamlit last_result).
   lastResult: DonePayload | null;
   setLastResult: (r: DonePayload | null) => void;
@@ -13,7 +13,7 @@ interface PrintoState {
   setStrict: (v: boolean) => void;
 }
 
-export const usePrintoStore = create<PrintoState>((set) => ({
+export const useErpRealSoftStore = create<ErpRealSoftState>((set) => ({
   lastResult: null,
   setLastResult: (r) => set({ lastResult: r }),
   strict: false,

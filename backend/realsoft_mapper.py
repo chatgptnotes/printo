@@ -1,5 +1,5 @@
 """
-Maps Printo extracted JSON -> RealSoft ERP payload.
+Maps extracted drawing JSON -> RealSoft ERP payload.
 
 Mapping accuracy is built on four pillars:
   1. A declarative FIELD_MAP (one source of truth; ERP names configurable).
@@ -278,10 +278,10 @@ def map_to_realsoft(extracted: dict, drawing_id: int, file_name: str,
         "data": data,
         "boq_items": boq_items,
         "metadata": {
-            "source":                 "PRINTO_AI",
+            "source":                 "ERP_REALSOFT_AI",
             "source_file":            file_name,
             "project_description":    project_description or "",
-            "printo_record_id":       drawing_id,
+            "erp_realsoft_record_id": drawing_id,
             "ai_confidence_avg":      round(ai_confidence_avg, 3),
             "status":                 validation_verdict,
             "extracted_at":           datetime.datetime.now().isoformat(),

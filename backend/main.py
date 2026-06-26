@@ -72,7 +72,7 @@ app = FastAPI(title="ERP RealSoft API", version="2.0.0")
 # Browser CORS. The Next.js frontend talks to this API server-side (BFF proxy), so
 # the browser normally never calls it cross-origin. Keep this configurable for any
 # direct browser access: set ALLOWED_ORIGINS to a comma-separated list of origins
-# (e.g. "https://printo.vercel.app,http://localhost:3000") to lock it down in prod.
+# (e.g. your Vercel URL and http://localhost:3000) to lock it down in prod.
 _origins_env = os.getenv("ALLOWED_ORIGINS", "*").strip()
 _allow_origins = ["*"] if _origins_env == "*" else [o.strip() for o in _origins_env.split(",") if o.strip()]
 app.add_middleware(
@@ -270,6 +270,20 @@ def _clear_generated_data(drawing_id: int):
     conn.commit()
     conn.close()
     (REPORT_DIR / f"{drawing_id}.json").unlink(missing_ok=True)
+
+
+def _safe_delete_upload(path_value: str | None) -> bool:
+    if not path_value:
+        return False
+    try:
+        upload_path = Path(path_value).resolve()
+        storage_root = STORAGE_DIR.resolve()
+        if storage_root not in upload_path.parents and upload_path != storage_root:
+            return False
+        upload_path.unlink(missing_ok=True)
+        return True
+    except Exception:
+        return False
 
 
 def _regeneration_target(drawing_id: int) -> dict | None:
@@ -591,7 +605,7 @@ async def run_pipeline(file_path: Path, file_name: str, drawing_id: int,
     if gw_data:
         realsoft_payload["data"] = gw_data
         realsoft_payload["metadata"]["mapping_source"] = "gateway"
-        yield event("✅", "ERP Mapping (Gateway)", "Mapped via Printo Gateway (ERP_MAP)", "success")
+        yield event("✅", "ERP Mapping (Gateway)", "Mapped via AI Gateway (ERP_MAP)", "success")
     else:
         realsoft_payload["metadata"]["mapping_source"] = "local"
         yield event("✅", "Mapping Complete",
@@ -829,6 +843,39 @@ async def regenerate_drawing(drawing_id: int, strict: bool = False,
     }
     asyncio.create_task(_run_regeneration_queue([target], strict))
     return {"queued": True, "drawing_id": drawing_id}
+
+
+@app.delete("/drawings/{drawing_id:int}")
+def delete_drawing(drawing_id: int, _user: dict = Depends(require_auth)):
+    """Delete one uploaded drawing and its generated report data."""
+    if drawing_id in JOBS and JOBS[drawing_id].get("phase") in {"queued", "streaming"}:
+        raise HTTPException(409, "Drawing is currently processing")
+
+    conn = get_conn()
+    row = conn.execute(
+        "SELECT id, file_path FROM drawings WHERE id=?",
+        (drawing_id,),
+    ).fetchone()
+    if not row:
+        conn.close()
+        raise HTTPException(404, "Drawing not found")
+
+    for table in ("extractions", "exceptions", "corrections", "erp_pushes"):
+        conn.execute(f"DELETE FROM {table} WHERE drawing_id=?", (drawing_id,))
+    conn.execute("DELETE FROM drawings WHERE id=?", (drawing_id,))
+    conn.commit()
+    conn.close()
+
+    report_deleted = (REPORT_DIR / f"{drawing_id}.json").exists()
+    (REPORT_DIR / f"{drawing_id}.json").unlink(missing_ok=True)
+    upload_deleted = _safe_delete_upload(row[1])
+    JOBS.pop(drawing_id, None)
+    return {
+        "deleted": True,
+        "drawing_id": drawing_id,
+        "upload_deleted": upload_deleted,
+        "report_deleted": report_deleted,
+    }
 
 
 @app.get("/drawings/{drawing_id}")

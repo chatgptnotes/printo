@@ -1,7 +1,7 @@
 """
 Construction BOQ extraction prompt + the rigorous take-off methodology.
 
-Adapted from the drawtoboq.com electrical take-off method and GENERALISED to any
+Adapted from the electrical take-off method and GENERALISED to any
 construction discipline (civil, structural, electrical, MEP/plumbing, industrial):
 read-don't-estimate, per-area completeness, one-row-per-item (no aggregation),
 read-as-drawn, source-drawing cross-reference, and mandatory-non-empty sections

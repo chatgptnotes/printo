@@ -1,7 +1,10 @@
 import { getSessionToken } from "./auth";
 
 /** Base URL of the Python FastAPI backend. Server-side only. */
-export const API_URL = process.env.PRINTO_API_URL || "http://127.0.0.1:8000";
+export const API_URL =
+  process.env.ERP_REALSOFT_API_URL ||
+  process.env.PRINTO_API_URL ||
+  "http://127.0.0.1:8000";
 
 /**
  * Server-side fetch to the backend with the session JWT attached as a Bearer

@@ -10,7 +10,7 @@ import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
 import HeroFallback from "@/components/upload/HeroFallback";
 import { EventLog, ProgressBar } from "@/components/pipeline/EventLog";
 import { useUploadStream } from "@/components/pipeline/useUploadStream";
-import { usePrintoStore } from "@/lib/store";
+import { useErpRealSoftStore } from "@/lib/store";
 import {
   DISCIPLINES,
   FLOOR_CATEGORIES,
@@ -47,9 +47,9 @@ interface BatchItem {
 
 export default function UploadPage() {
   const router = useRouter();
-  const setLastResult = usePrintoStore((s) => s.setLastResult);
-  const strict = usePrintoStore((s) => s.strict);
-  const setStrict = usePrintoStore((s) => s.setStrict);
+  const setLastResult = useErpRealSoftStore((s) => s.setLastResult);
+  const strict = useErpRealSoftStore((s) => s.strict);
+  const setStrict = useErpRealSoftStore((s) => s.setStrict);
 
   const [floor, setFloor] = useState(FLOOR_CATEGORIES[0]);
   const [discipline, setDiscipline] = useState(DISCIPLINES[0]);
@@ -144,7 +144,7 @@ export default function UploadPage() {
             <span className="text-grad">Converted to BOQ</span> by AI
           </h1>
           <p className="mt-3 max-w-md text-muted">
-            Upload drawings or PDFs — Printo extracts scope from every sheet, generates
+            Upload drawings or PDFs - ERP RealSoft extracts scope from every sheet, generates
             a fresh BOQ, and prepares it for review, ERP, and Excel export.
           </p>
           <div className="mt-5 flex gap-6 text-sm">

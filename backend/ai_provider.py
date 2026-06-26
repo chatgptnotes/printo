@@ -1,7 +1,7 @@
 """
 AI provider abstraction.
 
-Printo never calls a foundation-model API directly. Inference is routed through a
+ERP RealSoft never calls a foundation-model API directly. Inference is routed through a
 pluggable **AI sidecar** (the Pratyaya / Ampris AI-aaS pattern). Providers:
 
   • MockProvider   — built-in demo data (no network); always available.
@@ -180,7 +180,7 @@ def _anthropic_model() -> str:
 # Set False after an auth failure (401/403) so an invalid/placeholder key doesn't
 # make every extraction waste a call and then degrade to mock — we fall straight
 # back to the sidecar instead. Re-enabled on process restart (i.e. after the key
-# is fixed and printo-backend is restarted).
+# is fixed and the backend service is restarted).
 _ANTHROPIC_AUTH_OK = True
 
 
@@ -350,7 +350,7 @@ def codex_vision_extract(system: str, prompt: str, schema: dict,
     if not images:
         raise SidecarError("codex vision requires at least one image")
     suffix = _codex_media_suffix(media_type)
-    with tempfile.TemporaryDirectory(prefix="printo-codex-") as td:
+    with tempfile.TemporaryDirectory(prefix="erp-realsoft-codex-") as td:
         tmp = Path(td)
         paths: list[str] = []
         for i, img in enumerate(images):
@@ -422,7 +422,7 @@ class CodexProvider:
                                     images, req.media_type)
 
 
-# ── Unified multi-sheet vision: prefer the Printo Gateway (Claude CLI, no API key) ──
+# ── Unified multi-sheet vision: prefer the AI Gateway (Claude CLI, no API key) ──
 GATEWAY_VISION_TASK = "DRAWTOBOQ_ELECTRICAL_EXTRACT"  # honours a consumer systemPrompt
 
 
@@ -437,7 +437,7 @@ def gateway_vision_extract(system_prompt: str, sheets: list[bytes],
     payload.systemPrompt — the gateway runs Claude CLI over the images (no key)."""
     client = _gateway_client()
     if client is None:
-        raise SidecarError("printo_gateway_client not installed")
+        raise SidecarError("ai_gateway_client not installed")
     files = [(f"sheet_{i + 1}.png", "image/png", b) for i, b in enumerate(sheets) if b]
     if not files:
         raise SidecarError("no sheet images to send")
@@ -503,21 +503,22 @@ def vision_extract(system: str, prompt: str, sheets: list[bytes],
     raise SidecarError("no vision provider available" + (": " + " | ".join(errors) if errors else ""))
 
 
-# ── Printo Gateway (Hostinger VPS via printo_gateway_client) ──────────────────
+# ── AI Gateway (Hostinger VPS via vendored gateway client) ────────────────────
 def _gateway_url() -> str:
-    return _cfg("PRINTO_GATEWAY_URL")
+    return _cfg("AI_GATEWAY_URL") or _cfg("PRINTO_GATEWAY_URL")
 
 
 def _gateway_client():
     """Lazy-import the gateway client, making sure its env creds are set first.
     Returns the module, or None if it isn't installed."""
-    url, key = _gateway_url(), _cfg("PRINTO_GATEWAY_KEY")
+    url = _gateway_url()
+    key = _cfg("AI_GATEWAY_KEY") or _cfg("PRINTO_GATEWAY_KEY")
     if url:
-        os.environ.setdefault("PRINTO_GATEWAY_URL", url)
+        os.environ.setdefault("AI_GATEWAY_URL", url)
     if key:
-        os.environ.setdefault("PRINTO_GATEWAY_KEY", key)
+        os.environ.setdefault("AI_GATEWAY_KEY", key)
     try:
-        import printo_gateway_client as client
+        import ai_gateway_client as client
         return client
     except Exception:
         return None
@@ -548,7 +549,7 @@ class GatewayProvider:
     def extract(self, req: ExtractRequest) -> dict:
         client = _gateway_client()
         if client is None:
-            raise SidecarError("printo_gateway_client not installed")
+            raise SidecarError("ai_gateway_client not installed")
         image = req.image
         if not image and req.file_path:
             try:
@@ -626,10 +627,10 @@ def resolve_provider():
         if _gateway_client() is not None and _gateway_url():
             return GatewayProvider(), {"ai_provider": "gateway",
                                        "sidecar_reachable": _gateway_reachable(),
-                                       "mode": "gateway", "model": "printo-gateway"}
+                                       "mode": "gateway", "model": "ai-gateway"}
         reason = "gateway client/URL unavailable"
         return UnavailableProvider(reason), {"ai_provider": "unavailable", "sidecar_reachable": False,
-                                             "mode": "unavailable", "model": "printo-gateway",
+                                             "mode": "unavailable", "model": "ai-gateway",
                                              "note": reason}
         return MockProvider(), {"ai_provider": "mock", "sidecar_reachable": False,
                                 "mode": "mock", "model": "builtin-demo",
@@ -650,7 +651,7 @@ def resolve_provider():
                                  "mode": "vision", "model": _codex_model()}
     if gateway_ready():
         return GatewayProvider(), {"ai_provider": "gateway", "sidecar_reachable": True,
-                                   "mode": "gateway", "model": "printo-gateway"}
+                                   "mode": "gateway", "model": "ai-gateway"}
     if health is not None:
         prov = SidecarProvider(mode=mode_cfg, health=health)
         return prov, {"ai_provider": "sidecar", "sidecar_reachable": True,

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const SESSION_COOKIE = process.env.SESSION_COOKIE || "printo_session";
+const SESSION_COOKIE = process.env.SESSION_COOKIE || "erp_realsoft_session";
 
 function tokenValid(token: string | undefined): boolean {
   if (!token) return false;

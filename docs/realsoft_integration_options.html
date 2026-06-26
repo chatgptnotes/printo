@@ -1,8 +1,8 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>RealSoft Integration Options - Printo</title>
+<title>RealSoft Integration Options - ERP RealSoft</title>
 <style>
   @page { size: A4; margin: 1.6cm 1.5cm; }
 
@@ -155,24 +155,24 @@
 
 <!-- ================= COVER ================= -->
 <div class="cover">
-  <div class="brand">PRINTO</div>
-  <h1>Connecting Printo to RealSoft</h1>
+  <div class="brand">ERP RealSoft</div>
+  <h1>Connecting ERP RealSoft to RealSoft</h1>
   <p class="sub">The ways we can send drawing data into your RealSoft ERP</p>
   <!-- dashes kept ASCII for reliable xhtml2pdf font rendering -->
   <div class="meta">Prepared for: Coral Business Solutions &nbsp;|&nbsp; RealSoft ERP &nbsp;|&nbsp; A simple, non-technical guide</div>
 </div>
 <div class="accent-rule">&nbsp;</div>
 
-<!-- ================= WHAT PRINTO DOES ================= -->
-<h2>In one line: what Printo does</h2>
+<!-- ================= WHAT ERP RealSoft DOES ================= -->
+<h2>In one line: what ERP RealSoft does</h2>
 <div class="lead">
-  Printo reads your approved construction drawings using AI, automatically pulls out the
+  ERP RealSoft reads your approved construction drawings using AI, automatically pulls out the
   title-block details (drawing number, project name, revision, sheet, scale, and more),
   checks them for mistakes, and then sends that clean data straight into RealSoft  - 
   <strong>with no manual typing</strong>.
 </div>
 <p>
-  The only open question is <strong>how</strong> the data travels from Printo into RealSoft.
+  The only open question is <strong>how</strong> the data travels from ERP RealSoft into RealSoft.
   There are three practical ways to do this. This document explains each one in plain language
   so you can pick the one that suits RealSoft best.
 </p>
@@ -190,7 +190,7 @@
     </tr>
   </table>
   <div class="card-body">
-    <p><strong>What it is:</strong> Printo sends each drawing's data to RealSoft
+    <p><strong>What it is:</strong> ERP RealSoft sends each drawing's data to RealSoft
        <strong>instantly</strong> over a secure internet link (an "API"), using a private key
        that RealSoft gives us.</p>
     <table class="kv">
@@ -198,7 +198,7 @@
       <tr><td class="k">Good because</td><td>Real-time, no files to move by hand, and every send is logged so nothing gets lost.</td></tr>
       <tr><td class="k">Things to note</td><td>RealSoft needs to expose a web address (endpoint) that accepts the data.</td></tr>
       <tr><td class="k">What we need</td><td>A web address (base URL) and a security key from RealSoft / Coral.</td></tr>
-      <tr><td class="k">Status</td><td><span class="pill-green">Already built in Printo</span> - we only need the address and key to switch it on.</td></tr>
+      <tr><td class="k">Status</td><td><span class="pill-green">Already built in ERP RealSoft</span> - we only need the address and key to switch it on.</td></tr>
     </table>
   </div>
 </div>
@@ -213,7 +213,7 @@
     </tr>
   </table>
   <div class="card-body">
-    <p><strong>What it is:</strong> Printo creates a RealSoft-ready spreadsheet (Excel or CSV)
+    <p><strong>What it is:</strong> ERP RealSoft creates a RealSoft-ready spreadsheet (Excel or CSV)
        of the drawing data. That file is then loaded into RealSoft through RealData Hub  - 
        either by a person or on a schedule.</p>
     <table class="kv">
@@ -236,7 +236,7 @@
     </tr>
   </table>
   <div class="card-body">
-    <p><strong>What it is:</strong> Printo can also <strong>read</strong> records back from
+    <p><strong>What it is:</strong> ERP RealSoft can also <strong>read</strong> records back from
        RealSoft - for example, to confirm a drawing was saved, or to avoid creating the
        same record twice.</p>
     <table class="kv">
@@ -263,7 +263,7 @@
     <th>Speed</th>
     <th>Setup effort</th>
     <th>Best for</th>
-    <th>Status in Printo</th>
+    <th>Status in ERP RealSoft</th>
   </tr>
   <tr>
     <td><strong>A. Live API Link</strong></td>
@@ -292,7 +292,7 @@
 <h2>Our recommendation</h2>
 <div class="lead">
   <strong>Start with Option A (the Live API Link).</strong> It is real-time, fully automatic,
-  and the code is already built in Printo - we only need a web address and a security key
+  and the code is already built in ERP RealSoft - we only need a web address and a security key
   from your side. We suggest keeping <strong>Option B (Excel / CSV)</strong> ready as a simple
   fallback, and adding <strong>Option C (Read-Back)</strong> later for extra safety.
 </div>
@@ -301,7 +301,7 @@
 <h2>What we need from RealSoft / Coral to go live</h2>
 <table class="check">
   <tr><td class="box">[ ]</td><td><strong>RealSoft web address (base URL)</strong> for the test environment.</td></tr>
-  <tr><td class="box">[ ]</td><td><strong>Security key (API key / token)</strong> so Printo can connect safely.</td></tr>
+  <tr><td class="box">[ ]</td><td><strong>Security key (API key / token)</strong> so ERP RealSoft can connect safely.</td></tr>
   <tr><td class="box">[ ]</td><td><strong>Exact "import" address</strong> (the endpoint that accepts new drawing records).</td></tr>
   <tr><td class="box">[ ]</td><td><strong>The exact field names</strong> RealSoft expects (the DrawingMaster columns), so the data matches perfectly.</td></tr>
   <tr><td class="box">[ ]</td><td><strong>The Excel / CSV import template</strong> - only if you prefer Option B.</td></tr>
@@ -312,15 +312,16 @@
 <h2>Is it secure?</h2>
 <p>
   Yes. Every connection uses a private security key (a "Bearer token") that only RealSoft and
-  Printo know. Until RealSoft provides the real key, Printo runs in a safe
+  ERP RealSoft know. Until RealSoft provides the real key, ERP RealSoft runs in a safe
   <strong>simulation mode</strong> - it prepares the exact data it would send, but does not
   send anything live. This lets us test everything safely before connecting to your real system.
 </p>
 
 <div class="footer">
-  Printo - AI Drawing-to-ERP Platform &nbsp;|&nbsp; Prepared for Coral Business Solutions /
+  ERP RealSoft - AI Drawing-to-ERP Platform &nbsp;|&nbsp; Prepared for Coral Business Solutions /
   RealSoft &nbsp;|&nbsp; This is a non-technical summary; full technical details are available on request.
 </div>
 
 </body>
 </html>
+

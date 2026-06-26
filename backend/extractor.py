@@ -396,7 +396,7 @@ def extract_drawing_with_prepass(file_path: str, floor_category: str = None,
     vision_error: Exception | None = None
 
     # ── Preferred: multi-sheet vision — send every sheet at once. The dispatcher
-    #    prefers the Printo Gateway (Claude CLI, no API key), else a direct key. ──
+    #    prefers the AI Gateway (Claude CLI, no API key), else a direct key. ──
     try:
         total = _env_int("VISION_MAX_TOTAL_SHEETS", 20)   # bound runaway cost
         batch_size = _env_int("VISION_BATCH_SIZE", 5)     # gateway accepts up to 5 per call

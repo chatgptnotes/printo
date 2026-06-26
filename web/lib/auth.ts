@@ -1,7 +1,7 @@
 import { cookies } from "next/headers";
 import type { CurrentUser } from "./types";
 
-export const SESSION_COOKIE = process.env.SESSION_COOKIE || "printo_session";
+export const SESSION_COOKIE = process.env.SESSION_COOKIE || "erp_realsoft_session";
 
 interface JwtClaims {
   sub?: string;

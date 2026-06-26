@@ -1,8 +1,8 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>Printo - Project Overview</title>
+<title>ERP RealSoft - Project Overview</title>
 <style>
   @page { size: A4; margin: 1.5cm 1.4cm; }
 
@@ -45,18 +45,18 @@
 
 <!-- COVER -->
 <div class="cover">
-  <div class="brand">PRINTO</div>
+  <div class="brand">ERP RealSoft</div>
   <h1>AI Drawing-to-ERP Compliance Gateway</h1>
   <p class="sub">Read, verify and push construction drawings into RealSoft - automatically</p>
-  <div class="meta">Project Overview &nbsp;|&nbsp; Coral Business Solutions / RealSoft ERP &nbsp;|&nbsp; Prepared by the Printo team</div>
+  <div class="meta">Project Overview &nbsp;|&nbsp; Coral Business Solutions / RealSoft ERP &nbsp;|&nbsp; Prepared by the ERP RealSoft team</div>
 </div>
 <div class="accent-rule">&nbsp;</div>
 
-<!-- WHAT IS PRINTO -->
-<h2>1. What is Printo</h2>
+<!-- WHAT IS ERP RealSoft -->
+<h2>1. What is ERP RealSoft</h2>
 <div class="lead">
-  Printo is an AI gateway that turns approved construction drawings into clean, validated ERP
-  records. A user uploads a drawing (PDF or image); Printo reads it with AI, extracts the
+  ERP RealSoft is an AI gateway that turns approved construction drawings into clean, validated ERP
+  records. A user uploads a drawing (PDF or image); ERP RealSoft reads it with AI, extracts the
   title-block and floor-plan details, checks them against a rule book, and sends the verified data
   straight into RealSoft - with a full report and <strong>no manual typing</strong>.
 </div>
@@ -70,7 +70,7 @@
 <!-- PROBLEMS WE SOLVE -->
 <h2>2. The problems we solve</h2>
 <table class="grid">
-  <tr><th style="width:32%">Problem today</th><th>How Printo solves it</th></tr>
+  <tr><th style="width:32%">Problem today</th><th>How ERP RealSoft solves it</th></tr>
   <tr>
     <td class="k">Manual data entry from drawings into the ERP is slow and error-prone</td>
     <td>AI reads the title block and floor plan and fills the ERP fields automatically.</td>
@@ -113,7 +113,7 @@
 
 <!-- AI INTEGRATIONS -->
 <h2>4. AI integrations in the project</h2>
-<p>Printo never calls a model directly from the app - all inference is routed through a pluggable
+<p>ERP RealSoft never calls a model directly from the app - all inference is routed through a pluggable
 AI provider that prefers a hosted gateway, falls back to a local sidecar, and finally to built-in
 demo data, so the product always runs.</p>
 <table class="grid">
@@ -123,7 +123,7 @@ demo data, so the product always runs.</p>
     <td>Anthropic Claude reads the drawing image and returns the structured fields + confidence scores + bounding boxes for each field.</td>
   </tr>
   <tr class="alt">
-    <td class="k">Printo Gateway (AI-as-a-Service)</td>
+    <td class="k">AI Gateway (AI-as-a-Service)</td>
     <td>A hosted sidecar (Hostinger VPS) runs the model server-side and exposes tasks: DRAWING_EXTRACT, DRAWING_ANALYZE, DRAWING_VALIDATE, ERP_MAP, REPORT.</td>
   </tr>
   <tr>
@@ -150,13 +150,13 @@ demo data, so the product always runs.</p>
 
 <!-- PRATYAYA -->
 <h2>5. Features referenced from Pratyaya</h2>
-<p>Pratyaya is our sibling AI compliance-verification product. Printo reuses several of its proven,
+<p>Pratyaya is our sibling AI compliance-verification product. ERP RealSoft reuses several of its proven,
 production-tested patterns rather than re-inventing them:</p>
 <table class="grid">
-  <tr><th style="width:32%">From Pratyaya</th><th>How Printo uses it</th></tr>
+  <tr><th style="width:32%">From Pratyaya</th><th>How ERP RealSoft uses it</th></tr>
   <tr>
     <td class="k">Dark navy + orange design system</td>
-    <td>The same visual identity (deep navy background, orange accents) across Printo's UI and reports.</td>
+    <td>The same visual identity (deep navy background, orange accents) across ERP RealSoft's UI and reports.</td>
   </tr>
   <tr class="alt">
     <td class="k">Red-lining on drawings</td>
@@ -189,7 +189,7 @@ production-tested patterns rather than re-inventing them:</p>
 
 <!-- ERP -->
 <h2>7. RealSoft ERP integration</h2>
-<p>Printo sends each verified drawing into the RealSoft <span class="mono">DrawingMaster</span>
+<p>ERP RealSoft sends each verified drawing into the RealSoft <span class="mono">DrawingMaster</span>
 module. Three connection methods are supported (see the separate "RealSoft Integration Options"
 document for details):</p>
 <ul>
@@ -197,7 +197,7 @@ document for details):</p>
   <li><strong>Excel / CSV import</strong> via RealData Hub - simple batch fallback; needs the import template.</li>
   <li><strong>Read-back check</strong> via the Data API - optional, to confirm pushes and avoid duplicates.</li>
 </ul>
-<p>Until RealSoft credentials are provided, Printo runs in a safe <strong>simulation mode</strong> -
+<p>Until RealSoft credentials are provided, ERP RealSoft runs in a safe <strong>simulation mode</strong> -
 it prepares the exact payload it would send, without sending anything live.</p>
 
 <!-- ARCHITECTURE -->
@@ -222,16 +222,16 @@ it prepares the exact payload it would send, without sending anything live.</p>
 
 <!-- WHAT WE NEED FROM CLIENT -->
 <h2>10. What we need from the client</h2>
-<p>To move Printo from simulation to a fully live, production deployment, we need the following from
+<p>To move ERP RealSoft from simulation to a fully live, production deployment, we need the following from
 Coral / RealSoft:</p>
 <table class="check">
   <tr><td class="box">[ ]</td><td><strong>RealSoft test environment URL</strong> - the base web address of the RealSoft API.</td></tr>
-  <tr><td class="box">[ ]</td><td><strong>RealSoft API key / token</strong> - so Printo can connect securely.</td></tr>
+  <tr><td class="box">[ ]</td><td><strong>RealSoft API key / token</strong> - so ERP RealSoft can connect securely.</td></tr>
   <tr><td class="box">[ ]</td><td><strong>Exact "import" endpoint path</strong> - the address that accepts new drawing records.</td></tr>
   <tr><td class="box">[ ]</td><td><strong>DrawingMaster field names</strong> - the exact ERP column names so the data maps perfectly.</td></tr>
   <tr><td class="box">[ ]</td><td><strong>Excel / CSV import template</strong> - only if the Excel route (RealData Hub) is preferred.</td></tr>
   <tr><td class="box">[ ]</td><td><strong>5-10 sample approved drawings</strong> - real examples to test and tune extraction accuracy.</td></tr>
-  <tr><td class="box">[ ]</td><td><strong>AI provider decision</strong> - confirm using the hosted Printo Gateway, or provide an Anthropic API key.</td></tr>
+  <tr><td class="box">[ ]</td><td><strong>AI provider decision</strong> - confirm using the hosted AI Gateway, or provide an Anthropic API key.</td></tr>
   <tr><td class="box">[ ]</td><td><strong>Sign-off on the validation rules and thresholds</strong> - confirm R01-R18 match your approval policy.</td></tr>
   <tr><td class="box">[ ]</td><td><strong>Production hosting details</strong> - a domain (with HTTPS) for the backend so the live site is fully secured.</td></tr>
 </table>
@@ -245,9 +245,10 @@ Coral / RealSoft:</p>
 </ul>
 
 <div class="footer">
-  Printo - AI Drawing-to-ERP Compliance Gateway &nbsp;|&nbsp; Project Overview for Coral Business
+  ERP RealSoft - AI Drawing-to-ERP Compliance Gateway &nbsp;|&nbsp; Project Overview for Coral Business
   Solutions / RealSoft &nbsp;|&nbsp; Companion document: "RealSoft Integration Options".
 </div>
 
 </body>
 </html>
+

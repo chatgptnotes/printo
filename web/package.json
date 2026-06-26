@@ -1,8 +1,8 @@
 {
-  "name": "printo-web",
+  "name": "erp-realsoft-web",
   "version": "1.0.0",
   "private": true,
-  "description": "Printo Next.js frontend (Vercel) — talks to the FastAPI backend on the VPS.",
+  "description": "ERP RealSoft Next.js frontend (Vercel) - talks to the FastAPI backend on the VPS.",
   "scripts": {
     "dev": "next dev",
     "build": "next build",

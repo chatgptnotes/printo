@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Printo — AI BOQ Generator",
+  title: "ERP RealSoft - AI BOQ Generator",
   description: "AI BOQ extraction and export workflow for construction drawings.",
 };
 

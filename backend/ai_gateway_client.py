@@ -1,7 +1,7 @@
 """
-printo_gateway_client.py — vendored from the VPS gateway (/opt/printo-ai-gateway/clients).
+ai_gateway_client.py - vendored from the VPS gateway clients.
 
-Talks to the Printo AI Gateway (task-routed Claude-CLI gateway), which exposes
+Talks to the AI Gateway (task-routed Claude-CLI gateway), which exposes
 every AI capability behind a single auth key and a `taskID`:
 
     DRAWING_EXTRACT   vision  -> all structured fields + per-field confidence
@@ -11,13 +11,12 @@ every AI capability behind a single auth key and a `taskID`:
     REPORT_HTML       text    -> standalone HTML report
     GENERIC_ASK       text    -> free-form passthrough
 
-Config via environment variables (set these in the Printo .env):
-    PRINTO_GATEWAY_URL    e.g. http://127.0.0.1:8095            (local / SSH tunnel)
-                          or   https://printo-gw.hopetech.me     (prod, behind nginx+TLS)
-    PRINTO_GATEWAY_KEY    the PRINTO_GATEWAY_KEY from the gateway .env
+Config via environment variables:
+    AI_GATEWAY_URL    e.g. http://127.0.0.1:8095
+    AI_GATEWAY_KEY    the gateway auth key
 
 Usage:
-    from printo_gateway_client import extract_drawing, analyze_drawing, invoke
+    from ai_gateway_client import extract_drawing, analyze_drawing, invoke
 
     fields = extract_drawing("plan.pdf")              # dict of fields + confidence
     report = analyze_drawing("plan.pdf")              # full analysis (status/issues/...)
@@ -29,8 +28,8 @@ import os
 import urllib.error
 import urllib.request
 
-GATEWAY_URL = os.environ.get("PRINTO_GATEWAY_URL", "http://127.0.0.1:8095").rstrip("/")
-GATEWAY_KEY = os.environ.get("PRINTO_GATEWAY_KEY", "")
+GATEWAY_URL = os.environ.get("AI_GATEWAY_URL", "http://127.0.0.1:8095").rstrip("/")
+GATEWAY_KEY = os.environ.get("AI_GATEWAY_KEY", "")
 
 _TEXT_TASKS = {"DRAWING_VALIDATE", "ERP_MAP", "REPORT_HTML", "GENERIC_ASK"}
 _VISION_TASKS = {"DRAWING_EXTRACT", "DRAWING_ANALYZE"}
@@ -150,7 +149,7 @@ def _send(req, timeout):
 
 
 def _multipart(fields, filename, mime, file_bytes):
-    boundary = "----printo-gw-boundary-7f3a2c"
+    boundary = "----ai-gw-boundary-7f3a2c"
     pre = []
     for k, v in fields.items():
         pre.append(f"--{boundary}\r\n".encode())
@@ -168,7 +167,7 @@ def _multipart(fields, filename, mime, file_bytes):
 def _multipart_files(fields, files):
     """Multipart body with N file parts (all named "files", per the gateway's
     multer.array('files') contract). `files` is a list of (filename, mime, bytes)."""
-    boundary = "----printo-gw-boundary-7f3a2c"
+    boundary = "----ai-gw-boundary-7f3a2c"
     parts = []
     for k, v in fields.items():
         parts.append(f"--{boundary}\r\n".encode())
@@ -188,7 +187,7 @@ def _multipart_files(fields, files):
 if __name__ == "__main__":
     import sys
     if len(sys.argv) < 2:
-        print("usage: python printo_gateway_client.py <drawing-file> [extract|analyze]")
+        print("usage: python ai_gateway_client.py <drawing-file> [extract|analyze]")
         raise SystemExit(2)
     mode = sys.argv[2] if len(sys.argv) > 2 else "analyze"
     if mode == "extract":
