@@ -41,6 +41,10 @@ def _fast_profile() -> bool:
     return _speed_profile() in ("fast", "speed", "quick")
 
 
+def _speed_default(name: str, fast_default: int, balanced_default: int) -> int:
+    return _env_int(name, fast_default if _fast_profile() else balanced_default)
+
+
 def _mock_extract(file_path: str, floor_category: str = None,
                   original_name: str = None) -> dict:
     """Return realistic dummy data for demo/testing without API key.
@@ -452,7 +456,7 @@ def extract_drawing_with_prepass(file_path: str, floor_category: str = None,
     Returns (extracted_dict, prepass_hints_dict).
     """
     fast = _fast_profile()
-    dpi = _env_int("RENDER_DPI", 180 if fast else 220)
+    dpi = _speed_default("RENDER_DPI", 150, 220)
     img_set = preprocess.build_images(file_path, dpi=dpi)
     full_image = img_set.get("full")
     crops = img_set.get("crops") or []
@@ -491,9 +495,9 @@ def extract_drawing_with_prepass(file_path: str, floor_category: str = None,
     # ── Preferred: multi-sheet vision — send every sheet at once. The dispatcher
     #    prefers the AI Gateway (Claude CLI, no API key), else a direct key. ──
     try:
-        total = _env_int("VISION_MAX_TOTAL_SHEETS", 8 if fast else 20)   # bound runaway cost
-        sheet_dpi = _env_int("SHEET_RENDER_DPI", 160 if fast else 200)
-        max_long_edge = _env_int("VISION_MAX_LONG_EDGE", 1280 if fast else 1568)
+        total = _speed_default("VISION_MAX_TOTAL_SHEETS", 2, 20)   # bound runaway cost
+        sheet_dpi = _speed_default("SHEET_RENDER_DPI", 120, 200)
+        max_long_edge = _speed_default("VISION_MAX_LONG_EDGE", 1024, 1568)
         sheet_set = preprocess.build_sheet_images(
             file_path,
             dpi=sheet_dpi,

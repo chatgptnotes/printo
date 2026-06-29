@@ -58,7 +58,9 @@ MAX_FILE_SIZE_MB    = int(os.getenv("MAX_FILE_SIZE_MB", "100"))
 EXTRACT_TIMEOUT     = float(os.getenv("EXTRACT_TIMEOUT", "110"))
 # Extraction now runs in a background job (no request ceiling), so this is just a
 # safety bound for batching + gap-fill. Kept under the gateway's 1800s CLAUDE timeout.
-VISION_EXTRACT_TIMEOUT = float(os.getenv("VISION_EXTRACT_TIMEOUT", "1500"))
+EXTRACTION_SPEED_PROFILE = os.getenv("EXTRACTION_SPEED_PROFILE", "balanced").strip().lower()
+_FAST_EXTRACTION = EXTRACTION_SPEED_PROFILE in ("fast", "speed", "quick")
+VISION_EXTRACT_TIMEOUT = float(os.getenv("VISION_EXTRACT_TIMEOUT", "240" if _FAST_EXTRACTION else "1500"))
 
 # ERP simulation mode when credentials are absent or placeholder
 def _is_real_credential(val: str | None) -> bool:
@@ -1401,7 +1403,10 @@ def health():
         "ai_provider":        ai.get("ai_provider"),
         "ai_mode":            ai.get("mode"),
         "ai_model":           ai.get("model"),
-        "extraction_speed_profile": os.getenv("EXTRACTION_SPEED_PROFILE", "balanced"),
+        "extraction_speed_profile": EXTRACTION_SPEED_PROFILE,
+        "vision_extract_timeout": VISION_EXTRACT_TIMEOUT,
+        "vision_max_total_sheets": int(os.getenv("VISION_MAX_TOTAL_SHEETS", "2" if _FAST_EXTRACTION else "20")),
+        "vision_max_long_edge": int(os.getenv("VISION_MAX_LONG_EDGE", "1024" if _FAST_EXTRACTION else "1568")),
         "sidecar_reachable":  ai.get("sidecar_reachable"),
         "mock_extraction":    ai.get("ai_provider") == "mock",
         "realsoft_reachable": realsoft_reachable,
