@@ -33,6 +33,14 @@ def _env_int(name: str, default: int) -> int:
         return default
 
 
+def _speed_profile() -> str:
+    return (os.getenv("EXTRACTION_SPEED_PROFILE", "balanced") or "balanced").strip().lower()
+
+
+def _fast_profile() -> bool:
+    return _speed_profile() in ("fast", "speed", "quick")
+
+
 def _mock_extract(file_path: str, floor_category: str = None,
                   original_name: str = None) -> dict:
     """Return realistic dummy data for demo/testing without API key.
@@ -359,7 +367,7 @@ def _schedule_legend_pass(raw: dict, sheets: list, media_type: str,
     This supplements, never replaces, the main plan take-off. It catches rows that
     are often missed because schedules and legends are text-dense.
     """
-    if not isinstance(raw, dict) or not sheets or not _env_bool("SCHEDULE_LEGEND_PASS", True):
+    if not isinstance(raw, dict) or not sheets or not _env_bool("SCHEDULE_LEGEND_PASS", not _fast_profile()):
         return raw
     limit = max(1, _env_int("SCHEDULE_LEGEND_MAX_SHEETS", 8))
     selected = sheets[:limit]
@@ -443,7 +451,8 @@ def extract_drawing_with_prepass(file_path: str, floor_category: str = None,
 
     Returns (extracted_dict, prepass_hints_dict).
     """
-    dpi = _env_int("RENDER_DPI", 220)
+    fast = _fast_profile()
+    dpi = _env_int("RENDER_DPI", 180 if fast else 220)
     img_set = preprocess.build_images(file_path, dpi=dpi)
     full_image = img_set.get("full")
     crops = img_set.get("crops") or []
@@ -482,14 +491,20 @@ def extract_drawing_with_prepass(file_path: str, floor_category: str = None,
     # ── Preferred: multi-sheet vision — send every sheet at once. The dispatcher
     #    prefers the AI Gateway (Claude CLI, no API key), else a direct key. ──
     try:
-        total = _env_int("VISION_MAX_TOTAL_SHEETS", 20)   # bound runaway cost
-        batch_size = _env_int("VISION_BATCH_SIZE", 5)     # gateway accepts up to 5 per call
-        sheet_set = preprocess.build_sheet_images(file_path, max_sheets=total)
+        total = _env_int("VISION_MAX_TOTAL_SHEETS", 8 if fast else 20)   # bound runaway cost
+        sheet_dpi = _env_int("SHEET_RENDER_DPI", 160 if fast else 200)
+        max_long_edge = _env_int("VISION_MAX_LONG_EDGE", 1280 if fast else 1568)
+        sheet_set = preprocess.build_sheet_images(
+            file_path,
+            dpi=sheet_dpi,
+            max_sheets=total,
+            max_long_edge=max_long_edge,
+        )
         sheets = sheet_set.get("sheets") or ([full_image] if full_image else [])
         raw = _run_vision(prompt)
         # Gap-fill re-reads any floor the model listed but left empty. Now runs in
         # the background job (no request ceiling), so it's on by default.
-        if raw is not None and _env_bool("VISION_GAPFILL", True):
+        if raw is not None and _env_bool("VISION_GAPFILL", not fast):
             raw = _gap_fill(raw, sheets, media_type)
         if raw is not None:
             raw = _schedule_legend_pass(raw, sheets, media_type, effective_discipline, project_description)
@@ -540,7 +555,7 @@ def extract_drawing_with_prepass(file_path: str, floor_category: str = None,
     except BoqQualityError as first_error:
         retry_raw = None
         retry_discipline = "General"
-        if sheets and _env_bool("BOQ_QUALITY_RETRY", True):
+        if sheets and _env_bool("BOQ_QUALITY_RETRY", not fast):
             retry_prompt = _build_prompt(prepass_hints, project_description, retry_discipline)
             retry_raw = _run_vision(retry_prompt)
         if retry_raw:

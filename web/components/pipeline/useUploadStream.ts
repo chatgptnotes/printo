@@ -166,7 +166,7 @@ export function useUploadStream() {
         throw new Error((upJson && upJson.detail) || `Upload failed (HTTP ${resp.status})`);
       }
       const drawingId: number = upJson.drawing_id;
-      push("Extracting — multi-sheet drawings take a few minutes…", "success");
+      push("Extracting - optimized vision pass started...", "success");
 
       // The pipeline runs in a background job; poll for step-log lines + the result.
       let since = 0;

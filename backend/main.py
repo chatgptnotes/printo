@@ -587,7 +587,7 @@ async def run_pipeline(file_path: Path, file_name: str, drawing_id: int,
         prepass_count = len(prepass_hints)
         yield event("⚠️", "Limited Result", e.reason, "warning")
     except asyncio.TimeoutError:
-        msg = f"AI extraction timed out (>{int(EXTRACT_TIMEOUT)}s) — drawing saved, please retry"
+        msg = f"AI extraction timed out (>{int(VISION_EXTRACT_TIMEOUT)}s) — drawing saved, please retry"
         yield event("⏱️", "Timeout", msg, "error")
         mark_drawing_failed(drawing_id, "timeout", msg)
         yield f"data: {json.dumps({'type': 'done', 'verdict': 'TIMEOUT', 'drawing_id': drawing_id, 'errors': [msg]})}\n\n"
@@ -1401,6 +1401,7 @@ def health():
         "ai_provider":        ai.get("ai_provider"),
         "ai_mode":            ai.get("mode"),
         "ai_model":           ai.get("model"),
+        "extraction_speed_profile": os.getenv("EXTRACTION_SPEED_PROFILE", "balanced"),
         "sidecar_reachable":  ai.get("sidecar_reachable"),
         "mock_extraction":    ai.get("ai_provider") == "mock",
         "realsoft_reachable": realsoft_reachable,

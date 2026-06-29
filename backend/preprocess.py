@@ -215,8 +215,10 @@ def build_images(file_path: str, dpi: int = 220, clean: bool = True) -> dict:
     base: bytes | None = None
     page_count = 1
     if is_pdf:
-        pages = render_pdf_to_images(file_path, dpi=dpi)
-        page_count = len(pages)
+        # Only the first page is used for blur/title-block prepass here. Rendering
+        # more pages is handled by build_sheet_images for the actual vision pass.
+        pages = render_pdf_to_images(file_path, dpi=dpi, max_pages=1)
+        page_count = _pdf_page_count(file_path) or len(pages)
         base = pages[0] if pages else None
     elif suffix in IMAGE_SUFFIXES:
         try:
