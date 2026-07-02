@@ -1,0 +1,247 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 480" role="img" aria-label="Drawing to BOQ transformation">
+  <defs>
+    <linearGradient id="bgGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0f172a"/>
+      <stop offset="1" stop-color="#1e293b"/>
+    </linearGradient>
+    <linearGradient id="blueprintPaper" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1e40af"/>
+      <stop offset="1" stop-color="#1e3a8a"/>
+    </linearGradient>
+    <linearGradient id="boqPaper" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#f8fafc"/>
+    </linearGradient>
+    <linearGradient id="arrowGrad" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#3b82f6"/>
+      <stop offset="0.5" stop-color="#6366f1"/>
+      <stop offset="1" stop-color="#8b5cf6"/>
+    </linearGradient>
+    <linearGradient id="accentGrad" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#3b82f6"/>
+      <stop offset="1" stop-color="#8b5cf6"/>
+    </linearGradient>
+    <pattern id="grid" x="0" y="0" width="20" height="20" patternUnits="userSpaceOnUse">
+      <path d="M 20 0 L 0 0 0 20" fill="none" stroke="#60a5fa" stroke-width="0.4" opacity="0.5"/>
+    </pattern>
+    <filter id="softShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="6"/>
+      <feOffset dx="0" dy="4" result="offsetblur"/>
+      <feComponentTransfer><feFuncA type="linear" slope="0.25"/></feComponentTransfer>
+      <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="3" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="900" height="480" fill="url(#bgGrad)"/>
+
+  <!-- Subtle background dots -->
+  <g fill="#6366f1" opacity="0.08">
+    <circle cx="80" cy="60" r="2"/>
+    <circle cx="820" cy="90" r="2"/>
+    <circle cx="150" cy="420" r="2"/>
+    <circle cx="760" cy="400" r="2"/>
+    <circle cx="450" cy="40" r="2"/>
+    <circle cx="450" cy="440" r="2"/>
+  </g>
+
+  <!-- ============ LEFT: BLUEPRINT DRAWING ============ -->
+  <g filter="url(#softShadow)">
+    <rect x="50" y="90" width="320" height="300" rx="10" fill="url(#blueprintPaper)" stroke="#1d4ed8" stroke-width="1.5"/>
+    <rect x="50" y="90" width="320" height="300" rx="10" fill="url(#grid)"/>
+  </g>
+
+  <!-- Title bar -->
+  <rect x="50" y="90" width="320" height="26" rx="10" fill="#1e3a8a"/>
+  <rect x="50" y="106" width="320" height="10" fill="#1e3a8a"/>
+  <circle cx="66" cy="103" r="4" fill="#ef4444"/>
+  <circle cx="80" cy="103" r="4" fill="#f59e0b"/>
+  <circle cx="94" cy="103" r="4" fill="#22c55e"/>
+  <text x="210" y="107" font-family="ui-monospace, monospace" font-size="10" fill="#bfdbfe" text-anchor="middle" font-weight="600">G+3 VILLA — HVAC LAYOUT.dwg</text>
+
+  <!-- Floor plan: outer walls -->
+  <g stroke="#ffffff" stroke-width="2.5" fill="none" stroke-linejoin="round">
+    <rect x="80" y="140" width="260" height="220"/>
+    <!-- interior walls -->
+    <line x1="80" y1="230" x2="210" y2="230"/>
+    <line x1="210" y1="140" x2="210" y2="290"/>
+    <line x1="210" y1="290" x2="340" y2="290"/>
+    <line x1="150" y1="290" x2="150" y2="360"/>
+  </g>
+
+  <!-- Room labels -->
+  <g font-family="ui-sans-serif, system-ui" font-size="9" fill="#bfdbfe" font-weight="500">
+    <text x="145" y="188">LIVING</text>
+    <text x="275" y="210">KITCHEN</text>
+    <text x="115" y="265">BED 1</text>
+    <text x="270" y="330">BED 2</text>
+    <text x="105" y="335">BATH</text>
+  </g>
+
+  <!-- AC unit symbols (circles with lines = indoor units) -->
+  <g fill="#fbbf24" stroke="#fef3c7" stroke-width="1.2">
+    <circle cx="145" cy="170" r="5"/>
+    <circle cx="275" cy="185" r="5"/>
+    <circle cx="130" cy="250" r="5"/>
+    <circle cx="275" cy="310" r="5"/>
+  </g>
+  <g font-family="ui-monospace, monospace" font-size="7" fill="#fde68a" font-weight="700">
+    <text x="153" y="173">AC-1</text>
+    <text x="283" y="188">AC-2</text>
+    <text x="138" y="253">AC-3</text>
+    <text x="283" y="313">AC-4</text>
+  </g>
+
+  <!-- Duct lines -->
+  <g stroke="#60a5fa" stroke-width="1.2" stroke-dasharray="3,2" fill="none">
+    <path d="M 145 170 L 145 140 L 300 140 L 300 185"/>
+    <path d="M 130 250 L 95 250 L 95 310 L 130 310"/>
+  </g>
+
+  <!-- Dimension lines -->
+  <g stroke="#93c5fd" stroke-width="0.8">
+    <line x1="80" y1="375" x2="340" y2="375"/>
+    <line x1="80" y1="372" x2="80" y2="378"/>
+    <line x1="340" y1="372" x2="340" y2="378"/>
+  </g>
+  <text x="210" y="372" font-family="ui-monospace, monospace" font-size="8" fill="#bfdbfe" text-anchor="middle">12.5 m</text>
+
+  <!-- Drawing label under blueprint -->
+  <text x="210" y="420" font-family="ui-sans-serif, system-ui" font-size="14" fill="#94a3b8" text-anchor="middle" font-weight="600">Drawing</text>
+  <text x="210" y="440" font-family="ui-sans-serif, system-ui" font-size="10" fill="#64748b" text-anchor="middle">AutoCAD · PDF · DWG</text>
+
+  <!-- ============ CENTER: AI ARROW ============ -->
+  <g transform="translate(395, 215)">
+    <!-- Arrow line -->
+    <path d="M 0 25 L 95 25" stroke="url(#arrowGrad)" stroke-width="4" stroke-linecap="round"/>
+    <!-- Arrowhead -->
+    <path d="M 95 25 L 82 15 L 82 35 Z" fill="#8b5cf6"/>
+    <!-- AI chip badge -->
+    <g filter="url(#glow)">
+      <rect x="20" y="-10" width="70" height="24" rx="12" fill="#0f172a" stroke="url(#accentGrad)" stroke-width="1.5"/>
+      <text x="55" y="6" font-family="ui-sans-serif, system-ui" font-size="10" fill="#e0e7ff" text-anchor="middle" font-weight="700">AI · Claude</text>
+    </g>
+    <!-- Sparkles -->
+    <g fill="#a78bfa">
+      <circle cx="8" cy="55" r="1.5"/>
+      <circle cx="45" cy="62" r="1"/>
+      <circle cx="75" cy="55" r="1.8"/>
+      <circle cx="90" cy="-5" r="1"/>
+    </g>
+    <text x="47" y="85" font-family="ui-sans-serif, system-ui" font-size="9" fill="#94a3b8" text-anchor="middle" font-style="italic">extract · classify · price</text>
+  </g>
+
+  <!-- ============ RIGHT: BOQ SPREADSHEET ============ -->
+  <g filter="url(#softShadow)">
+    <rect x="520" y="90" width="330" height="300" rx="10" fill="url(#boqPaper)" stroke="#cbd5e1" stroke-width="1.2"/>
+  </g>
+
+  <!-- BOQ header bar -->
+  <rect x="520" y="90" width="330" height="34" rx="10" fill="#065f46"/>
+  <rect x="520" y="108" width="330" height="16" fill="#065f46"/>
+  <rect x="520" y="90" width="30" height="34" rx="10" fill="#047857"/>
+  <rect x="520" y="108" width="30" height="16" fill="#047857"/>
+  <text x="535" y="112" font-family="ui-sans-serif, system-ui" font-size="14" fill="#ffffff" text-anchor="middle" font-weight="900">X</text>
+  <text x="565" y="112" font-family="ui-sans-serif, system-ui" font-size="11" fill="#ffffff" font-weight="700">BOQ — Villa_Jumeirah.xlsx</text>
+
+  <!-- Column headers -->
+  <rect x="530" y="135" width="310" height="22" fill="#f1f5f9" stroke="#e2e8f0"/>
+  <g font-family="ui-sans-serif, system-ui" font-size="9" fill="#475569" font-weight="700">
+    <text x="540" y="150">#</text>
+    <text x="560" y="150">DESCRIPTION</text>
+    <text x="700" y="150" text-anchor="end">QTY</text>
+    <text x="735" y="150" text-anchor="middle">UNIT</text>
+    <text x="790" y="150" text-anchor="end">RATE</text>
+    <text x="835" y="150" text-anchor="end">AMOUNT</text>
+  </g>
+
+  <!-- Rows -->
+  <g font-family="ui-sans-serif, system-ui" font-size="8.5" fill="#1e293b">
+    <!-- Row 1 -->
+    <rect x="530" y="157" width="310" height="20" fill="#ffffff"/>
+    <text x="540" y="171">1</text>
+    <text x="560" y="171" font-weight="600">VRF Indoor Unit — Decorative</text>
+    <text x="700" y="171" text-anchor="end" font-variant-numeric="tabular-nums">4</text>
+    <text x="735" y="171" text-anchor="middle" fill="#64748b">nos</text>
+    <text x="790" y="171" text-anchor="end" font-variant-numeric="tabular-nums">3,200</text>
+    <text x="835" y="171" text-anchor="end" font-variant-numeric="tabular-nums" font-weight="600">12,800</text>
+
+    <!-- Row 2 -->
+    <rect x="530" y="177" width="310" height="20" fill="#f8fafc"/>
+    <text x="540" y="191">2</text>
+    <text x="560" y="191" font-weight="600">VRF Outdoor Unit — 14 TR</text>
+    <text x="700" y="191" text-anchor="end" font-variant-numeric="tabular-nums">1</text>
+    <text x="735" y="191" text-anchor="middle" fill="#64748b">nos</text>
+    <text x="790" y="191" text-anchor="end" font-variant-numeric="tabular-nums">58,800</text>
+    <text x="835" y="191" text-anchor="end" font-variant-numeric="tabular-nums" font-weight="600">58,800</text>
+
+    <!-- Row 3 -->
+    <rect x="530" y="197" width="310" height="20" fill="#ffffff"/>
+    <text x="540" y="211">3</text>
+    <text x="560" y="211" font-weight="600">Fresh Air Handling Unit</text>
+    <text x="700" y="211" text-anchor="end" font-variant-numeric="tabular-nums">1</text>
+    <text x="735" y="211" text-anchor="middle" fill="#64748b">nos</text>
+    <text x="790" y="211" text-anchor="end" font-variant-numeric="tabular-nums">55,000</text>
+    <text x="835" y="211" text-anchor="end" font-variant-numeric="tabular-nums" font-weight="600">55,000</text>
+
+    <!-- Row 4 -->
+    <rect x="530" y="217" width="310" height="20" fill="#f8fafc"/>
+    <text x="540" y="231">4</text>
+    <text x="560" y="231" font-weight="600">GI Ductwork — Supply</text>
+    <text x="700" y="231" text-anchor="end" font-variant-numeric="tabular-nums">186</text>
+    <text x="735" y="231" text-anchor="middle" fill="#64748b">sqm</text>
+    <text x="790" y="231" text-anchor="end" font-variant-numeric="tabular-nums">145</text>
+    <text x="835" y="231" text-anchor="end" font-variant-numeric="tabular-nums" font-weight="600">26,970</text>
+
+    <!-- Row 5 -->
+    <rect x="530" y="237" width="310" height="20" fill="#ffffff"/>
+    <text x="540" y="251">5</text>
+    <text x="560" y="251" font-weight="600">Diffusers + Grilles</text>
+    <text x="700" y="251" text-anchor="end" font-variant-numeric="tabular-nums">12</text>
+    <text x="735" y="251" text-anchor="middle" fill="#64748b">nos</text>
+    <text x="790" y="251" text-anchor="end" font-variant-numeric="tabular-nums">480</text>
+    <text x="835" y="251" text-anchor="end" font-variant-numeric="tabular-nums" font-weight="600">5,760</text>
+
+    <!-- Row 6 -->
+    <rect x="530" y="257" width="310" height="20" fill="#f8fafc"/>
+    <text x="540" y="271">6</text>
+    <text x="560" y="271" font-weight="600">Copper Refrigerant Piping</text>
+    <text x="700" y="271" text-anchor="end" font-variant-numeric="tabular-nums">85</text>
+    <text x="735" y="271" text-anchor="middle" fill="#64748b">m</text>
+    <text x="790" y="271" text-anchor="end" font-variant-numeric="tabular-nums">180</text>
+    <text x="835" y="271" text-anchor="end" font-variant-numeric="tabular-nums" font-weight="600">15,300</text>
+
+    <!-- Row 7 -->
+    <rect x="530" y="277" width="310" height="20" fill="#ffffff"/>
+    <text x="540" y="291">7</text>
+    <text x="560" y="291" font-weight="600">Insulation — Pipe &amp; Duct</text>
+    <text x="700" y="291" text-anchor="end" font-variant-numeric="tabular-nums">220</text>
+    <text x="735" y="291" text-anchor="middle" fill="#64748b">m</text>
+    <text x="790" y="291" text-anchor="end" font-variant-numeric="tabular-nums">35</text>
+    <text x="835" y="291" text-anchor="end" font-variant-numeric="tabular-nums" font-weight="600">7,700</text>
+
+    <!-- Row 8 (ellipsis) -->
+    <rect x="530" y="297" width="310" height="20" fill="#f8fafc"/>
+    <text x="540" y="311" fill="#94a3b8">…</text>
+    <text x="560" y="311" fill="#94a3b8" font-style="italic">37 more line items</text>
+  </g>
+
+  <!-- Total row -->
+  <rect x="530" y="325" width="310" height="28" fill="#ecfdf5" stroke="#10b981" stroke-width="1.5"/>
+  <text x="560" y="344" font-family="ui-sans-serif, system-ui" font-size="11" font-weight="800" fill="#065f46">TOTAL (AED)</text>
+  <text x="835" y="344" font-family="ui-sans-serif, system-ui" font-size="13" font-weight="900" fill="#047857" text-anchor="end" font-variant-numeric="tabular-nums">412,560</text>
+
+  <!-- BOQ label -->
+  <text x="685" y="420" font-family="ui-sans-serif, system-ui" font-size="14" fill="#94a3b8" text-anchor="middle" font-weight="600">Bill of Quantities</text>
+  <text x="685" y="440" font-family="ui-sans-serif, system-ui" font-size="10" fill="#64748b" text-anchor="middle">Excel · priced · ready to send</text>
+
+  <!-- Top tag -->
+  <g transform="translate(450, 35)">
+    <rect x="-90" y="-18" width="180" height="32" rx="16" fill="#0f172a" stroke="url(#accentGrad)" stroke-width="1.5"/>
+    <text x="0" y="3" font-family="ui-sans-serif, system-ui" font-size="11" fill="#e0e7ff" text-anchor="middle" font-weight="700">REALSOFT</text>
+  </g>
+</svg>

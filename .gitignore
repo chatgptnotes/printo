@@ -1,24 +1,66 @@
-# Python
-__pycache__/
-*.pyc
-*.pyo
-*.pyd
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
 
-# Environment
+# Testing
+coverage/
+
+# Next.js
+.next/
+out/
+build/
+dist/
+
+# Production
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Environment variables
 .env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
 
-# Database
-*.db
-*.sqlite3
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
 
-# Logs
-logs/
+# OS
+.DS_Store
+Thumbs.db
 
-# Generated reports and uploaded files (runtime artifacts)
-reports/
-storage/
-
-# Local verification screenshots
-_shots/
-_*.py
+# Misc
+# Ignore .claude by default but share team-wide harness config:
+#  - skills/  : project skills (egress-audit, etc.) — picked up by Claude Code
+#  - hooks/   : pre/post tool-use scripts (e.g. egress-audit-gate.sh)
+#  - settings.json : project-wide hook + permission config
+# Per-user overrides (settings.local.json) stay ignored.
+.claude/*
+!.claude/skills/
+!.claude/hooks/
+!.claude/settings.json
+.claude/settings.local.json
+*.bak
+*.tmp
 .vercel
+.env*.local
+
+# Zoom recordings
+*.mov
+*.mp4
+*.avi
+
+# Auto-approve agent
+auto-approve-agent/
+tsconfig.tsbuildinfo
+supabase/.temp/
+
+# Local dev runtime junk (logs, scratch PDF copies)
+tmp/

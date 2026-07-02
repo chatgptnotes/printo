@@ -1,0 +1,21 @@
+# Normalize line endings on commit. Working tree may use CRLF on Windows
+# checkouts, but the canonical form in the repo is LF. Without this, every
+# editor save on Windows can re-write a whole file with CRLF and produce
+# noisy 100-line "changes" that mask real diffs.
+* text=auto eol=lf
+
+# Binary types — don't try to normalize.
+*.pdf binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.ico binary
+*.gif binary
+*.xlsx binary
+*.xlsm binary
+*.docx binary
+*.zip binary
+*.7z binary
+*.rar binary
+*.dwg binary
+*.dxf binary

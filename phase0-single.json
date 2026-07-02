@@ -1,0 +1,29 @@
+{
+  "file": "p379-power.pdf",
+  "mode": "single",
+  "reps": 5,
+  "ensembleSize": 5,
+  "single": {
+    "metrics": {
+      "n": 0,
+      "cov": {
+        "cableCount": null,
+        "outletQty": null,
+        "lightingQty": null,
+        "cableLength": null
+      },
+      "jaccard": {
+        "cable_schedule": null,
+        "db_inventory": null,
+        "power_outlets": null,
+        "lighting_fixtures": null,
+        "containment": null
+      },
+      "presenceFlip": null,
+      "aggregates": []
+    },
+    "diagnostics": [],
+    "results": []
+  },
+  "ensemble": null
+}

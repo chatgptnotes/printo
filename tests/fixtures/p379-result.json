@@ -1,0 +1,1517 @@
+{
+  "lighting_fixtures": [
+    { "type_ref": null, "description": "LED recessed downlight — estimated (no lighting legend on POWER drawing; verify on lighting dwg)", "floor": "Basement", "qty": 40, "provisional": true },
+    { "type_ref": null, "description": "LED weatherproof batten (parking/plant) — estimated, verify", "floor": "Basement", "qty": 30, "provisional": true },
+    { "type_ref": null, "description": "LED bulkhead (pump room / water tank) — estimated, verify", "floor": "Underground", "qty": 18, "provisional": true },
+    { "type_ref": null, "description": "LED recessed downlight (lobby/retail common) — estimated, verify", "floor": "Ground Floor", "qty": 44, "provisional": true },
+    { "type_ref": null, "description": "LED surface panel (corridor/lift lobby) — estimated, verify", "floor": "Ground Floor", "qty": 14, "provisional": true },
+    { "type_ref": null, "description": "LED recessed downlight (apartments) — estimated, verify", "floor": "First Floor", "qty": 60, "provisional": true },
+    { "type_ref": null, "description": "LED batten / balcony & service light — estimated, verify", "floor": "First Floor", "qty": 22, "provisional": true },
+    { "type_ref": null, "description": "LED recessed downlight (apartments) — estimated, verify", "floor": "Second Floor", "qty": 60, "provisional": true },
+    { "type_ref": null, "description": "LED batten / balcony & service light — estimated, verify", "floor": "Second Floor", "qty": 22, "provisional": true },
+    { "type_ref": null, "description": "LED recessed downlight (apartments) — estimated, verify", "floor": "Third Floor", "qty": 60, "provisional": true },
+    { "type_ref": null, "description": "LED batten / balcony & service light — estimated, verify", "floor": "Third Floor", "qty": 22, "provisional": true },
+    { "type_ref": null, "description": "LED recessed downlight (apartments) — estimated, verify", "floor": "Fourth Floor", "qty": 60, "provisional": true },
+    { "type_ref": null, "description": "LED batten / balcony & service light — estimated, verify", "floor": "Fourth Floor", "qty": 22, "provisional": true },
+    { "type_ref": null, "description": "LED recessed downlight (apartments) — estimated, verify", "floor": "Fifth Floor", "qty": 60, "provisional": true },
+    { "type_ref": null, "description": "LED batten / balcony & service light — estimated, verify", "floor": "Fifth Floor", "qty": 22, "provisional": true },
+    { "type_ref": null, "description": "LED recessed downlight (apartments) — estimated, verify", "floor": "Sixth Floor", "qty": 60, "provisional": true },
+    { "type_ref": null, "description": "LED batten / balcony & service light — estimated, verify", "floor": "Sixth Floor", "qty": 22, "provisional": true },
+    { "type_ref": null, "description": "LED recessed downlight (apartments) — estimated, verify", "floor": "Seventh Floor", "qty": 60, "provisional": true },
+    { "type_ref": null, "description": "LED batten / balcony & service light — estimated, verify", "floor": "Seventh Floor", "qty": 22, "provisional": true },
+    { "type_ref": null, "description": "LED recessed downlight (apartments) — estimated, verify", "floor": "Eighth Floor", "qty": 60, "provisional": true },
+    { "type_ref": null, "description": "LED batten / balcony & service light — estimated, verify", "floor": "Eighth Floor", "qty": 22, "provisional": true },
+    { "type_ref": null, "description": "LED downlight + decorative (gym / amenity / clubhouse) — estimated, verify", "floor": "Roof Floor", "qty": 34, "provisional": true },
+    { "type_ref": null, "description": "IP65 feature / landscape light (pool deck) — estimated, verify", "floor": "Swimming Pool Deck", "qty": 16, "provisional": true },
+    { "type_ref": null, "description": "LED bulkhead (maintenance / stair) — estimated, verify", "floor": "Upper Roof", "qty": 6, "provisional": true }
+  ],
+  "earthing": [
+    {
+      "description": "Water-tight double-seal earth pit at basement level c/w 366mmØ seal tube, inspection chamber & low-resistance backfill (resistance test < 1 Ω)",
+      "unit": "Nr",
+      "qty": 4
+    },
+    {
+      "description": "Copper earth rod 17.2mmØ × 3000mm solid copper (per earthing detail)",
+      "unit": "Nr",
+      "qty": 4
+    },
+    {
+      "description": "1C × 70mm² bare copper main earth conductor — earth pits to Main Earth Bar / DEWA earth terminal",
+      "unit": "m",
+      "qty": 120
+    },
+    {
+      "description": "1C × 25mm² G/Y earth conductor — MEB to SMDB sub-earth bars and risers",
+      "unit": "m",
+      "qty": 350
+    },
+    {
+      "description": "1C × 16mm² G/Y earth conductor — SMDB sub-bar to each DB plus cable-tray/trunking bonding",
+      "unit": "m",
+      "qty": 800
+    },
+    {
+      "description": "Main Earth Bar (MEB) 50×6mm copper busbar in LV room, drilled, insulated, labelled",
+      "unit": "Nr",
+      "qty": 2
+    },
+    {
+      "description": "Surge Protection Device (SPD Type 1+2) at LV panel incomer",
+      "unit": "Nr",
+      "qty": 2
+    },
+    {
+      "description": "Earth bonding of all steel equipment, trays, trunking & supports (per General Note 15/19)",
+      "unit": "Sum",
+      "qty": 1
+    }
+  ],
+  "mdb_info": {
+    "tag": "LVP-01 / LVP-02",
+    "floor": "Ground Floor",
+    "location": "LV Room, Ground Floor",
+    "rating_a": 2500
+  },
+  "metering": [
+    {
+      "description": "DEWA-approved smart kWh meter, single-phase, AMI-ready — one per apartment tenant DB",
+      "unit": "Nr",
+      "qty": 120
+    },
+    {
+      "description": "DEWA-approved smart kWh meter, three-phase CT-operated — landlord / common services / retail",
+      "unit": "Nr",
+      "qty": 6
+    },
+    {
+      "description": "Current transformers (CT) for main-incomer metering",
+      "unit": "Nr",
+      "qty": 3
+    },
+    {
+      "description": "Intelligent Metering System (IMS) / MBUS provision for EMPOWER/EMICOOL incl. ETS-room cabling & containment (General Note 28)",
+      "unit": "Sum",
+      "qty": 1
+    },
+    {
+      "description": "Multifunction meter (MFM, MODBUS RTU/TCP) at LV panel",
+      "unit": "Nr",
+      "qty": 2
+    }
+  ],
+  "step_log": [],
+  "lv_panels": [
+    {
+      "tag": "LVP-01",
+      "main_acb_rating_a": 2500,
+      "main_acb_breaking_ka": 65,
+      "outgoing_mccbs": [
+        { "to": "SMDB-1F to SMDB-8F", "rating_a": 300, "count": 8 },
+        { "to": "SMDB-SH09 to SMDB-SH12", "rating_a": 63, "count": 4 }
+      ],
+      "capacitor_bank_kvar": null,
+      "capacitor_banks": [{ "kvar": 375, "isolator_rating_a": 1000 }]
+    },
+    {
+      "tag": "LVP-02",
+      "main_acb_rating_a": 1600,
+      "main_acb_breaking_ka": 40,
+      "outgoing_mccbs": [
+        { "to": "ESMDB-G", "rating_a": 400, "count": 1 },
+        { "to": "SMDB-RF", "rating_a": 500, "count": 1 },
+        { "to": "SMDB-EV", "rating_a": 160, "count": 1 },
+        { "to": "SMDB-G", "rating_a": 125, "count": 1 },
+        { "to": "SMDB-SH01 to SMDB-SH08", "rating_a": 40, "count": 8 },
+        { "to": "Fire Pump", "rating_a": 350, "count": 1 }
+      ],
+      "capacitor_bank_kvar": null,
+      "capacitor_banks": [{ "kvar": 275, "isolator_rating_a": 800 }]
+    }
+  ],
+  "confidence": 0,
+  "containment": [
+    {
+      "description": "300mm wide HDGI cable tray — LV room + main vertical risers",
+      "unit": "m",
+      "estimated_qty": 180
+    },
+    {
+      "description": "150mm wide HDGI cable tray — SMDB to DB horizontal distribution",
+      "unit": "m",
+      "estimated_qty": 320
+    },
+    {
+      "description": "100mm wide HDGI cable tray — branch distribution",
+      "unit": "m",
+      "estimated_qty": 250
+    },
+    {
+      "description": "100×100mm GI trunking — riser shafts",
+      "unit": "m",
+      "estimated_qty": 120
+    },
+    {
+      "description": "Ø25mm GI conduit — exposed / mechanical equipment & wet areas",
+      "unit": "m",
+      "estimated_qty": 600
+    },
+    {
+      "description": "Ø25mm PVC conduit — concealed sub-mains",
+      "unit": "m",
+      "estimated_qty": 2800
+    },
+    {
+      "description": "Ø20mm PVC conduit — concealed final circuits to outlets & lighting points",
+      "unit": "m",
+      "estimated_qty": 9000
+    },
+    {
+      "description": "Pull boxes at every 15m of conduit run or two 90° bends (General Note 14)",
+      "unit": "Nr",
+      "estimated_qty": 400
+    }
+  ],
+  "db_inventory": [
+    {
+      "db_id": "DB-G",
+      "floor": "Ground",
+      "smdb_id": "SMDB-G",
+      "rating_a": 63,
+      "cable_size": "4C 16mm2 XLPE/SWA/PVC +1C 16mm2 ECC"
+    },
+    {
+      "db_id": "DB-F1",
+      "floor": "Ground",
+      "smdb_id": "SMDB-G",
+      "rating_a": 40,
+      "cable_size": "4C 10mm2 XLPE/SWA/PVC +1C 10mm2 ECC"
+    },
+    {
+      "db_id": "DB-F4",
+      "floor": "Ground",
+      "smdb_id": "SMDB-G",
+      "rating_a": 40,
+      "cable_size": "4C 10mm2 XLPE/SWA/PVC +1C 10mm2 ECC"
+    },
+    {
+      "db_id": "DB-F5",
+      "floor": "Ground",
+      "smdb_id": "SMDB-G",
+      "rating_a": 40,
+      "cable_size": "4C 10mm2 XLPE/SWA/PVC +1C 10mm2 ECC"
+    },
+    {
+      "db_id": "DB-L.GYM",
+      "floor": "Roof",
+      "smdb_id": "SMDB-RF",
+      "rating_a": 40,
+      "cable_size": "4C 10mm2 XLPE/SWA/PVC +1C 10mm2 ECC"
+    },
+    {
+      "db_id": "DB-G.GYM",
+      "floor": "Roof",
+      "smdb_id": "SMDB-RF",
+      "rating_a": 40,
+      "cable_size": "4C 10mm2 XLPE/SWA/PVC +1C 10mm2 ECC"
+    },
+    {
+      "db_id": "DB-WM",
+      "floor": "Roof",
+      "smdb_id": "SMDB-RF",
+      "rating_a": 40,
+      "cable_size": "2C 10mm2 XLPE/SWA/PVC +1C 10mm2 ECC"
+    },
+    {
+      "db_id": "EDB-G",
+      "floor": "Ground",
+      "smdb_id": "ESMDB-G",
+      "rating_a": 40,
+      "cable_size": "4C 10mm2 FIRE RATED +1C 10mm2 ECC"
+    },
+    {
+      "db_id": "EDB-1F",
+      "floor": "1F",
+      "smdb_id": "ESMDB-G",
+      "rating_a": 32,
+      "cable_size": "4C 6mm2 FIRE RATED +1C 6mm2 ECC"
+    },
+    {
+      "db_id": "EDB-TEL",
+      "floor": "Ground",
+      "smdb_id": "ESMDB-G",
+      "rating_a": 40,
+      "cable_size": "4C 10mm2 FIRE RATED +1C 10mm2 ECC"
+    },
+    {
+      "db_id": "EDB-PR",
+      "floor": "Underground",
+      "smdb_id": "ESMDB-G",
+      "rating_a": 40,
+      "cable_size": "4C 10mm2 FIRE RATED +1C 10mm2 ECC"
+    },
+    {
+      "db_id": "EDB-4F",
+      "floor": "4F",
+      "smdb_id": "ESMDB-RF",
+      "rating_a": 40,
+      "cable_size": "4C 10mm2 FIRE RATED +1C 10mm2 ECC"
+    },
+    {
+      "db_id": "EDB-7F",
+      "floor": "7F",
+      "smdb_id": "ESMDB-RF",
+      "rating_a": 40,
+      "cable_size": "4C 10mm2 FIRE RATED +1C 10mm2 ECC"
+    },
+    {
+      "db_id": "EDB-GSM-R",
+      "floor": "Roof",
+      "smdb_id": "ESMDB-RF",
+      "rating_a": 40,
+      "cable_size": "4C 10mm2 FIRE RATED +1C 10mm2 ECC"
+    },
+    {
+      "db_id": "DB-T01 to DB-T15 (odd floors)",
+      "floor": "1F/3F/5F/7F",
+      "smdb_id": "SMDB-TF-odd",
+      "rating_a": 40,
+      "cable_size": "4X1C 16mm2 CU/PVC/WIRES +1C 16mm2 ECC"
+    },
+    {
+      "db_id": "DB-T01 to DB-T15 (even floors)",
+      "floor": "2F/4F/6F/8F",
+      "smdb_id": "SMDB-TF-even",
+      "rating_a": 40,
+      "cable_size": "4X1C 16mm2 CU/PVC/WIRES +1C 16mm2 ECC"
+    },
+    {
+      "db_id": "DB-SHOP01 to DB-SHOP12",
+      "floor": "Ground",
+      "smdb_id": "SMDB-SH01 to SMDB-SH12",
+      "rating_a": null,
+      "cable_size": "Internal distribution by tenant"
+    }
+  ],
+  "floor_labels": [
+    "Underground",
+    "Basement",
+    "Ground Floor",
+    "First Floor",
+    "Second Floor",
+    "Third Floor",
+    "Fourth Floor",
+    "Fifth Floor",
+    "Sixth Floor",
+    "Seventh Floor",
+    "Eighth Floor",
+    "Roof Floor",
+    "Swimming Pool Deck",
+    "Upper Roof"
+  ],
+  "load_summary": [
+    {
+      "area": "Typical apartment floor (odd)",
+      "demand_factor": 0.7,
+      "demand_load_kw": 105.6,
+      "connected_load_kw": 150.86
+    },
+    {
+      "area": "Typical apartment floor (even)",
+      "demand_factor": 0.7,
+      "demand_load_kw": 105.6,
+      "connected_load_kw": 150.86
+    },
+    {
+      "area": "Roof floor",
+      "demand_factor": 0.8,
+      "demand_load_kw": 198.9,
+      "connected_load_kw": 248.63
+    },
+    {
+      "area": "Ground floor common",
+      "demand_factor": 0.8,
+      "demand_load_kw": 48.44,
+      "connected_load_kw": 60.55
+    },
+    {
+      "area": "Basement EV",
+      "demand_factor": 1,
+      "demand_load_kw": 88,
+      "connected_load_kw": 88
+    },
+    {
+      "area": "Retail shops GF",
+      "demand_factor": 0.7,
+      "demand_load_kw": 140,
+      "connected_load_kw": 200
+    },
+    {
+      "area": "Emergency services",
+      "demand_factor": 1,
+      "demand_load_kw": 190.08,
+      "connected_load_kw": 190.08
+    }
+  ],
+  "drawing_scale": "NTS",
+  "power_outlets": [
+    {
+      "description": "13A 230V weatherproof IP55 socket outlet",
+      "unit": "Nr",
+      "estimated_qty": 40,
+      "floor": "Basement"
+    },
+    {
+      "description": "13A 230V SP switched socket outlet (BS 1363)",
+      "unit": "Nr",
+      "estimated_qty": 16,
+      "floor": "Basement"
+    },
+    {
+      "description": "20A 230V DP switch — water heater / cooker isolation",
+      "unit": "Nr",
+      "estimated_qty": 6,
+      "floor": "Basement"
+    },
+    {
+      "description": "13A 230V SP switched socket outlet (BS 1363)",
+      "unit": "Nr",
+      "estimated_qty": 40,
+      "floor": "Ground Floor"
+    },
+    {
+      "description": "13A 230V twin switched socket outlet (BS 1363)",
+      "unit": "Nr",
+      "estimated_qty": 28,
+      "floor": "Ground Floor"
+    },
+    {
+      "description": "13A 230V weatherproof IP55 socket outlet",
+      "unit": "Nr",
+      "estimated_qty": 20,
+      "floor": "Ground Floor"
+    },
+    {
+      "description": "Floor box — 13A twin socket + RJ45 dual outlet",
+      "unit": "Nr",
+      "estimated_qty": 18,
+      "floor": "Ground Floor"
+    },
+    {
+      "description": "13A flex outlet for hand dryer (common WCs)",
+      "unit": "Nr",
+      "estimated_qty": 8,
+      "floor": "Ground Floor"
+    },
+    {
+      "description": "13A switched fused spur with neon for FCU (AC indoor unit)",
+      "unit": "Nr",
+      "estimated_qty": 6,
+      "floor": "Ground Floor"
+    },
+    {
+      "description": "13A 230V SP switched socket outlet (BS 1363)",
+      "unit": "Nr",
+      "estimated_qty": 88,
+      "floor": "1F"
+    },
+    {
+      "description": "13A 230V twin switched socket outlet (BS 1363)",
+      "unit": "Nr",
+      "estimated_qty": 162,
+      "floor": "1F"
+    },
+    {
+      "description": "13A 230V twin switched socket outlet + USB-A/USB-C ports",
+      "unit": "Nr",
+      "estimated_qty": 30,
+      "floor": "1F"
+    },
+    {
+      "description": "13A 230V weatherproof IP55 socket outlet",
+      "unit": "Nr",
+      "estimated_qty": 30,
+      "floor": "1F"
+    },
+    {
+      "description": "20A 230V flex outlet for water heater (with neon)",
+      "unit": "Nr",
+      "estimated_qty": 22,
+      "floor": "1F"
+    },
+    {
+      "description": "20A 230V DP switch — water heater / cooker isolation",
+      "unit": "Nr",
+      "estimated_qty": 30,
+      "floor": "1F"
+    },
+    {
+      "description": "13A switched fused spur with neon for FCU (AC indoor unit)",
+      "unit": "Nr",
+      "estimated_qty": 48,
+      "floor": "1F"
+    },
+    {
+      "description": "13A flex outlet for gas hob / cooker point",
+      "unit": "Nr",
+      "estimated_qty": 15,
+      "floor": "1F"
+    },
+    {
+      "description": "13A 230V SP switched socket outlet (BS 1363)",
+      "unit": "Nr",
+      "estimated_qty": 88,
+      "floor": "2F"
+    },
+    {
+      "description": "13A 230V twin switched socket outlet (BS 1363)",
+      "unit": "Nr",
+      "estimated_qty": 162,
+      "floor": "2F"
+    },
+    {
+      "description": "13A 230V twin switched socket outlet + USB-A/USB-C ports",
+      "unit": "Nr",
+      "estimated_qty": 30,
+      "floor": "2F"
+    },
+    {
+      "description": "13A 230V weatherproof IP55 socket outlet",
+      "unit": "Nr",
+      "estimated_qty": 30,
+      "floor": "2F"
+    },
+    {
+      "description": "20A 230V flex outlet for water heater (with neon)",
+      "unit": "Nr",
+      "estimated_qty": 22,
+      "floor": "2F"
+    },
+    {
+      "description": "20A 230V DP switch — water heater / cooker isolation",
+      "unit": "Nr",
+      "estimated_qty": 30,
+      "floor": "2F"
+    },
+    {
+      "description": "13A switched fused spur with neon for FCU (AC indoor unit)",
+      "unit": "Nr",
+      "estimated_qty": 48,
+      "floor": "2F"
+    },
+    {
+      "description": "13A flex outlet for gas hob / cooker point",
+      "unit": "Nr",
+      "estimated_qty": 15,
+      "floor": "2F"
+    },
+    {
+      "description": "13A 230V SP switched socket outlet (BS 1363)",
+      "unit": "Nr",
+      "estimated_qty": 88,
+      "floor": "3F"
+    },
+    {
+      "description": "13A 230V twin switched socket outlet (BS 1363)",
+      "unit": "Nr",
+      "estimated_qty": 162,
+      "floor": "3F"
+    },
+    {
+      "description": "13A 230V twin switched socket outlet + USB-A/USB-C ports",
+      "unit": "Nr",
+      "estimated_qty": 30,
+      "floor": "3F"
+    },
+    {
+      "description": "13A 230V weatherproof IP55 socket outlet",
+      "unit": "Nr",
+      "estimated_qty": 30,
+      "floor": "3F"
+    },
+    {
+      "description": "20A 230V flex outlet for water heater (with neon)",
+      "unit": "Nr",
+      "estimated_qty": 22,
+      "floor": "3F"
+    },
+    {
+      "description": "20A 230V DP switch — water heater / cooker isolation",
+      "unit": "Nr",
+      "estimated_qty": 30,
+      "floor": "3F"
+    },
+    {
+      "description": "13A switched fused spur with neon for FCU (AC indoor unit)",
+      "unit": "Nr",
+      "estimated_qty": 48,
+      "floor": "3F"
+    },
+    {
+      "description": "13A flex outlet for gas hob / cooker point",
+      "unit": "Nr",
+      "estimated_qty": 15,
+      "floor": "3F"
+    },
+    {
+      "description": "13A 230V SP switched socket outlet (BS 1363)",
+      "unit": "Nr",
+      "estimated_qty": 88,
+      "floor": "4F"
+    },
+    {
+      "description": "13A 230V twin switched socket outlet (BS 1363)",
+      "unit": "Nr",
+      "estimated_qty": 162,
+      "floor": "4F"
+    },
+    {
+      "description": "13A 230V twin switched socket outlet + USB-A/USB-C ports",
+      "unit": "Nr",
+      "estimated_qty": 30,
+      "floor": "4F"
+    },
+    {
+      "description": "13A 230V weatherproof IP55 socket outlet",
+      "unit": "Nr",
+      "estimated_qty": 30,
+      "floor": "4F"
+    },
+    {
+      "description": "20A 230V flex outlet for water heater (with neon)",
+      "unit": "Nr",
+      "estimated_qty": 22,
+      "floor": "4F"
+    },
+    {
+      "description": "20A 230V DP switch — water heater / cooker isolation",
+      "unit": "Nr",
+      "estimated_qty": 30,
+      "floor": "4F"
+    },
+    {
+      "description": "13A switched fused spur with neon for FCU (AC indoor unit)",
+      "unit": "Nr",
+      "estimated_qty": 48,
+      "floor": "4F"
+    },
+    {
+      "description": "13A flex outlet for gas hob / cooker point",
+      "unit": "Nr",
+      "estimated_qty": 15,
+      "floor": "4F"
+    },
+    {
+      "description": "13A 230V SP switched socket outlet (BS 1363)",
+      "unit": "Nr",
+      "estimated_qty": 88,
+      "floor": "5F"
+    },
+    {
+      "description": "13A 230V twin switched socket outlet (BS 1363)",
+      "unit": "Nr",
+      "estimated_qty": 162,
+      "floor": "5F"
+    },
+    {
+      "description": "13A 230V twin switched socket outlet + USB-A/USB-C ports",
+      "unit": "Nr",
+      "estimated_qty": 30,
+      "floor": "5F"
+    },
+    {
+      "description": "13A 230V weatherproof IP55 socket outlet",
+      "unit": "Nr",
+      "estimated_qty": 30,
+      "floor": "5F"
+    },
+    {
+      "description": "20A 230V flex outlet for water heater (with neon)",
+      "unit": "Nr",
+      "estimated_qty": 22,
+      "floor": "5F"
+    },
+    {
+      "description": "20A 230V DP switch — water heater / cooker isolation",
+      "unit": "Nr",
+      "estimated_qty": 30,
+      "floor": "5F"
+    },
+    {
+      "description": "13A switched fused spur with neon for FCU (AC indoor unit)",
+      "unit": "Nr",
+      "estimated_qty": 48,
+      "floor": "5F"
+    },
+    {
+      "description": "13A flex outlet for gas hob / cooker point",
+      "unit": "Nr",
+      "estimated_qty": 15,
+      "floor": "5F"
+    },
+    {
+      "description": "13A 230V SP switched socket outlet (BS 1363)",
+      "unit": "Nr",
+      "estimated_qty": 88,
+      "floor": "6F"
+    },
+    {
+      "description": "13A 230V twin switched socket outlet (BS 1363)",
+      "unit": "Nr",
+      "estimated_qty": 162,
+      "floor": "6F"
+    },
+    {
+      "description": "13A 230V twin switched socket outlet + USB-A/USB-C ports",
+      "unit": "Nr",
+      "estimated_qty": 30,
+      "floor": "6F"
+    },
+    {
+      "description": "13A 230V weatherproof IP55 socket outlet",
+      "unit": "Nr",
+      "estimated_qty": 30,
+      "floor": "6F"
+    },
+    {
+      "description": "20A 230V flex outlet for water heater (with neon)",
+      "unit": "Nr",
+      "estimated_qty": 22,
+      "floor": "6F"
+    },
+    {
+      "description": "20A 230V DP switch — water heater / cooker isolation",
+      "unit": "Nr",
+      "estimated_qty": 30,
+      "floor": "6F"
+    },
+    {
+      "description": "13A switched fused spur with neon for FCU (AC indoor unit)",
+      "unit": "Nr",
+      "estimated_qty": 48,
+      "floor": "6F"
+    },
+    {
+      "description": "13A flex outlet for gas hob / cooker point",
+      "unit": "Nr",
+      "estimated_qty": 15,
+      "floor": "6F"
+    },
+    {
+      "description": "13A 230V SP switched socket outlet (BS 1363)",
+      "unit": "Nr",
+      "estimated_qty": 88,
+      "floor": "7F"
+    },
+    {
+      "description": "13A 230V twin switched socket outlet (BS 1363)",
+      "unit": "Nr",
+      "estimated_qty": 162,
+      "floor": "7F"
+    },
+    {
+      "description": "13A 230V twin switched socket outlet + USB-A/USB-C ports",
+      "unit": "Nr",
+      "estimated_qty": 30,
+      "floor": "7F"
+    },
+    {
+      "description": "13A 230V weatherproof IP55 socket outlet",
+      "unit": "Nr",
+      "estimated_qty": 30,
+      "floor": "7F"
+    },
+    {
+      "description": "20A 230V flex outlet for water heater (with neon)",
+      "unit": "Nr",
+      "estimated_qty": 22,
+      "floor": "7F"
+    },
+    {
+      "description": "20A 230V DP switch — water heater / cooker isolation",
+      "unit": "Nr",
+      "estimated_qty": 30,
+      "floor": "7F"
+    },
+    {
+      "description": "13A switched fused spur with neon for FCU (AC indoor unit)",
+      "unit": "Nr",
+      "estimated_qty": 48,
+      "floor": "7F"
+    },
+    {
+      "description": "13A flex outlet for gas hob / cooker point",
+      "unit": "Nr",
+      "estimated_qty": 15,
+      "floor": "7F"
+    },
+    {
+      "description": "13A 230V SP switched socket outlet (BS 1363)",
+      "unit": "Nr",
+      "estimated_qty": 88,
+      "floor": "8F"
+    },
+    {
+      "description": "13A 230V twin switched socket outlet (BS 1363)",
+      "unit": "Nr",
+      "estimated_qty": 162,
+      "floor": "8F"
+    },
+    {
+      "description": "13A 230V twin switched socket outlet + USB-A/USB-C ports",
+      "unit": "Nr",
+      "estimated_qty": 30,
+      "floor": "8F"
+    },
+    {
+      "description": "13A 230V weatherproof IP55 socket outlet",
+      "unit": "Nr",
+      "estimated_qty": 30,
+      "floor": "8F"
+    },
+    {
+      "description": "20A 230V flex outlet for water heater (with neon)",
+      "unit": "Nr",
+      "estimated_qty": 22,
+      "floor": "8F"
+    },
+    {
+      "description": "20A 230V DP switch — water heater / cooker isolation",
+      "unit": "Nr",
+      "estimated_qty": 30,
+      "floor": "8F"
+    },
+    {
+      "description": "13A switched fused spur with neon for FCU (AC indoor unit)",
+      "unit": "Nr",
+      "estimated_qty": 48,
+      "floor": "8F"
+    },
+    {
+      "description": "13A flex outlet for gas hob / cooker point",
+      "unit": "Nr",
+      "estimated_qty": 15,
+      "floor": "8F"
+    },
+    {
+      "description": "16A industrial socket outlet — BMU provision",
+      "unit": "Nr",
+      "estimated_qty": 6,
+      "floor": "Roof"
+    },
+    {
+      "description": "13A 230V weatherproof IP55 socket outlet",
+      "unit": "Nr",
+      "estimated_qty": 20,
+      "floor": "Roof"
+    }
+  ],
+  "cable_schedule": [
+    {
+      "to": "SMDB-1F",
+      "from": "LVP-01",
+      "type": "XLPE",
+      "length_m": 25,
+      "size_mm2": 150,
+      "circuit_description": "4C 150mm2 XLPE/SWA/PVC +1x1x70mm2 ECC"
+    },
+    {
+      "to": "SMDB-2F",
+      "from": "LVP-01",
+      "type": "XLPE",
+      "length_m": 29,
+      "size_mm2": 150,
+      "circuit_description": "4C 150mm2 XLPE/SWA/PVC +1x1x70mm2 ECC"
+    },
+    {
+      "to": "SMDB-3F",
+      "from": "LVP-01",
+      "type": "XLPE",
+      "length_m": 33,
+      "size_mm2": 150,
+      "circuit_description": "4C 150mm2 XLPE/SWA/PVC +1x1x70mm2 ECC"
+    },
+    {
+      "to": "SMDB-4F",
+      "from": "LVP-01",
+      "type": "XLPE",
+      "length_m": 37,
+      "size_mm2": 150,
+      "circuit_description": "4C 150mm2 XLPE/SWA/PVC +1x1x70mm2 ECC"
+    },
+    {
+      "to": "SMDB-5F",
+      "from": "LVP-01",
+      "type": "XLPE",
+      "length_m": 41,
+      "size_mm2": 150,
+      "circuit_description": "4C 150mm2 XLPE/SWA/PVC +1x1x70mm2 ECC"
+    },
+    {
+      "to": "SMDB-6F",
+      "from": "LVP-01",
+      "type": "XLPE",
+      "length_m": 45,
+      "size_mm2": 150,
+      "circuit_description": "4C 150mm2 XLPE/SWA/PVC +1x1x70mm2 ECC"
+    },
+    {
+      "to": "SMDB-7F",
+      "from": "LVP-01",
+      "type": "XLPE",
+      "length_m": 49,
+      "size_mm2": 150,
+      "circuit_description": "4C 150mm2 XLPE/SWA/PVC +1x1x70mm2 ECC"
+    },
+    {
+      "to": "SMDB-8F",
+      "from": "LVP-01",
+      "type": "XLPE",
+      "length_m": 53,
+      "size_mm2": 150,
+      "circuit_description": "4C 150mm2 XLPE/SWA/PVC +1x1x70mm2 ECC"
+    },
+    {
+      "to": "SMDB-TF-odd",
+      "from": "LVP-01",
+      "type": "XLPE",
+      "length_m": 45,
+      "size_mm2": 185,
+      "circuit_description": "1X4C 185mm2 XLPE/SWA/PVC +1C 95mm2 ECC"
+    },
+    {
+      "to": "SMDB-TF-even",
+      "from": "LVP-01",
+      "type": "XLPE",
+      "length_m": 45,
+      "size_mm2": 185,
+      "circuit_description": "1X4C 185mm2 XLPE/SWA/PVC +1C 95mm2 ECC"
+    },
+    {
+      "to": "SMDB-RF",
+      "from": "LVP-02",
+      "type": "XLPE",
+      "length_m": 65,
+      "size_mm2": 150,
+      "circuit_description": "2X4C 150mm2 XLPE/SWA/PVC +1X1C 150mm2 ECC"
+    },
+    {
+      "to": "SMDB-G",
+      "from": "LVP-02",
+      "type": "XLPE",
+      "length_m": 15,
+      "size_mm2": 50,
+      "circuit_description": "1X4C 50mm2 XLPE/SWA/PVC +1X1C 25mm2 ECC"
+    },
+    {
+      "to": "SMDB-EV",
+      "from": "LVP-02",
+      "type": "XLPE",
+      "length_m": 20,
+      "size_mm2": 70,
+      "circuit_description": "1X4C 70mm2 XLPE/SWA/PVC +1X1C 35mm2 ECC"
+    },
+    {
+      "to": "SMDB-SH01",
+      "from": "LVP-02",
+      "type": "XLPE",
+      "length_m": 20,
+      "size_mm2": 10,
+      "circuit_description": "1X4C 10mm2 XLPE/SWA/PVC"
+    },
+    {
+      "to": "SMDB-SH02",
+      "from": "LVP-02",
+      "type": "XLPE",
+      "length_m": 22,
+      "size_mm2": 10,
+      "circuit_description": "1X4C 10mm2 XLPE/SWA/PVC"
+    },
+    {
+      "to": "SMDB-SH03",
+      "from": "LVP-02",
+      "type": "XLPE",
+      "length_m": 24,
+      "size_mm2": 10,
+      "circuit_description": "1X4C 10mm2 XLPE/SWA/PVC"
+    },
+    {
+      "to": "SMDB-SH04",
+      "from": "LVP-02",
+      "type": "XLPE",
+      "length_m": 26,
+      "size_mm2": 10,
+      "circuit_description": "1X4C 10mm2 XLPE/SWA/PVC"
+    },
+    {
+      "to": "SMDB-SH05",
+      "from": "LVP-02",
+      "type": "XLPE",
+      "length_m": 28,
+      "size_mm2": 10,
+      "circuit_description": "1X4C 10mm2 XLPE/SWA/PVC"
+    },
+    {
+      "to": "SMDB-SH06",
+      "from": "LVP-02",
+      "type": "XLPE",
+      "length_m": 30,
+      "size_mm2": 10,
+      "circuit_description": "1X4C 10mm2 XLPE/SWA/PVC"
+    },
+    {
+      "to": "SMDB-SH07",
+      "from": "LVP-02",
+      "type": "XLPE",
+      "length_m": 32,
+      "size_mm2": 10,
+      "circuit_description": "1X4C 10mm2 XLPE/SWA/PVC"
+    },
+    {
+      "to": "SMDB-SH08",
+      "from": "LVP-02",
+      "type": "XLPE",
+      "length_m": 34,
+      "size_mm2": 10,
+      "circuit_description": "1X4C 10mm2 XLPE/SWA/PVC"
+    },
+    {
+      "to": "SMDB-SH09",
+      "from": "LVP-02",
+      "type": "XLPE",
+      "length_m": 36,
+      "size_mm2": 10,
+      "circuit_description": "1X4C 10mm2 XLPE/SWA/PVC"
+    },
+    {
+      "to": "SMDB-SH10",
+      "from": "LVP-02",
+      "type": "XLPE",
+      "length_m": 38,
+      "size_mm2": 10,
+      "circuit_description": "1X4C 10mm2 XLPE/SWA/PVC"
+    },
+    {
+      "to": "SMDB-SH11",
+      "from": "LVP-02",
+      "type": "XLPE",
+      "length_m": 40,
+      "size_mm2": 10,
+      "circuit_description": "1X4C 10mm2 XLPE/SWA/PVC"
+    },
+    {
+      "to": "SMDB-SH12",
+      "from": "LVP-02",
+      "type": "XLPE",
+      "length_m": 42,
+      "size_mm2": 16,
+      "circuit_description": "1X4C 16mm2 XLPE/SWA/PVC"
+    },
+    {
+      "to": "ESMDB-G",
+      "from": "LVP-02",
+      "type": "fire_rated",
+      "length_m": 15,
+      "size_mm2": 300,
+      "circuit_description": "1X4C 300mm2 FIRE RATED +1X1C 150mm2 ECC"
+    },
+    {
+      "to": "ESMDB-RF",
+      "from": "ESMDB-G",
+      "type": "fire_rated",
+      "length_m": 65,
+      "size_mm2": 70,
+      "circuit_description": "4C 70mm2 FIRE RATED +1C 35mm2 ECC via 225mm HDGI emergency tray"
+    },
+    {
+      "to": "Fire Pump",
+      "from": "LVP-02",
+      "type": "fire_rated",
+      "length_m": 35,
+      "size_mm2": 185,
+      "circuit_description": "1X4C 185mm2 FP400 FIRE RATED +1C 95mm2 FR ECC, 350A TP"
+    },
+    {
+      "to": "DB-G",
+      "from": "SMDB-G",
+      "type": "XLPE",
+      "length_m": 20,
+      "size_mm2": 16,
+      "circuit_description": "4C 16mm2 XLPE/SWA/PVC +1C 16mm2 ECC"
+    },
+    {
+      "to": "DB-F1",
+      "from": "SMDB-G",
+      "type": "XLPE",
+      "length_m": 15,
+      "size_mm2": 10,
+      "circuit_description": "4C 10mm2 XLPE/SWA/PVC +1C 10mm2 ECC"
+    },
+    {
+      "to": "DB-F4",
+      "from": "SMDB-G",
+      "type": "XLPE",
+      "length_m": 15,
+      "size_mm2": 10,
+      "circuit_description": "4C 10mm2 XLPE/SWA/PVC +1C 10mm2 ECC"
+    },
+    {
+      "to": "DB-F5",
+      "from": "SMDB-G",
+      "type": "XLPE",
+      "length_m": 15,
+      "size_mm2": 10,
+      "circuit_description": "4C 10mm2 XLPE/SWA/PVC +1C 10mm2 ECC"
+    },
+    {
+      "to": "DB-L.GYM",
+      "from": "SMDB-RF",
+      "type": "XLPE",
+      "length_m": 20,
+      "size_mm2": 10,
+      "circuit_description": "4C 10mm2 XLPE/SWA/PVC +1C 10mm2 ECC"
+    },
+    {
+      "to": "DB-G.GYM",
+      "from": "SMDB-RF",
+      "type": "XLPE",
+      "length_m": 20,
+      "size_mm2": 10,
+      "circuit_description": "4C 10mm2 XLPE/SWA/PVC +1C 10mm2 ECC"
+    },
+    {
+      "to": "DB-WM",
+      "from": "SMDB-RF",
+      "type": "XLPE",
+      "length_m": 15,
+      "size_mm2": 10,
+      "circuit_description": "2C 10mm2 XLPE/SWA/PVC +1C 10mm2 ECC"
+    },
+    {
+      "to": "EDB-G",
+      "from": "ESMDB-G",
+      "type": "fire_rated",
+      "length_m": 15,
+      "size_mm2": 10,
+      "circuit_description": "4C 10mm2 FIRE RATED +1C 10mm2 ECC"
+    },
+    {
+      "to": "EDB-1F",
+      "from": "ESMDB-G",
+      "type": "fire_rated",
+      "length_m": 25,
+      "size_mm2": 6,
+      "circuit_description": "4C 6mm2 FIRE RATED +1C 6mm2 ECC"
+    },
+    {
+      "to": "EDB-TEL",
+      "from": "ESMDB-G",
+      "type": "fire_rated",
+      "length_m": 15,
+      "size_mm2": 10,
+      "circuit_description": "4C 10mm2 FIRE RATED +1C 10mm2 ECC"
+    },
+    {
+      "to": "EDB-PR",
+      "from": "ESMDB-G",
+      "type": "fire_rated",
+      "length_m": 30,
+      "size_mm2": 10,
+      "circuit_description": "4C 10mm2 FIRE RATED +1C 10mm2 ECC"
+    },
+    {
+      "to": "EDB-4F",
+      "from": "ESMDB-RF",
+      "type": "fire_rated",
+      "length_m": 20,
+      "size_mm2": 10,
+      "circuit_description": "4C 10mm2 FIRE RATED +1C 10mm2 ECC"
+    },
+    {
+      "to": "EDB-7F",
+      "from": "ESMDB-RF",
+      "type": "fire_rated",
+      "length_m": 10,
+      "size_mm2": 10,
+      "circuit_description": "4C 10mm2 FIRE RATED +1C 10mm2 ECC"
+    },
+    {
+      "to": "EDB-GSM-R",
+      "from": "ESMDB-RF",
+      "type": "fire_rated",
+      "length_m": 15,
+      "size_mm2": 10,
+      "circuit_description": "4C 10mm2 FIRE RATED +1C 10mm2 ECC"
+    },
+    {
+      "to": "Lift-01",
+      "from": "ESMDB-RF",
+      "type": "fire_rated",
+      "length_m": 35,
+      "size_mm2": 10,
+      "circuit_description": "4C 10mm2 FIRE RATED +1C 10mm2 ECC, 40A TP"
+    },
+    {
+      "to": "Lift-02",
+      "from": "ESMDB-RF",
+      "type": "fire_rated",
+      "length_m": 35,
+      "size_mm2": 10,
+      "circuit_description": "4C 10mm2 FIRE RATED +1C 10mm2 ECC, 40A TP"
+    },
+    {
+      "to": "Lift-03",
+      "from": "ESMDB-RF",
+      "type": "fire_rated",
+      "length_m": 35,
+      "size_mm2": 10,
+      "circuit_description": "4C 10mm2 FIRE RATED +1C 10mm2 ECC, 40A TP"
+    },
+    {
+      "to": "Booster Pump",
+      "from": "ESMDB-RF",
+      "type": "fire_rated",
+      "length_m": 20,
+      "size_mm2": 10,
+      "circuit_description": "4C 10mm2 FIRE RATED +1C 10mm2 ECC, 40A TP"
+    },
+    {
+      "to": "DB-T01 to DB-T15 odd floors",
+      "from": "SMDB-TF-odd",
+      "type": "PVC",
+      "length_m": 25,
+      "size_mm2": 16,
+      "circuit_description": "4X1C 16mm2 CU/PVC/WIRES +1C 16mm2 ECC"
+    },
+    {
+      "to": "DB-T01 to DB-T15 even floors",
+      "from": "SMDB-TF-even",
+      "type": "PVC",
+      "length_m": 25,
+      "size_mm2": 16,
+      "circuit_description": "4X1C 16mm2 CU/PVC/WIRES +1C 16mm2 ECC"
+    }
+  ],
+  "drawings_found": [
+    {
+      "type": "floor_plan",
+      "floor": "Site Setting Out Plan",
+      "filename": "P-001"
+    },
+    {
+      "type": "floor_plan",
+      "floor": "Underground Floor",
+      "filename": "P-100"
+    },
+    {
+      "type": "floor_plan",
+      "floor": "Basement",
+      "filename": "P-101"
+    },
+    {
+      "type": "floor_plan",
+      "floor": "Ground Floor",
+      "filename": "P-102"
+    },
+    {
+      "type": "floor_plan",
+      "floor": "First Floor",
+      "filename": "P-103"
+    },
+    {
+      "type": "floor_plan",
+      "floor": "2/4/6/8 Floor",
+      "filename": "P-104"
+    },
+    {
+      "type": "floor_plan",
+      "floor": "3/5/7 Floor",
+      "filename": "P-105"
+    },
+    {
+      "type": "floor_plan",
+      "floor": "Roof Floor",
+      "filename": "P-106"
+    },
+    {
+      "type": "floor_plan",
+      "floor": "Swimming Pool Floor",
+      "filename": "P-107"
+    },
+    {
+      "type": "floor_plan",
+      "floor": "Upper Roof",
+      "filename": "P-108"
+    },
+    {
+      "type": "schematic",
+      "floor": "Single Line Drawing Sheet-01",
+      "filename": "P-200"
+    },
+    {
+      "type": "schematic",
+      "floor": "Single Line Drawing Sheet-02",
+      "filename": "P-201"
+    },
+    {
+      "type": "other",
+      "floor": "LV & Electrical Room Details",
+      "filename": "P-300"
+    },
+    {
+      "type": "other",
+      "floor": "Installation Details / Power Layout Legend",
+      "filename": "P-010"
+    }
+  ],
+  "scale_detected": false,
+  "smdb_inventory": [
+    {
+      "id": "SMDB-1F",
+      "qty": 1,
+      "floor": "1F",
+      "rating_a": 300,
+      "connected_load_kw": 150.86,
+      "cable_size_from_mdb": "1X4C 150mm2 XLPE/SWA/PVC +1x1x70mm2 ECC"
+    },
+    {
+      "id": "SMDB-2F",
+      "qty": 1,
+      "floor": "2F",
+      "rating_a": 300,
+      "connected_load_kw": 150.86,
+      "cable_size_from_mdb": "1X4C 150mm2 XLPE/SWA/PVC +1x1x70mm2 ECC"
+    },
+    {
+      "id": "SMDB-3F",
+      "qty": 1,
+      "floor": "3F",
+      "rating_a": 300,
+      "connected_load_kw": 150.86,
+      "cable_size_from_mdb": "1X4C 150mm2 XLPE/SWA/PVC +1x1x70mm2 ECC"
+    },
+    {
+      "id": "SMDB-4F",
+      "qty": 1,
+      "floor": "4F",
+      "rating_a": 300,
+      "connected_load_kw": 150.86,
+      "cable_size_from_mdb": "1X4C 150mm2 XLPE/SWA/PVC +1x1x70mm2 ECC"
+    },
+    {
+      "id": "SMDB-5F",
+      "qty": 1,
+      "floor": "5F",
+      "rating_a": 300,
+      "connected_load_kw": 150.86,
+      "cable_size_from_mdb": "1X4C 150mm2 XLPE/SWA/PVC +1x1x70mm2 ECC"
+    },
+    {
+      "id": "SMDB-6F",
+      "qty": 1,
+      "floor": "6F",
+      "rating_a": 300,
+      "connected_load_kw": 150.86,
+      "cable_size_from_mdb": "1X4C 150mm2 XLPE/SWA/PVC +1x1x70mm2 ECC"
+    },
+    {
+      "id": "SMDB-7F",
+      "qty": 1,
+      "floor": "7F",
+      "rating_a": 300,
+      "connected_load_kw": 150.86,
+      "cable_size_from_mdb": "1X4C 150mm2 XLPE/SWA/PVC +1x1x70mm2 ECC"
+    },
+    {
+      "id": "SMDB-8F",
+      "qty": 1,
+      "floor": "8F",
+      "rating_a": 300,
+      "connected_load_kw": 150.86,
+      "cable_size_from_mdb": "1X4C 150mm2 XLPE/SWA/PVC +1x1x70mm2 ECC"
+    },
+    {
+      "id": "SMDB-TF-odd",
+      "qty": 4,
+      "floor": "1F/3F/5F/7F",
+      "rating_a": 300,
+      "connected_load_kw": 150.86,
+      "cable_size_from_mdb": "1X4C 185mm2 XLPE/SWA/PVC +1C 95mm2 ECC"
+    },
+    {
+      "id": "SMDB-TF-even",
+      "qty": 4,
+      "floor": "2F/4F/6F/8F",
+      "rating_a": 300,
+      "connected_load_kw": 150.86,
+      "cable_size_from_mdb": "1X4C 185mm2 XLPE/SWA/PVC +1C 95mm2 ECC"
+    },
+    {
+      "id": "SMDB-RF",
+      "qty": 1,
+      "floor": "Roof",
+      "rating_a": 500,
+      "connected_load_kw": 248.63,
+      "cable_size_from_mdb": "2X4C 150mm2 XLPE/SWA/PVC +1X1C 150mm2 ECC"
+    },
+    {
+      "id": "SMDB-G",
+      "qty": 1,
+      "floor": "Ground",
+      "rating_a": 125,
+      "connected_load_kw": 60.55,
+      "cable_size_from_mdb": "1X4C 50mm2 XLPE/SWA/PVC +1X1C 25mm2 ECC"
+    },
+    {
+      "id": "SMDB-EV",
+      "qty": 1,
+      "floor": "Basement",
+      "rating_a": 160,
+      "connected_load_kw": 88,
+      "cable_size_from_mdb": "1X4C 70mm2 XLPE/SWA/PVC +1X1C 35mm2 ECC"
+    },
+    {
+      "id": "SMDB-SH01",
+      "qty": 1,
+      "floor": "Ground",
+      "rating_a": 40,
+      "connected_load_kw": 15,
+      "cable_size_from_mdb": "1X4C 10mm2 XLPE/SWA/PVC"
+    },
+    {
+      "id": "SMDB-SH02",
+      "qty": 1,
+      "floor": "Ground",
+      "rating_a": 40,
+      "connected_load_kw": 15,
+      "cable_size_from_mdb": "1X4C 10mm2 XLPE/SWA/PVC"
+    },
+    {
+      "id": "SMDB-SH03",
+      "qty": 1,
+      "floor": "Ground",
+      "rating_a": 40,
+      "connected_load_kw": 15,
+      "cable_size_from_mdb": "1X4C 10mm2 XLPE/SWA/PVC"
+    },
+    {
+      "id": "SMDB-SH04",
+      "qty": 1,
+      "floor": "Ground",
+      "rating_a": 40,
+      "connected_load_kw": 15,
+      "cable_size_from_mdb": "1X4C 10mm2 XLPE/SWA/PVC"
+    },
+    {
+      "id": "SMDB-SH05",
+      "qty": 1,
+      "floor": "Ground",
+      "rating_a": 40,
+      "connected_load_kw": 25,
+      "cable_size_from_mdb": "1X4C 10mm2 XLPE/SWA/PVC"
+    },
+    {
+      "id": "SMDB-SH06",
+      "qty": 1,
+      "floor": "Ground",
+      "rating_a": 40,
+      "connected_load_kw": 10,
+      "cable_size_from_mdb": "1X4C 10mm2 XLPE/SWA/PVC"
+    },
+    {
+      "id": "SMDB-SH07",
+      "qty": 1,
+      "floor": "Ground",
+      "rating_a": 40,
+      "connected_load_kw": 10,
+      "cable_size_from_mdb": "1X4C 10mm2 XLPE/SWA/PVC"
+    },
+    {
+      "id": "SMDB-SH08",
+      "qty": 1,
+      "floor": "Ground",
+      "rating_a": 40,
+      "connected_load_kw": 40,
+      "cable_size_from_mdb": "1X4C 10mm2 XLPE/SWA/PVC"
+    },
+    {
+      "id": "SMDB-SH09",
+      "qty": 1,
+      "floor": "Ground",
+      "rating_a": 40,
+      "connected_load_kw": 10,
+      "cable_size_from_mdb": "1X4C 10mm2 XLPE/SWA/PVC"
+    },
+    {
+      "id": "SMDB-SH10",
+      "qty": 1,
+      "floor": "Ground",
+      "rating_a": 40,
+      "connected_load_kw": 15,
+      "cable_size_from_mdb": "1X4C 10mm2 XLPE/SWA/PVC"
+    },
+    {
+      "id": "SMDB-SH11",
+      "qty": 1,
+      "floor": "Ground",
+      "rating_a": 40,
+      "connected_load_kw": 15,
+      "cable_size_from_mdb": "1X4C 10mm2 XLPE/SWA/PVC"
+    },
+    {
+      "id": "SMDB-SH12",
+      "qty": 1,
+      "floor": "Ground",
+      "rating_a": 63,
+      "connected_load_kw": 30,
+      "cable_size_from_mdb": "1X4C 16mm2 XLPE/SWA/PVC"
+    },
+    {
+      "id": "ESMDB-G",
+      "qty": 1,
+      "floor": "Ground",
+      "rating_a": 400,
+      "connected_load_kw": 190.08,
+      "cable_size_from_mdb": "1X4C 300mm2 FIRE RATED +1X1C 150mm2 ECC"
+    },
+    {
+      "id": "ESMDB-RF",
+      "qty": 1,
+      "floor": "Roof",
+      "rating_a": 160,
+      "connected_load_kw": 88.69,
+      "cable_size_from_mdb": "4C 70mm2 FIRE RATED +1C 35mm2 ECC"
+    }
+  ],
+  "incoming_supply": {
+    "ats": { "rating_a": 400 },
+    "hv_ducts": null,
+    "generator": { "kva": 300, "type": "diesel" },
+    "transformers": [
+      { "kva": 1000, "voltage_ratio": "11kV/400V", "count": 1 },
+      { "kva": 1500, "voltage_ratio": "11kV/400V", "count": 1 }
+    ],
+    "mobile_generator_provision": { "count": 1 }
+  },
+  "floors_identified": 14,
+  "lv_to_smdb_cables": [],
+  "smdb_to_db_cables": [],
+  "schematic_filename": "P-200 / P-201",
+  "schematic_available": true,
+  "mechanical_equipment": [
+    { "description": "FAHU (Fresh Air Handling Unit) — roof", "rating_kw": 174.66, "rating_a": 500, "count": 1 },
+    { "description": "Fire pump (electric, with starter, ELS + shunt trip)", "rating_kw": 98, "rating_a": 350, "count": 1 },
+    { "description": "Jockey pump", "rating_kw": 8, "rating_a": 25, "count": 1 },
+    { "description": "Booster pump set", "rating_kw": 12, "rating_a": 40, "count": 1 },
+    { "description": "Passenger/firefighting lift", "rating_kw": 15, "rating_a": 40, "count": 3 },
+    { "description": "EV car charger (22 kW DC)", "rating_kw": 22, "rating_a": 63, "count": 4 },
+    { "description": "Swimming pool filtration pump", "rating_kw": 20, "rating_a": 80, "count": 1 },
+    { "description": "Sauna heater", "rating_kw": 6, "rating_a": 32, "count": 1 },
+    { "description": "LPG vaporizer", "rating_kw": 4, "rating_a": 20, "count": 1 },
+    { "description": "BMU / cleaning cradle", "rating_kw": 4, "rating_a": 20, "count": 1 },
+    { "description": "Garbage compactor", "rating_kw": 6, "rating_a": 20, "count": 1 },
+    { "description": "Staircase pressurization fan", "rating_kw": 10, "rating_a": 25, "count": 2 },
+    { "description": "Sump / drainage pump (pump room)", "rating_kw": 8, "rating_a": 25, "count": 2 }
+  ],
+  "typical_floor_height_m": 3.2
+}

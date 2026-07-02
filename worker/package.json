@@ -1,0 +1,20 @@
+{
+  "name": "drawtoboq-estimate-worker",
+  "version": "1.0.0",
+  "private": true,
+  "description": "VPS background worker for /api/projects/[id]/estimate. Receives kickoff from Vercel lambda, calls the existing ai-aas gateway with the prepared payload, runs post-processing (enrich + empty-check + cache + status writes), and lets Vercel return 202 immediately. Removes the Pro-plan 300s lambda cap from the Run-to-BOQ path.",
+  "main": "server.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.45.0",
+    "express": "^4.21.0",
+    "multer": "^2.0.0",
+    "undici": "^7.0.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

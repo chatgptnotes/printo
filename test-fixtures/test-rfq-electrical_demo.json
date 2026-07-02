@@ -1,0 +1,36 @@
+{
+  "template_id": "electrical_demo",
+  "display_name": "P-379 — Electrical Power Package (manual walkthrough)",
+  "email_from": "tendering@gulfengineering.ae",
+  "email_subject": "RFQ — Electrical Power Works | Project P-379 | Please quote",
+  "email_snippet": "Dear Estimation Team, please find attached the electrical power drawings for Project P-379. Kindly review the floor plans / SLD and submit your best price for the complete LV power package (MDB, SMDBs, DBs, cabling, containment and outlets). Tender closes shortly, please quote at the earliest. Regards, Gulf Engineering Consultants.",
+  "fallback_project": {
+    "client_name": "Gulf Engineering Consultants",
+    "project_name": "P-379 — Electrical Power Package",
+    "location": "Dubai, UAE",
+    "building_type": "residential",
+    "floors": 11,
+    "parking_floors": 2,
+    "typical_floors": 8,
+    "area_per_floor_sqft": 9000,
+    "total_area_sqft": 99000,
+    "typical_height_m": 3.2,
+    "priority": "high"
+  },
+  "fallback_services": [
+    {
+      "service_type": "electrical",
+      "is_required": true,
+      "system_type": "LV Power Distribution",
+      "notes": "MDB / SMDB / DB distribution, power cabling, containment, outdoor & internal outlets"
+    }
+  ],
+  "attachments": [
+    {
+      "filename": "p379-power.pdf",
+      "mime_type": "application/pdf",
+      "file_type": "drawing_pdf",
+      "discipline": "electrical"
+    }
+  ]
+}

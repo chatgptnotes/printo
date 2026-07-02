@@ -1,0 +1,13 @@
+node_modules/
+.next/
+.git/
+.vercel/
+test-files/
+test-fixtures/
+TEST_RFQ_MAIL/
+*.pdf
+*.zip
+*.csv
+*.xlsx
+pnpm-lock.yaml
+lib/pdfkit-fonts.generated.ts

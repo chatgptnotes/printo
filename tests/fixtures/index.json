@@ -1,0 +1,20 @@
+{
+  "de010907e0e152115b4770f0a1233fea549af1cf37bb0a6529b41b4ca4b7b417": {
+    "label": "p379 (computeFixtureKey: P-379 POWER.pdf — Abu Dhabi Project upload)",
+    "result": "p379-result.json",
+    "pdf": "p379-power-boq.pdf",
+    "xlsx": "p379-power-boq-industry.xlsx"
+  },
+  "ca1f6295b6fd77c7dda27bca14a08a036cde498323cf4abe7f810d7262ab8bf1": {
+    "label": "p379",
+    "result": "p379-result.json",
+    "pdf": "p379-power-boq.pdf",
+    "xlsx": "p379-power-boq-industry.xlsx"
+  },
+  "04adb1c55922168435a12cb16c453d3416f73749b5510d0d2c2e4e5b92877096": {
+    "label": "p379 (computeFixtureKey: p379-power.pdf)",
+    "result": "p379-result.json",
+    "pdf": "p379-power-boq.pdf",
+    "xlsx": "p379-power-boq-industry.xlsx"
+  }
+}

@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>P-379 · Power BOQ · Reconciled · v1.0</title>
+<style>
+  @page { size: A4; margin: 16mm 14mm; }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0; background: #fff; color: #0f172a;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+    font-size: 10.5pt; line-height: 1.45;
+  }
+  body { padding: 14mm 12mm; }
+
+  .doc-header {
+    background: #0f172a; color: #fff; padding: 14px 18px; border-radius: 8px;
+    display: flex; justify-content: space-between; align-items: flex-start; gap: 16px;
+  }
+  .doc-header .title { font-size: 16pt; font-weight: 700; letter-spacing: 0.2px; }
+  .doc-header .subtitle { font-size: 9.5pt; opacity: 0.82; margin-top: 4px; max-width: 520px; }
+  .doc-header .meta { font-size: 9pt; font-family: ui-monospace, "SF Mono", monospace; opacity: 0.9; text-align: right; }
+
+  .banner {
+    margin: 14px 0 18px; padding: 10px 14px;
+    border: 1px solid #d97706; background: #fffbeb; border-radius: 6px;
+    font-size: 9.5pt;
+  }
+  .banner .label { font-weight: 700; color: #b45309; letter-spacing: 0.4px; font-size: 9pt; }
+  .banner ul { margin: 6px 0 0; padding-left: 18px; }
+  .banner li { margin-bottom: 2px; }
+  .banner .src { color: #6b7280; font-family: ui-monospace, "SF Mono", monospace; font-size: 8.5pt; }
+
+  h2.section {
+    margin: 22px 0 6px; padding: 6px 10px;
+    background: #f1f5f9; border-left: 4px solid #0f172a; border-radius: 2px;
+    font-size: 11.5pt; font-weight: 700; color: #0f172a;
+  }
+  h2.section .num { color: #475569; margin-right: 8px; font-family: ui-monospace, "SF Mono", monospace; }
+  p.section-note { margin: 4px 0 8px; font-size: 9.5pt; color: #475569; }
+
+  table { width: 100%; border-collapse: collapse; margin: 6px 0 8px; font-size: 9.5pt; }
+  th, td { border: 1px solid #cbd5e1; padding: 5px 7px; text-align: left; vertical-align: top; }
+  th { background: #f8fafc; font-weight: 700; font-size: 9pt; color: #1e293b; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  td.center, th.center { text-align: center; }
+  tr.total td { background: #f1f5f9; font-weight: 700; }
+  tr.subhead td { background: #e2e8f0; font-weight: 700; font-size: 9pt; }
+
+  .pill { display: inline-block; padding: 1px 6px; border-radius: 3px; font-size: 8.5pt; font-weight: 600; }
+  .pill.fixed   { background: #dcfce7; color: #166534; }
+  .pill.verify  { background: #fef3c7; color: #92400e; }
+  .pill.source  { background: #e0e7ff; color: #3730a3; }
+
+  .footer-meta {
+    margin-top: 28px; padding-top: 10px; border-top: 1px solid #e2e8f0;
+    font-size: 8.5pt; color: #64748b;
+  }
+  .footer-meta b { color: #334155; }
+
+  .keep { page-break-inside: avoid; }
+</style>
+</head>
+<body>
+
+<div class="doc-header">
+  <div>
+    <div class="title">Power BOQ — Project P-379</div>
+    <div class="subtitle">
+      Proposed B+G+8+R Commercial &amp; Residential Building<br/>
+      Plot 6731315, Al Barsha South Third, Dubai · Authority: DEWA
+    </div>
+  </div>
+  <div class="meta">
+    Job No · FA_P379<br/>
+    Drawing Set · P-001 … P-300 (14 sheets)<br/>
+    Date · 16.01.2026<br/>
+    Revision · v1.0 (reconciled)
+  </div>
+</div>
+
+<div class="banner">
+  <div class="label">RECONCILIATION NOTE — corrections applied vs source files</div>
+  <ul>
+    <li>
+      <b>ESMDB-G feeder cable</b>: source PDF section 4 listed <code>1×4C 70 mm² FR</code>; section 8.7 listed <code>1×4C 300 mm² FR</code>.
+      Resolved to <b>1×4C 300 mm² FR + 1×1C 150 mm² ECC</b> — 70 mm² is undersized by ~3× for ~338 A load.
+      <span class="src">[XLSX wins / PDF self-conflict]</span>
+    </li>
+    <li>
+      <b>LVP-01 → SMDB-1F…8F riser cable</b>: source XLSX sized at <code>4C × 300 mm²</code>; source PDF sized at <code>1×4C 150 mm² + 1C 70 mm² ECC</code>.
+      Resolved to <b>1×4C 150 mm² XLPE/SWA/PVC + 1×1C 70 mm² ECC</b> — 150.86 kW @ 400 V ≈ 256 A; 150 mm² is the textbook size.
+      <span class="src">[PDF wins — XLSX oversized]</span>
+    </li>
+    <li>
+      <b>Fire-pump feeder cable</b>: source PDF <code>1×4C 185 mm² FR</code>; source XLSX <code>2×4C 300 mm² FR</code>.
+      Resolved to <b>1×4C 185 mm² FR + 1×1C 95 mm² ECC</b> — 167 A starting; 185 mm² FR adequate.
+      <span class="src">[PDF wins — XLSX oversized]</span>
+    </li>
+    <li>
+      <b>Fire-pump breaker</b>: source PDF <code>350 A TP</code>; source XLSX <code>300 A TP MCCB (ATS)</code>.
+      Resolved to <b>350 A TP MCCB (with shunt-trip)</b> — typical for fire pump starter.
+      <span class="src">[PDF wins]</span>
+    </li>
+    <li>
+      <b>Drawing date</b>: source XLSX self-conflict (Project Info 16.01.2026 vs Drawing Register 12.02.2026).
+      Resolved to <b>16.01.2026</b> across the document.
+      <span class="src">[PDF wins]</span>
+    </li>
+  </ul>
+</div>
+
+<!-- ─────────────────────────────────────────────────────────────
+     SECTION 1 — PROJECT SUMMARY
+     ───────────────────────────────────────────────────────────── -->
+<h2 class="section"><span class="num">1.</span> Project Summary</h2>
+<table>
+  <tr><th style="width: 35%;">Item</th><th>Value</th></tr>
+  <tr><td>Project</td><td>Proposed B+G+8+R Commercial &amp; Residential Building</td></tr>
+  <tr><td>Plot No.</td><td>6731315</td></tr>
+  <tr><td>Location</td><td>Al Barsha South Third, Dubai, UAE</td></tr>
+  <tr><td>Owner</td><td>Qutaiba Ameen Abdal Kija</td></tr>
+  <tr><td>Architect</td><td>Engr. Samer Mahmoud Ajami (Reg. 105181)</td></tr>
+  <tr><td>Structural Engineer</td><td>Engr. Mohamad Maher Myaser Jabban (Reg. 101079)</td></tr>
+  <tr><td>MEP Consultant</td><td>Future Art Engineering Consultancy</td></tr>
+  <tr><td>Job No.</td><td>FA_P379 / CRs B/010/25</td></tr>
+  <tr><td>Drawing Set</td><td>P-001 … P-300 (14 sheets, Power Layout)</td></tr>
+  <tr><td>Drawing Date</td><td>16.01.2026</td></tr>
+  <tr><td>Authority</td><td>DEWA (Dubai Electricity &amp; Water Authority)</td></tr>
+  <tr><td>Floors</td><td>14 levels: UG (basement) → G → 1F–8F → R → UR</td></tr>
+</table>
+
+<!-- ─────────────────────────────────────────────────────────────
+     SECTION 2 — INCOMING SUPPLY & TRANSFORMERS
+     ───────────────────────────────────────────────────────────── -->
+<h2 class="section"><span class="num">2.</span> Incoming Supply &amp; Transformers</h2>
+<table>
+  <tr><th style="width: 8%;">Item</th><th>Description</th><th class="num" style="width: 10%;">Qty</th><th class="center" style="width: 10%;">Unit</th></tr>
+  <tr><td>2.1</td><td>DEWA HV incoming service connection (RMU side, by DEWA)</td><td class="num">1</td><td class="center">lot</td></tr>
+  <tr><td>2.2</td><td>HV/LV distribution transformer to suit Building Maximum Demand of <b>~1,597 kW</b> (DF 0.80, TCL 2,117.06 kW). Sizing per DEWA approval. <span class="pill source">SOURCE</span></td><td class="num">1</td><td class="center">lot</td></tr>
+  <tr><td>2.3</td><td>HV cable from RMU to transformer LV side, complete with terminations and earthing</td><td class="num">1</td><td class="center">lot</td></tr>
+  <tr><td>2.4</td><td>Transformer room civil/MEP coordination — ventilation, drainage, fire-rated enclosure</td><td class="num">1</td><td class="center">lot</td></tr>
+</table>
+<p class="section-note">Transformer kVA, oil/dry type, vector group and impedance to be finalised per DEWA load letter response. Sizing target: ≥ 1,597 kW continuous + 25% spare ≈ 2,000 kVA dry-type.</p>
+
+<!-- ─────────────────────────────────────────────────────────────
+     SECTION 3 — LV PANELS
+     ───────────────────────────────────────────────────────────── -->
+<h2 class="section"><span class="num">3.</span> LV Panels (Main Distribution)</h2>
+<table>
+  <tr>
+    <th style="width: 8%;">Item</th>
+    <th>Panel</th>
+    <th class="num">TCL (kW)</th>
+    <th class="num">MD (kW)</th>
+    <th>Incomer / Bus</th>
+    <th class="num" style="width: 7%;">Qty</th>
+  </tr>
+  <tr><td>3.1</td><td><b>LVP-01</b> — Main LV Panel #1 (essential + non-essential)</td><td class="num">1,206.89</td><td class="num">965.51</td><td>4P ACB, ≥ 2,000 A; bus 2,500 A</td><td class="num">1</td></tr>
+  <tr><td>3.2</td><td><b>LVP-02</b> — Main LV Panel #2 (services + tenant feeders)</td><td class="num">910.17</td><td class="num">631.34</td><td>4P ACB, ≥ 1,250 A; bus 1,600 A</td><td class="num">1</td></tr>
+  <tr><td>3.3</td><td>Outgoing MCCB feeder for SMDB-1F (150.86 kW · ~256 A)</td><td colspan="3">4P MCCB, 400 A frame, 250 A trip</td><td class="num">8</td></tr>
+  <tr><td>3.4</td><td>Outgoing MCCB feeder for SMDB-G (60.55 kW)</td><td colspan="3">4P MCCB, 160 A frame, 125 A trip</td><td class="num">1</td></tr>
+  <tr><td>3.5</td><td>Outgoing MCCB feeder for SMDB-RF (248.63 kW)</td><td colspan="3">4P MCCB, 630 A frame, 500 A trip</td><td class="num">1</td></tr>
+  <tr><td>3.6</td><td>Outgoing MCCB feeder for SMDB-EV (88.00 kW)</td><td colspan="3">4P MCCB, 250 A frame, 160 A trip</td><td class="num">1</td></tr>
+  <tr><td>3.7</td><td>Outgoing MCCB feeder for ESMDB-G (199.13 kW)</td><td colspan="3">4P MCCB, 630 A frame, 400 A trip <span class="pill fixed">CORRECTED</span></td><td class="num">1</td></tr>
+  <tr><td>3.8</td><td>Outgoing MCCB feeder for ESMDB-RF (82.69 kW)</td><td colspan="3">4P MCCB, 250 A frame, 160 A trip</td><td class="num">1</td></tr>
+  <tr><td>3.9</td><td>Outgoing MCCB feeder for Fire Pump (98 kW · 167 A start)</td><td colspan="3">4P MCCB, <b>350 A TP</b> with shunt-trip <span class="pill fixed">CORRECTED</span></td><td class="num">1</td></tr>
+</table>
+
+<!-- ─────────────────────────────────────────────────────────────
+     SECTION 4 — SMDBs
+     ───────────────────────────────────────────────────────────── -->
+<h2 class="section"><span class="num">4.</span> Sub-Main Distribution Boards (SMDB)</h2>
+<table>
+  <tr>
+    <th style="width: 8%;">Item</th>
+    <th>SMDB Tag</th>
+    <th>Location</th>
+    <th class="num">Connected Load (kW)</th>
+    <th>Incomer</th>
+    <th class="num" style="width: 7%;">Qty</th>
+  </tr>
+  <tr><td>4.1</td><td>SMDB-1F</td><td>1st Floor (electrical riser)</td><td class="num">150.86</td><td>4P MCCB 250 A</td><td class="num">1</td></tr>
+  <tr><td>4.2</td><td>SMDB-2F</td><td>2nd Floor</td><td class="num">150.86</td><td>4P MCCB 250 A</td><td class="num">1</td></tr>
+  <tr><td>4.3</td><td>SMDB-3F</td><td>3rd Floor</td><td class="num">150.86</td><td>4P MCCB 250 A</td><td class="num">1</td></tr>
+  <tr><td>4.4</td><td>SMDB-4F</td><td>4th Floor</td><td class="num">150.86</td><td>4P MCCB 250 A</td><td class="num">1</td></tr>
+  <tr><td>4.5</td><td>SMDB-5F</td><td>5th Floor</td><td class="num">150.86</td><td>4P MCCB 250 A</td><td class="num">1</td></tr>
+  <tr><td>4.6</td><td>SMDB-6F</td><td>6th Floor</td><td class="num">150.86</td><td>4P MCCB 250 A</td><td class="num">1</td></tr>
+  <tr><td>4.7</td><td>SMDB-7F</td><td>7th Floor</td><td class="num">150.86</td><td>4P MCCB 250 A</td><td class="num">1</td></tr>
+  <tr><td>4.8</td><td>SMDB-8F</td><td>8th Floor</td><td class="num">150.86</td><td>4P MCCB 250 A</td><td class="num">1</td></tr>
+  <tr><td>4.9</td><td>SMDB-G</td><td>Ground Floor (lobby / retail)</td><td class="num">60.55</td><td>4P MCCB 125 A</td><td class="num">1</td></tr>
+  <tr><td>4.10</td><td>SMDB-RF</td><td>Roof Floor (chillers / lift machine room)</td><td class="num">248.63</td><td>4P MCCB 500 A</td><td class="num">1</td></tr>
+  <tr><td>4.11</td><td>SMDB-EV</td><td>Basement (EV charging)</td><td class="num">88.00</td><td>4P MCCB 160 A</td><td class="num">1</td></tr>
+  <tr><td>4.12</td><td>ESMDB-G</td><td>Ground (essential — life safety + fire)</td><td class="num">199.13</td><td>4P MCCB 400 A</td><td class="num">1</td></tr>
+  <tr><td>4.13</td><td>ESMDB-RF</td><td>Roof (essential — fire pump panel feeder)</td><td class="num">82.69</td><td>4P MCCB 160 A</td><td class="num">1</td></tr>
+  <tr class="total"><td colspan="3">Total SMDB connected load</td><td class="num">1,837.59</td><td colspan="2"></td></tr>
+</table>
+
+<!-- ─────────────────────────────────────────────────────────────
+     SECTION 5 — DBs
+     ───────────────────────────────────────────────────────────── -->
+<h2 class="section"><span class="num">5.</span> Distribution Boards (DB)</h2>
+<p class="section-note">DB-level itemisation drawn from XLSX sheet "SMDB to DB" (108 rows · total cable run 1,578 m). Per-DB summary below; full DB list in Section 8 cable schedule.</p>
+<table>
+  <tr>
+    <th style="width: 8%;">Item</th>
+    <th>Fed From</th>
+    <th>DBs (typical use)</th>
+    <th class="num">Cable run (m)</th>
+    <th class="num" style="width: 10%;">Qty</th>
+  </tr>
+  <tr><td>5.1</td><td>SMDB-1F … SMDB-8F</td><td>DB-Apt-A, DB-Apt-B, DB-Corridor (per typical floor)</td><td class="num">~120 / floor</td><td class="num">24</td></tr>
+  <tr><td>5.2</td><td>SMDB-G</td><td>DB-Lobby, DB-Retail-1, DB-Retail-2</td><td class="num">~85</td><td class="num">3</td></tr>
+  <tr><td>5.3</td><td>SMDB-RF</td><td>DB-Chiller, DB-Lift-MR, DB-Pump, DB-AHU-Roof</td><td class="num">~140</td><td class="num">4</td></tr>
+  <tr><td>5.4</td><td>SMDB-EV</td><td>DB-EV-1, DB-EV-2 (basement charging)</td><td class="num">~95</td><td class="num">2</td></tr>
+  <tr><td>5.5</td><td>ESMDB-G</td><td>DB-FA, DB-Emergency-Lighting, DB-Smoke-Vent</td><td class="num">~110</td><td class="num">3</td></tr>
+  <tr><td>5.6</td><td>ESMDB-RF</td><td>DB-Fire-Pump-Aux, DB-Stair-Pressurisation</td><td class="num">~70</td><td class="num">2</td></tr>
+  <tr class="total"><td colspan="3">Total DB count / total SMDB→DB cable</td><td class="num">~1,578</td><td class="num">~38</td></tr>
+</table>
+
+<!-- ─────────────────────────────────────────────────────────────
+     SECTION 6 — MECHANICAL & SERVICE EQUIPMENT
+     ───────────────────────────────────────────────────────────── -->
+<h2 class="section"><span class="num">6.</span> Mechanical &amp; Service Equipment Loads</h2>
+<p class="section-note">Connection (power supply &amp; control wiring) for mechanical / service equipment. Equipment supply by others. Largest single load: FAHU at 174.66 kW. <span class="pill source">SOURCE</span> 15 line items per source PDF section 6 — full schedule from MEP coordination.</p>
+<table>
+  <tr>
+    <th style="width: 8%;">Item</th>
+    <th>Equipment</th>
+    <th class="num">Connected Load (kW)</th>
+    <th>Feed</th>
+    <th class="num" style="width: 7%;">Qty</th>
+  </tr>
+  <tr><td>6.1</td><td>FAHU (Fresh Air Handling Unit)</td><td class="num">174.66</td><td>SMDB-RF</td><td class="num">1</td></tr>
+  <tr><td>6.2</td><td>Chillers / chilled-water pumps (per HVAC drawings)</td><td class="num">see HVAC</td><td>SMDB-RF</td><td class="num">lot</td></tr>
+  <tr><td>6.3</td><td>Domestic water pumps (booster set)</td><td class="num">see Plumbing</td><td>SMDB-G</td><td class="num">lot</td></tr>
+  <tr><td>6.4</td><td>Sewage / sump pumps</td><td class="num">see Plumbing</td><td>ESMDB-G</td><td class="num">lot</td></tr>
+  <tr><td>6.5</td><td>Fire pump (jockey + main + diesel cooling)</td><td class="num">98.00</td><td>ESMDB-RF (Fire Pump panel)</td><td class="num">1</td></tr>
+  <tr><td>6.6</td><td>Stair pressurisation fans</td><td class="num">see HVAC</td><td>ESMDB-G</td><td class="num">lot</td></tr>
+  <tr><td>6.7</td><td>Smoke-extract fans (basement &amp; corridors)</td><td class="num">see HVAC</td><td>ESMDB-G</td><td class="num">lot</td></tr>
+  <tr><td>6.8</td><td>Lift drives (passenger + service)</td><td class="num">see Lift sub-cont.</td><td>SMDB-RF</td><td class="num">lot</td></tr>
+  <tr><td>6.9</td><td>Kitchen exhaust / make-up air fans (retail)</td><td class="num">see HVAC</td><td>SMDB-G</td><td class="num">lot</td></tr>
+  <tr><td>6.10</td><td>EV charger feeders (7 kW &amp; 22 kW points)</td><td class="num">88.00</td><td>SMDB-EV</td><td class="num">lot</td></tr>
+  <tr><td>6.11–6.15</td><td>Misc. service equipment (gate motor, water tank level, BMS field, irrigation pump, garbage chute fan)</td><td class="num">balance</td><td>various</td><td class="num">lot</td></tr>
+  <tr class="total"><td colspan="2">Standby generator allowance (essential loads, gen-fed)</td><td class="num">23.00</td><td colspan="2">ESMDB feeders</td></tr>
+</table>
+
+<!-- ─────────────────────────────────────────────────────────────
+     SECTION 7 — POWER OUTLETS & ACCESSORIES
+     ───────────────────────────────────────────────────────────── -->
+<h2 class="section"><span class="num">7.</span> Power Outlets &amp; Accessories</h2>
+<p class="section-note">19 line items per source PDF section 7 — apartment and common-area accessories. Final quantities per architectural finishes schedule. <span class="pill source">SOURCE</span></p>
+<table>
+  <tr>
+    <th style="width: 8%;">Item</th>
+    <th>Description</th>
+    <th class="center" style="width: 10%;">Unit</th>
+    <th class="num" style="width: 10%;">Indicative Qty</th>
+  </tr>
+  <tr><td>7.1</td><td>Single 13 A switched socket outlet (BS 1363, white finish)</td><td class="center">no</td><td class="num">~340</td></tr>
+  <tr><td>7.2</td><td>Twin 13 A switched socket outlet</td><td class="center">no</td><td class="num">~280</td></tr>
+  <tr><td>7.3</td><td>13 A SSO with USB-A/USB-C (apartment living/bedrooms)</td><td class="center">no</td><td class="num">~110</td></tr>
+  <tr><td>7.4</td><td>20 A DP switched outlet for AC indoor unit</td><td class="center">no</td><td class="num">~95</td></tr>
+  <tr><td>7.5</td><td>20 A DP switched outlet for water heater</td><td class="center">no</td><td class="num">~50</td></tr>
+  <tr><td>7.6</td><td>32 A cooker / oven outlet with isolator</td><td class="center">no</td><td class="num">~25</td></tr>
+  <tr><td>7.7</td><td>Weatherproof IP55 13 A SSO (balconies, podium, roof)</td><td class="center">no</td><td class="num">~60</td></tr>
+  <tr><td>7.8</td><td>Floor-mounted service box (lobby / retail counters)</td><td class="center">no</td><td class="num">~18</td></tr>
+  <tr><td>7.9</td><td>Connection unit for ceiling fan / extract fan (3 A FCU)</td><td class="center">no</td><td class="num">~75</td></tr>
+  <tr><td>7.10</td><td>Shaver socket outlet (bathrooms)</td><td class="center">no</td><td class="num">~40</td></tr>
+  <tr><td>7.11</td><td>Doorbell push + chime kit (apartments)</td><td class="center">set</td><td class="num">25</td></tr>
+  <tr><td>7.12</td><td>1-gang / 2-gang lighting switches (white grid)</td><td class="center">no</td><td class="num">~520</td></tr>
+  <tr><td>7.13</td><td>Dimmer switch (1-gang, 250 W)</td><td class="center">no</td><td class="num">~60</td></tr>
+  <tr><td>7.14</td><td>2-way / intermediate switch (corridors, stairs)</td><td class="center">no</td><td class="num">~45</td></tr>
+  <tr><td>7.15</td><td>Occupancy / PIR sensor (corridors, BOH)</td><td class="center">no</td><td class="num">~30</td></tr>
+  <tr><td>7.16</td><td>Isolator (4P 32 A) for outdoor mech. equipment</td><td class="center">no</td><td class="num">~22</td></tr>
+  <tr><td>7.17</td><td>EV charger socket outlet — 7 kW Mode 3 Type 2 (basement)</td><td class="center">no</td><td class="num">8</td></tr>
+  <tr><td>7.18</td><td>EV charger socket outlet — 22 kW Mode 3 Type 2 (basement)</td><td class="center">no</td><td class="num">2</td></tr>
+  <tr><td>7.19</td><td>Final-fix testing &amp; commissioning of accessories</td><td class="center">lot</td><td class="num">1</td></tr>
+</table>
+
+<!-- ─────────────────────────────────────────────────────────────
+     SECTION 8 — CABLES (MAIN DISTRIBUTION CABLE SCHEDULE)
+     ───────────────────────────────────────────────────────────── -->
+<h2 class="section"><span class="num">8.</span> Cables — Main Distribution Cable Schedule</h2>
+<p class="section-note">
+  LV → SMDB cable schedule, drawn from XLSX sheet "LV to SMDB" (26 itemised rows, total <b>1,056 m</b>) and reconciled against PDF sections 8.1–8.10.
+  All runs include +10% installation allowance.
+</p>
+<table>
+  <tr>
+    <th style="width: 6%;">Item</th>
+    <th>From</th>
+    <th>To</th>
+    <th class="num">Load (kW)</th>
+    <th class="num">Current (A)</th>
+    <th>Cable Size (Phase + ECC)</th>
+    <th class="num">Length incl. +10% (m)</th>
+  </tr>
+
+  <tr class="subhead"><td colspan="7">8.1  LVP-01 → typical-floor SMDB risers (1F–8F)</td></tr>
+  <tr><td>8.1.1</td><td>LVP-01</td><td>SMDB-1F</td><td class="num">150.86</td><td class="num">256</td><td>1×4C 150 mm² XLPE/SWA/PVC + 1×1C 70 mm² ECC <span class="pill fixed">CORRECTED</span></td><td class="num">22</td></tr>
+  <tr><td>8.1.2</td><td>LVP-01</td><td>SMDB-2F</td><td class="num">150.86</td><td class="num">256</td><td>1×4C 150 mm² XLPE/SWA/PVC + 1×1C 70 mm² ECC</td><td class="num">26</td></tr>
+  <tr><td>8.1.3</td><td>LVP-01</td><td>SMDB-3F</td><td class="num">150.86</td><td class="num">256</td><td>1×4C 150 mm² XLPE/SWA/PVC + 1×1C 70 mm² ECC</td><td class="num">29</td></tr>
+  <tr><td>8.1.4</td><td>LVP-01</td><td>SMDB-4F</td><td class="num">150.86</td><td class="num">256</td><td>1×4C 150 mm² XLPE/SWA/PVC + 1×1C 70 mm² ECC</td><td class="num">33</td></tr>
+  <tr><td>8.1.5</td><td>LVP-01</td><td>SMDB-5F</td><td class="num">150.86</td><td class="num">256</td><td>1×4C 150 mm² XLPE/SWA/PVC + 1×1C 70 mm² ECC</td><td class="num">36</td></tr>
+  <tr><td>8.1.6</td><td>LVP-01</td><td>SMDB-6F</td><td class="num">150.86</td><td class="num">256</td><td>1×4C 150 mm² XLPE/SWA/PVC + 1×1C 70 mm² ECC</td><td class="num">40</td></tr>
+  <tr><td>8.1.7</td><td>LVP-01</td><td>SMDB-7F</td><td class="num">150.86</td><td class="num">256</td><td>1×4C 150 mm² XLPE/SWA/PVC + 1×1C 70 mm² ECC</td><td class="num">43</td></tr>
+  <tr><td>8.1.8</td><td>LVP-01</td><td>SMDB-8F</td><td class="num">150.86</td><td class="num">256</td><td>1×4C 150 mm² XLPE/SWA/PVC + 1×1C 70 mm² ECC</td><td class="num">47</td></tr>
+  <tr class="total"><td colspan="6">Subtotal — 8 typical-floor risers (LVP-01 → SMDB-1F…8F)</td><td class="num">276</td></tr>
+
+  <tr class="subhead"><td colspan="7">8.2  LVP-02 → roof / ground / EV SMDBs</td></tr>
+  <tr><td>8.2.1</td><td>LVP-02</td><td>SMDB-RF</td><td class="num">248.63</td><td class="num">422</td><td>2×4C 150 mm² XLPE/SWA/PVC + 1×1C 150 mm² ECC</td><td class="num">62</td></tr>
+  <tr><td>8.2.2</td><td>LVP-02</td><td>SMDB-G</td><td class="num">60.55</td><td class="num">103</td><td>1×4C 50 mm² XLPE/SWA/PVC + 1×1C 25 mm² ECC</td><td class="num">14</td></tr>
+  <tr><td>8.2.3</td><td>LVP-02</td><td>SMDB-EV</td><td class="num">88.00</td><td class="num">149</td><td>1×4C 70 mm² XLPE/SWA/PVC + 1×1C 35 mm² ECC</td><td class="num">28</td></tr>
+  <tr class="total"><td colspan="6">Subtotal — services / roof / EV feeders</td><td class="num">104</td></tr>
+
+  <tr class="subhead"><td colspan="7">8.3  Essential feeders (gen-backed) — Fire Rated</td></tr>
+  <tr><td>8.3.1</td><td>LVP-02</td><td>ESMDB-G</td><td class="num">199.13</td><td class="num">338</td><td>1×4C 300 mm² FR + 1×1C 150 mm² ECC <span class="pill fixed">CORRECTED</span></td><td class="num">18</td></tr>
+  <tr><td>8.3.2</td><td>LVP-02</td><td>ESMDB-RF</td><td class="num">82.69</td><td class="num">140</td><td>1×4C 70 mm² FR + 1×1C 35 mm² ECC</td><td class="num">58</td></tr>
+  <tr><td>8.3.3</td><td>ESMDB-RF</td><td>Fire Pump panel</td><td class="num">98.00</td><td class="num">167 / 350 start</td><td>1×4C 185 mm² FR + 1×1C 95 mm² ECC <span class="pill fixed">CORRECTED</span></td><td class="num">36</td></tr>
+  <tr class="total"><td colspan="6">Subtotal — essential feeders</td><td class="num">112</td></tr>
+
+  <tr class="subhead"><td colspan="7">8.4  Auxiliary &amp; balance feeders (per XLSX itemisation)</td></tr>
+  <tr><td>8.4.x</td><td>LVP / SMDB</td><td>Auxiliary loads (HVAC isolators, lift main switch, BMS panel, generator control, lighting risers, etc.)</td><td colspan="2" class="num">balance</td><td>per cable schedule (XLSX rows 17–26)</td><td class="num">~564</td></tr>
+
+  <tr class="total"><td colspan="6"><b>TOTAL — LV → SMDB cable (with +10% allowance)</b></td><td class="num"><b>~1,056</b></td></tr>
+</table>
+
+<table>
+  <tr>
+    <th style="width: 70%;">SMDB → DB cable schedule (108 itemised runs in XLSX sheet "SMDB to DB")</th>
+    <th class="num">Total length incl. +10% (m)</th>
+  </tr>
+  <tr class="total"><td><b>TOTAL — SMDB → DB cable</b></td><td class="num"><b>1,578</b></td></tr>
+</table>
+
+<!-- ─────────────────────────────────────────────────────────────
+     SECTION 9 — CONTAINMENT
+     ───────────────────────────────────────────────────────────── -->
+<h2 class="section"><span class="num">9.</span> Containment (Cable Tray, Trunking, Conduit)</h2>
+<p class="section-note">12 line items per source PDF section 9. Sized to take cable schedule above + 30% spare. Hot-dip galvanised finish (basement/roof), pre-galvanised (apartment / dry areas). <span class="pill source">SOURCE</span></p>
+<table>
+  <tr>
+    <th style="width: 8%;">Item</th>
+    <th>Description</th>
+    <th class="center" style="width: 10%;">Unit</th>
+    <th class="num" style="width: 14%;">Indicative Qty</th>
+  </tr>
+  <tr><td>9.1</td><td>600 mm wide hot-dip galvanised cable tray (riser shaft &amp; basement)</td><td class="center">m</td><td class="num">~180</td></tr>
+  <tr><td>9.2</td><td>450 mm wide HDG cable tray (corridor mains)</td><td class="center">m</td><td class="num">~220</td></tr>
+  <tr><td>9.3</td><td>300 mm wide HDG cable tray (branch routes)</td><td class="center">m</td><td class="num">~340</td></tr>
+  <tr><td>9.4</td><td>200 mm wide HDG cable tray</td><td class="center">m</td><td class="num">~260</td></tr>
+  <tr><td>9.5</td><td>100 mm wide HDG cable tray</td><td class="center">m</td><td class="num">~180</td></tr>
+  <tr><td>9.6</td><td>Cable tray accessories — bends, tees, reducers, copplers (≈ 15% of tray length)</td><td class="center">lot</td><td class="num">1</td></tr>
+  <tr><td>9.7</td><td>Cable tray supports — threaded rod, channel, anchors</td><td class="center">lot</td><td class="num">1</td></tr>
+  <tr><td>9.8</td><td>50×50 mm GI trunking (DB sub-mains)</td><td class="center">m</td><td class="num">~140</td></tr>
+  <tr><td>9.9</td><td>100×100 mm GI trunking (sub-main risers)</td><td class="center">m</td><td class="num">~85</td></tr>
+  <tr><td>9.10</td><td>HG steel conduit Ø 25/32/40 mm with accessories (concealed final circuits)</td><td class="center">m</td><td class="num">~3,400</td></tr>
+  <tr><td>9.11</td><td>HG steel conduit Ø 20 mm (accessory drops)</td><td class="center">m</td><td class="num">~2,800</td></tr>
+  <tr><td>9.12</td><td>Fire-rated cable cleats &amp; spacers (FR feeders, sec 8.3)</td><td class="center">lot</td><td class="num">1</td></tr>
+</table>
+
+<!-- ─────────────────────────────────────────────────────────────
+     SECTION 10 — EARTHING & LIGHTNING PROTECTION
+     ───────────────────────────────────────────────────────────── -->
+<h2 class="section"><span class="num">10.</span> Earthing &amp; Lightning Protection</h2>
+<p class="section-note">7 line items per source PDF section 10. System: TN-S, building earth ≤ 1 Ω. <span class="pill source">SOURCE</span></p>
+<table>
+  <tr>
+    <th style="width: 8%;">Item</th>
+    <th>Description</th>
+    <th class="center" style="width: 10%;">Unit</th>
+    <th class="num" style="width: 14%;">Qty</th>
+  </tr>
+  <tr><td>10.1</td><td>Main earth bar (250 × 50 × 6 mm copper) in LV room</td><td class="center">no</td><td class="num">2</td></tr>
+  <tr><td>10.2</td><td>Earth electrode pit with 2.4 m × Ø 19 mm copper-bonded rod, inspection chamber</td><td class="center">no</td><td class="num">8</td></tr>
+  <tr><td>10.3</td><td>70 mm² bare copper earth conductor (electrode interconnection / risers)</td><td class="center">m</td><td class="num">~240</td></tr>
+  <tr><td>10.4</td><td>25 mm² PVC-insulated earth conductor (DB sub-circuits)</td><td class="center">m</td><td class="num">~520</td></tr>
+  <tr><td>10.5</td><td>Lightning protection air terminals (ESE / Franklin, per consultant spec)</td><td class="center">no</td><td class="num">6</td></tr>
+  <tr><td>10.6</td><td>Down-conductor 50 mm² bare copper, full building height</td><td class="center">m</td><td class="num">~240</td></tr>
+  <tr><td>10.7</td><td>Earthing testing &amp; certification (DEWA acceptance)</td><td class="center">lot</td><td class="num">1</td></tr>
+</table>
+
+<!-- ─────────────────────────────────────────────────────────────
+     SECTION 11 — METERING & MONITORING
+     ───────────────────────────────────────────────────────────── -->
+<h2 class="section"><span class="num">11.</span> Metering &amp; Monitoring</h2>
+<p class="section-note">6 line items per source PDF section 11. <b>132 kWh meters</b> (apartments + common services + retail + landlord) — per DEWA tenant-metering standard. <span class="pill source">SOURCE</span></p>
+<table>
+  <tr>
+    <th style="width: 8%;">Item</th>
+    <th>Description</th>
+    <th class="center" style="width: 10%;">Unit</th>
+    <th class="num" style="width: 14%;">Qty</th>
+  </tr>
+  <tr><td>11.1</td><td>Single-phase DEWA-approved kWh meter, apartment tenants (CT-operated)</td><td class="center">no</td><td class="num">~120</td></tr>
+  <tr><td>11.2</td><td>Three-phase DEWA-approved kWh meter, retail / common services / landlord</td><td class="center">no</td><td class="num">~12</td></tr>
+  <tr><td>11.3</td><td>Tenant meter cabinet — modular, lockable, ventilated</td><td class="center">no</td><td class="num">8</td></tr>
+  <tr><td>11.4</td><td>Multi-function digital meter (LV panel incomers / outgoers, MODBUS to BMS)</td><td class="center">no</td><td class="num">12</td></tr>
+  <tr><td>11.5</td><td>Current transformers — 250/5, 400/5, 630/5, 2000/5 (per panel schedule)</td><td class="center">set</td><td class="num">1</td></tr>
+  <tr><td>11.6</td><td>Wiring, terminations &amp; commissioning of metering system, DEWA acceptance</td><td class="center">lot</td><td class="num">1</td></tr>
+  <tr class="total"><td colspan="2">Total kWh meters (apartments + common + landlord)</td><td colspan="2" class="num">132</td></tr>
+</table>
+
+<!-- ─────────────────────────────────────────────────────────────
+     SECTION 12 — SUMMARY OF ELECTRICAL LOADS
+     ───────────────────────────────────────────────────────────── -->
+<h2 class="section"><span class="num">12.</span> Summary of Electrical Loads</h2>
+<table class="keep">
+  <tr>
+    <th style="width: 30%;">Panel</th>
+    <th class="num">Total Connected Load — TCL (kW)</th>
+    <th class="num">Demand Factor</th>
+    <th class="num">Maximum Demand — MD (kW)</th>
+  </tr>
+  <tr><td>LVP-01 (residential risers + EV)</td><td class="num">1,206.89</td><td class="num">0.80</td><td class="num">965.51</td></tr>
+  <tr><td>LVP-02 (services + retail + roof + essential)</td><td class="num">910.17</td><td class="num">0.69</td><td class="num">631.34</td></tr>
+  <tr class="total"><td><b>Building Total</b></td><td class="num"><b>2,117.06</b></td><td class="num"><b>0.755</b></td><td class="num"><b>~1,597</b></td></tr>
+  <tr><td>of which: standby generator allowance (essential, gen-fed)</td><td class="num">23.00</td><td colspan="2">included in ESMDB feeders</td></tr>
+</table>
+
+<table class="keep">
+  <tr>
+    <th style="width: 30%;">Distribution Cable Totals</th>
+    <th class="num">Length (m, incl. +10%)</th>
+    <th>Source</th>
+  </tr>
+  <tr><td>LV → SMDB main feeders</td><td class="num">~1,056</td><td>XLSX sheet "LV to SMDB" (26 rows)</td></tr>
+  <tr><td>SMDB → DB sub-mains</td><td class="num">~1,578</td><td>XLSX sheet "SMDB to DB" (108 rows)</td></tr>
+  <tr class="total"><td><b>Total main + sub-main cable</b></td><td class="num"><b>~2,634</b></td><td>both sheets</td></tr>
+</table>
+
+<div class="footer-meta">
+  <p>
+    <b>Reconciliation source:</b> P-379_POWER_BOQ.pdf (deliverable BOQ, 12 sections) and "Extracted Data for Electrical BOQ and Estimation.xlsx" (working take-off, 6 sheets).
+    Verdict-driven: PDF wins on building totals + typical-cable-size accuracy + section coverage; XLSX wins on per-circuit cable lengths + drawing register + floor schedule.
+  </p>
+  <p>
+    <b>Items pending source itemisation</b> (marked <span class="pill source">SOURCE</span> in document):
+    Section 6 mechanical equipment list, Section 7 accessory final-fix counts, Section 9 containment lengths, Section 10 earthing items, Section 11 metering breakdown.
+    These quantities are indicative — to be confirmed from architectural finishes schedule, MEP coordination drawings and tenant-meter layout before pricing finalisation.
+  </p>
+  <p>
+    <b>Cross-check applied:</b> ESMDB-G feeder size now consistent in Sections 3 (400 A MCCB), 4 (incomer note) and 8.3.1 (cable size) — the section 4 vs 8.7 mismatch in the source PDF is resolved.
+  </p>
+  <p style="margin-top: 10px; font-size: 8pt;">
+    Generated by SABI RFQ→BOQ pipeline · Power BOQ format v6.1 · Job FA_P379 · Date 16.01.2026 · Revision v1.0 (reconciled)
+  </p>
+</div>
+
+</body>
+</html>

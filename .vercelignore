@@ -1,0 +1,13 @@
+# .vercelignore
+auto-approve-agent/
+*.mov
+*.mp4
+*.avi
+zoom.mov
+.env.vercel.prod
+.env.vercel.local
+
+# Dev-only artifacts — never deploy
+tmp/
+test-files/
+test-fixtures/

@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>SABI · RFQ → Quote Pipeline · Electrical-only</title>
+<style>
+  /* Page sized to fit the full vertical flow at readable scale. */
+  @page { size: 900pt 2200pt; margin: 0; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: #ffffff; color: #0f172a; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif; }
+  body { padding: 36px 44px; font-size: 13px; line-height: 1.45; }
+
+  /* ─── Header ─────────────────────────────────────────────────── */
+  .doc-header {
+    background: #0f172a; color: #fff;
+    padding: 22px 26px; border-radius: 12px;
+    display: flex; justify-content: space-between; align-items: flex-start;
+    gap: 20px;
+  }
+  .doc-header .title { font-size: 22px; font-weight: 700; letter-spacing: 0.3px; }
+  .doc-header .subtitle { font-size: 12px; opacity: 0.78; margin-top: 6px; max-width: 660px; }
+  .doc-header .version { font-size: 12px; font-family: ui-monospace, "SF Mono", monospace; opacity: 0.85; }
+
+  /* ─── Legend ─────────────────────────────────────────────────── */
+  .legend {
+    display: flex; flex-wrap: wrap; gap: 12px 22px;
+    padding: 14px 4px 22px; font-size: 11.5px; color: #334155;
+  }
+  .legend .chip { display: inline-flex; align-items: center; gap: 8px; }
+  .legend .swatch { width: 14px; height: 14px; border-radius: 3px; border: 1.5px solid #94a3b8; background: #ffffff; }
+  .legend .swatch.new { background: #d1fae5; border-color: #10b981; }
+  .legend .swatch.gate-mark { background: #fde68a; border-color: #f59e0b; transform: rotate(45deg); width: 12px; height: 12px; }
+  .legend .swatch.terminal { background: #0f172a; border-color: #0f172a; }
+  .legend .swatch.reject { background: #fee2e2; border-color: #ef4444; }
+  .legend .swatch.bypass {
+    width: 26px; height: 0; border: none;
+    border-top: 2.5px dashed #f97316;
+  }
+  .legend .count { margin-left: auto; font-family: ui-monospace, "SF Mono", monospace; color: #475569; }
+
+  /* ─── Vertical flow column container ─────────────────────────── */
+  .flow {
+    display: grid;
+    grid-template-columns: 230px 1fr 230px; /* [exits] [main] [callouts] */
+    gap: 18px;
+    align-items: start;
+  }
+
+  /* Each row: 3 cells — exit | main | callout. */
+  .cell-exit, .cell-main, .cell-callout {
+    display: flex; align-items: center; min-height: 0;
+  }
+  .cell-exit { justify-content: flex-end; }
+  .cell-main { justify-content: center; }
+  .cell-callout { justify-content: flex-start; }
+
+  /* Connector below each main-column item. Span all 3 columns of grid. */
+  .connector {
+    grid-column: 2 / 3;
+    height: 18px;
+    display: flex; justify-content: center; align-items: center;
+  }
+  .connector .line { width: 2px; height: 100%; background: #cbd5e1; }
+  .connector.arrow .line::after {
+    content: ""; display: block; position: relative; bottom: -2px;
+    width: 0; height: 0;
+    border-left: 5px solid transparent; border-right: 5px solid transparent;
+    border-top: 7px solid #94a3b8; margin: 0 auto;
+  }
+
+  /* ─── Steps ──────────────────────────────────────────────────── */
+  .step {
+    background: #ffffff; border: 1.5px solid #cbd5e1; border-radius: 10px;
+    padding: 12px 16px; min-width: 460px; max-width: 540px;
+    display: flex; align-items: center; gap: 12px;
+    box-shadow: 0 1px 2px rgba(15,23,42,0.04);
+  }
+  .step.new { background: #ecfdf5; border-color: #34d399; }
+  .step .num {
+    width: 32px; height: 32px; border-radius: 999px;
+    background: #f1f5f9; color: #0f172a;
+    font-family: ui-monospace, "SF Mono", monospace; font-weight: 700; font-size: 12px;
+    display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
+  }
+  .step.new .num { background: #a7f3d0; color: #064e3b; }
+  .step .body { flex: 1; }
+  .step .name { font-weight: 600; font-size: 13.5px; color: #0f172a; }
+  .step .meta { font-size: 11px; color: #64748b; margin-top: 3px; }
+  .step .new-badge {
+    background: #10b981; color: #ffffff; font-size: 10px; font-weight: 700;
+    border-radius: 4px; padding: 3px 8px; letter-spacing: 0.5px;
+    margin-left: auto; flex-shrink: 0;
+  }
+
+  /* ─── Gates (clipped diamonds — two stacked layers for border + fill) ── */
+  .gate {
+    width: 320px; height: 120px;
+    display: inline-flex; align-items: center; justify-content: center;
+    position: relative;
+  }
+  .gate .border {
+    position: absolute; inset: 0;
+    background: #f59e0b;
+    clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
+  }
+  .gate .fill {
+    position: absolute; inset: 3px;
+    background: #fef3c7;
+    clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
+  }
+  .gate .label {
+    position: relative; z-index: 2;
+    text-align: center; font-weight: 700; color: #78350f;
+    line-height: 1.35; font-size: 12px;
+    max-width: 240px;
+  }
+  .gate .label .gid {
+    display: block;
+    font-family: ui-monospace, "SF Mono", monospace; font-size: 10.5px;
+    color: #92400e; opacity: 0.9; margin-bottom: 3px; font-weight: 600;
+  }
+  .gate .label .sub { font-weight: 500; font-size: 10.5px; opacity: 0.85; display: block; margin-top: 2px; }
+  .gate-new-tag {
+    position: absolute; top: 18px; left: 50%; transform: translateX(-50%);
+    background: #10b981; color: #ffffff; font-size: 9.5px; font-weight: 700;
+    border-radius: 4px; padding: 2px 7px; letter-spacing: 0.5px;
+    z-index: 3;
+  }
+
+  /* ─── Exit boxes ─────────────────────────────────────────────── */
+  .exit-box {
+    background: #fee2e2; border: 1.5px solid #ef4444; border-radius: 8px;
+    padding: 10px 14px; font-size: 12px; font-weight: 700; color: #991b1b;
+    text-align: center; min-width: 180px; max-width: 220px;
+  }
+  .exit-box.terminal { background: #0f172a; border-color: #0f172a; color: #ffffff; }
+  .exit-box .sub { font-size: 10px; font-weight: 500; opacity: 0.85; margin-top: 4px; }
+
+  .exit-arrow {
+    flex: 0 0 26px; height: 0; margin: 0 6px;
+    border-top: 2px dashed #ef4444; position: relative;
+  }
+  .exit-arrow.solid { border-top-style: solid; border-top-color: #0f172a; }
+  .exit-arrow .lbl {
+    position: absolute; top: -16px; left: 50%; transform: translateX(-50%);
+    font-size: 10px; font-weight: 700; color: #b91c1c; white-space: nowrap;
+    background: #ffffff; padding: 0 5px;
+  }
+  .exit-arrow.solid .lbl { color: #0f172a; }
+
+  /* ─── Callout (right column) ─────────────────────────────────── */
+  .callout {
+    background: #ffedd5; border: 1.5px solid #fb923c; border-radius: 8px;
+    padding: 10px 14px; min-width: 180px; max-width: 220px;
+    font-size: 11px; color: #9a3412; text-align: center;
+  }
+  .callout .t { font-weight: 700; font-size: 12px; margin-bottom: 2px; }
+  .yes-marker { font-size: 12px; color: #166534; font-weight: 700; padding: 6px 10px; background: #f0fdf4; border-radius: 6px; border: 1px solid #bbf7d0; }
+  .quick-arrow {
+    flex: 0 0 26px; height: 0; margin: 0 6px;
+    border-top: 2px solid #c2410c; position: relative;
+  }
+  .quick-arrow .lbl {
+    position: absolute; top: -16px; left: 50%; transform: translateX(-50%);
+    font-size: 10px; font-weight: 700; color: #c2410c; white-space: nowrap;
+    background: #ffffff; padding: 0 5px;
+  }
+
+  /* ─── Phase container ────────────────────────────────────────── */
+  .phase {
+    grid-column: 1 / -1;
+    border: 2.5px solid; border-radius: 14px;
+    padding: 20px 24px;
+    margin: 14px 0 6px;
+    position: relative;
+  }
+  .phase > .head {
+    display: flex; align-items: center; justify-content: space-between;
+    font-size: 12px; font-weight: 800; letter-spacing: 1px;
+    text-transform: uppercase; margin-bottom: 14px;
+  }
+  .phase > .head .right {
+    font-size: 11.5px; font-weight: 500; opacity: 0.78;
+    text-transform: none; letter-spacing: 0;
+  }
+  .phase.p1 { border-color: #93c5fd; background: #eff6ff; }
+  .phase.p1 > .head { color: #1d4ed8; }
+  .phase.p2 { border-color: #c4b5fd; background: #f5f3ff; }
+  .phase.p2 > .head { color: #6d28d9; }
+  .phase.p3 { border-color: #5eead4; background: #f0fdfa; }
+  .phase.p3 > .head { color: #0f766e; }
+  .phase.p4 { border-color: #fdba74; background: #fff7ed; }
+  .phase.p4 > .head { color: #9a3412; }
+
+  /* The grid inside each phase has the same 3-column layout. */
+  .phase .flow { display: grid; grid-template-columns: 230px 1fr 230px; gap: 18px; align-items: center; }
+
+  /* ─── Take-off card (Phase 3 main step) ──────────────────────── */
+  .takeoff {
+    background: #ffffff; border: 2px solid #14b8a6; border-radius: 12px;
+    padding: 16px 22px; max-width: 720px;
+    box-shadow: 0 2px 4px rgba(20,184,166,0.12);
+  }
+  .takeoff .head {
+    display: flex; align-items: center; gap: 12px; margin-bottom: 12px;
+    font-weight: 700; color: #0f172a; font-size: 14.5px;
+  }
+  .takeoff .head .num {
+    background: #99f6e4; color: #0f766e; border-radius: 999px;
+    width: 36px; height: 36px;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-family: ui-monospace, "SF Mono", monospace; font-weight: 700; font-size: 13px;
+    flex-shrink: 0;
+  }
+  .takeoff .head .meta { font-size: 11px; color: #475569; font-weight: 500; margin-left: auto; }
+  .takeoff .grid {
+    display: grid; grid-template-columns: 1fr 1fr;
+    gap: 6px 26px; font-size: 12px; color: #1f2937;
+  }
+  .takeoff .grid .lab {
+    font-family: ui-monospace, "SF Mono", monospace; color: #0f766e;
+    margin-right: 8px; font-weight: 700;
+  }
+  .takeoff .footnote {
+    margin-top: 12px; padding-top: 10px;
+    font-size: 10.5px; color: #475569; line-height: 1.55;
+    border-top: 1px dashed #cbd5e1;
+  }
+  .takeoff .footnote b { color: #0f172a; }
+
+  /* ─── START / END nodes ──────────────────────────────────────── */
+  .pill {
+    background: #0f172a; color: #fff; border-radius: 999px;
+    padding: 12px 32px; font-weight: 800; font-size: 14px;
+    width: max-content; margin: 0 auto;
+    letter-spacing: 1px;
+  }
+  .pill.end { background: #064e3b; }
+
+  /* ─── Footer (rejection exits) ───────────────────────────────── */
+  .footer-block {
+    margin-top: 32px;
+    border: 1.5px solid #cbd5e1; border-radius: 12px;
+    padding: 18px 22px; background: #f8fafc;
+  }
+  .footer-block h3 {
+    margin: 0 0 12px; font-size: 13px; letter-spacing: 1px;
+    color: #0f172a; text-transform: uppercase;
+  }
+  .footer-block .cols { display: grid; grid-template-columns: repeat(4, 1fr); gap: 24px; font-size: 11.5px; color: #334155; }
+  .footer-block .col h4 { margin: 0 0 6px; font-size: 12px; letter-spacing: 0.3px; }
+  .footer-block .col h4.term { color: #0f172a; }
+  .footer-block .col h4.pause { color: #b45309; }
+  .footer-block .col h4.revert { color: #b91c1c; }
+  .footer-block .col h4.bypass { color: #c2410c; }
+  .footer-block .col ul { padding-left: 16px; margin: 0; }
+  .footer-block .col li { margin-bottom: 4px; line-height: 1.5; }
+
+  .doc-footer-line {
+    margin-top: 16px; padding: 12px 4px; text-align: center;
+    font-size: 11px; color: #475569;
+    border-top: 1px solid #e2e8f0;
+  }
+
+  /* The simple START → 00 → Phase 1 path (above first phase). */
+  .hero {
+    display: grid; grid-template-columns: 230px 1fr 230px; gap: 18px;
+    align-items: center;
+  }
+</style>
+</head>
+<body>
+
+<!-- ─── Header ───────────────────────────────────────────────────── -->
+<div class="doc-header">
+  <div>
+    <div class="title">SABI · RFQ → QUOTE PIPELINE — Electrical-only</div>
+    <div class="subtitle">Adapted from v5.0 · transcript-aligned · 4 phase containers · 5 gates · all rejection paths shown</div>
+  </div>
+  <div class="version">v 5.0e</div>
+</div>
+
+<!-- ─── Legend ──────────────────────────────────────────────────── -->
+<div class="legend">
+  <span class="chip"><span class="swatch"></span> Original step</span>
+  <span class="chip"><span class="swatch new"></span> NEW / changed</span>
+  <span class="chip"><span class="swatch gate-mark"></span> Gate</span>
+  <span class="chip"><span class="swatch terminal"></span> Terminal</span>
+  <span class="chip"><span class="swatch reject"></span> Rejection exit</span>
+  <span class="chip"><span class="swatch bypass"></span> Quick bypass</span>
+  <span class="count">19 steps + 1 auto-filter · 5 gates</span>
+</div>
+
+<!-- ─── START → Step 00 ─────────────────────────────────────────── -->
+<div class="hero">
+  <div></div>
+  <div class="cell-main" style="display:flex;justify-content:center;"><div class="pill">START</div></div>
+  <div></div>
+</div>
+<div class="connector arrow"><div class="line"></div></div>
+
+<div class="hero">
+  <div class="cell-exit" style="display:flex;justify-content:flex-end;align-items:center;">
+    <div class="exit-box terminal">OFF-PIPELINE · IGNORED</div>
+    <div class="exit-arrow solid"></div>
+  </div>
+  <div class="cell-main" style="display:flex;justify-content:center;">
+    <div class="step new"><span class="num">00</span><div class="body"><div class="name">Auto-Filter</div><div class="meta">spam · non-MEP · duplicate · wrong addressee</div></div><span class="new-badge">NEW</span></div>
+  </div>
+  <div></div>
+</div>
+<div class="connector arrow"><div class="line"></div></div>
+
+<!-- ═════ PHASE 1 ═══════════════════════════════════════════════ -->
+<div class="phase p1">
+  <div class="head"><span>Phase 1 · Information Sufficiency</span><span class="right">what do we have · is it usable?</span></div>
+
+  <div class="flow">
+    <div></div><div class="cell-main"><div class="step"><span class="num">01</span><div class="body"><div class="name">Identify Email</div></div></div></div><div></div>
+  </div>
+  <div class="connector"><div class="line"></div></div>
+
+  <div class="flow">
+    <div></div><div class="cell-main"><div class="step"><span class="num">02</span><div class="body"><div class="name">Identify Enquiry (RFQ Detection)</div></div></div></div><div></div>
+  </div>
+  <div class="connector"><div class="line"></div></div>
+
+  <div class="flow">
+    <div></div><div class="cell-main"><div class="step"><span class="num">03</span><div class="body"><div class="name">Add to Bid List + Classify Priority</div></div></div></div><div></div>
+  </div>
+  <div class="connector"><div class="line"></div></div>
+
+  <!-- Step 04 with no-attach pause -->
+  <div class="flow">
+    <div class="cell-exit"><div class="exit-box">NOTIFY EST. DEPT · PAUSE</div><div class="exit-arrow"><span class="lbl">no attach</span></div></div>
+    <div class="cell-main"><div class="step"><span class="num">04</span><div class="body"><div class="name">Unzip Attachments</div></div></div></div>
+    <div></div>
+  </div>
+  <div class="connector"><div class="line"></div></div>
+
+  <div class="flow">
+    <div></div><div class="cell-main"><div class="step"><span class="num">05</span><div class="body"><div class="name">List Drawings + Documents</div></div></div></div><div></div>
+  </div>
+  <div class="connector"><div class="line"></div></div>
+
+  <div class="flow">
+    <div></div><div class="cell-main"><div class="step"><span class="num">06</span><div class="body"><div class="name">Identify Services</div><div class="meta">electrical only — single discipline</div></div></div></div><div></div>
+  </div>
+  <div class="connector"><div class="line"></div></div>
+
+  <div class="flow">
+    <div></div><div class="cell-main"><div class="step"><span class="num">07</span><div class="body"><div class="name">Extract Project Info</div></div></div></div><div></div>
+  </div>
+  <div class="connector"><div class="line"></div></div>
+
+  <div class="flow">
+    <div></div><div class="cell-main"><div class="step new"><span class="num">08</span><div class="body"><div class="name">Critical-Drawings Check</div><div class="meta">electrical drawings present?</div></div><span class="new-badge">NEW</span></div></div><div></div>
+  </div>
+  <div class="connector"><div class="line"></div></div>
+
+  <div class="flow">
+    <div></div><div class="cell-main"><div class="step new"><span class="num">09</span><div class="body"><div class="name">BOQ Quality Check</div><div class="meta">reliable · partial · unusable</div></div><span class="new-badge">NEW</span></div></div><div></div>
+  </div>
+  <div class="connector"><div class="line"></div></div>
+
+  <div class="flow">
+    <div></div><div class="cell-main"><div class="step new"><span class="num">10</span><div class="body"><div class="name">Detect Drawing Scale</div><div class="meta">1:100 / 1:50 annotation or scale bar</div></div><span class="new-badge">NEW</span></div></div><div></div>
+  </div>
+  <div class="connector"><div class="line"></div></div>
+
+  <!-- Gate 1 -->
+  <div class="flow">
+    <div class="cell-exit"><div class="exit-box">PAUSE · REQUEST</div><div class="exit-arrow"><span class="lbl">No</span></div></div>
+    <div class="cell-main"><div class="gate"><div class="border"></div><div class="fill"></div><div class="label"><span class="gid">GATE 1 · step 11</span>Documents Sufficient?</div></div></div>
+    <div class="cell-callout"><div class="yes-marker">Yes ↓</div></div>
+  </div>
+</div>
+
+<!-- ═════ PHASE 2 ═══════════════════════════════════════════════ -->
+<div class="phase p2">
+  <div class="head"><span>Phase 2 · Bid / No-Bid</span><span class="right">go / no-go · depth of response</span></div>
+
+  <div class="flow">
+    <div></div><div class="cell-main"><div class="step new"><span class="num">12</span><div class="body"><div class="name">Match Ideal-Customer + Reputation Class</div><div class="meta">IDM lookup · tier A / B / C</div></div><span class="new-badge">NEW</span></div></div><div></div>
+  </div>
+  <div class="connector"><div class="line"></div></div>
+
+  <!-- Gate 2 (3-way) -->
+  <div class="flow">
+    <div class="cell-exit"><div class="exit-box terminal">NO-BID · END<div class="sub">log reason · status=declined</div></div><div class="exit-arrow solid"><span class="lbl">No-Bid</span></div></div>
+    <div class="cell-main"><div class="gate"><div class="border"></div><div class="fill"></div><div class="label"><span class="gid">GATE 2 · step 13 · 3-way</span>Bid Decision<br><span class="sub">No-Bid · Quick · Detailed</span></div><div class="gate-new-tag">NEW</div></div></div>
+    <div class="cell-callout"><div class="quick-arrow"><span class="lbl">Quick</span></div><div class="callout"><div class="t">QUICK BUDGETARY</div><div>rate × sqft OR tonnage</div></div></div>
+  </div>
+  <div style="grid-column: 2 / 3; text-align: center; font-size: 12px; color: #1f2937; font-weight: 700; margin: 8px 0 0;">Detailed ↓</div>
+</div>
+
+<!-- ═════ PHASE 3 ═══════════════════════════════════════════════ -->
+<div class="phase p3">
+  <div class="head"><span>Phase 3 · Extract Actual Quantities</span><span class="right">detailed proposal path only</span></div>
+
+  <div class="flow">
+    <div></div>
+    <div class="cell-main">
+      <div class="takeoff">
+        <div class="head" style="text-transform:none;letter-spacing:0;color:#0f172a;font-size:14.5px;margin-bottom:12px;">
+          <span class="num">14</span>
+          <span>Electrical Take-Off — 14-step Cable Schedule</span>
+          <span class="meta">runs <code style="background:#f1f5f9;padding:2px 6px;border-radius:4px;">ELECTRICAL_SUB_PIPELINE</code> · MDB → SMDB → DB</span>
+        </div>
+        <div class="grid">
+          <div><span class="lab">a ·</span>Open the Drawing</div>
+          <div><span class="lab">h ·</span>Identify SMDBs in Floor Drawings</div>
+          <div><span class="lab">b ·</span>List Available Drawings</div>
+          <div><span class="lab">i ·</span>Establish Cable Route LV → SMDBs</div>
+          <div><span class="lab">c ·</span>Establish Floors and Floor Height</div>
+          <div><span class="lab">j ·</span>Estimate Cable Length & Size LV → SMDB</div>
+          <div><span class="lab">d ·</span>Find Drawing Scale</div>
+          <div><span class="lab">k ·</span>Establish SMDB → DB Identification</div>
+          <div><span class="lab">e ·</span>Identify LV Room / MDB</div>
+          <div><span class="lab">l ·</span>Identify DB Locations per SMDB</div>
+          <div><span class="lab">f ·</span>Check Schematic / SLD Availability</div>
+          <div><span class="lab">m ·</span>Estimate Cable Size & Length per DB</div>
+          <div><span class="lab">g ·</span>Note SMDBs from LV Panel (schematic)</div>
+          <div><span class="lab">n ·</span>Compile Cable Schedule</div>
+        </div>
+        <div class="footnote">
+          <b>Claude Sonnet 4.6 vision</b> · MEP-QS Dubai prompt · count actual items · no hallucination<br>
+          schematics / legends → high-confidence · floor-plan lengths → low-confidence (yellow flag in step 15)
+        </div>
+      </div>
+    </div>
+    <div></div>
+  </div>
+  <div class="connector"><div class="line"></div></div>
+
+  <div class="flow">
+    <div></div><div class="cell-main"><div class="step new"><span class="num">15</span><div class="body"><div class="name">Tag Confidence (low-conf yellow)</div><div class="meta">high · medium · low — flag scaled lengths</div></div><span class="new-badge">NEW</span></div></div><div></div>
+  </div>
+  <div class="connector"><div class="line"></div></div>
+
+  <div class="flow">
+    <div></div><div class="cell-main"><div class="step"><span class="num">16</span><div class="body"><div class="name">Formula-Based Pricing — Electrical</div></div></div></div><div></div>
+  </div>
+  <div class="connector"><div class="line"></div></div>
+
+  <!-- Gate 3 -->
+  <div class="flow">
+    <div class="cell-exit"><div class="exit-box">REVISE · loop to step 14</div><div class="exit-arrow"><span class="lbl">No</span></div></div>
+    <div class="cell-main"><div class="gate"><div class="border"></div><div class="fill"></div><div class="label"><span class="gid">GATE 3 · step 17</span>Confirm Quantities + Pricing?</div></div></div>
+    <div class="cell-callout"><div class="yes-marker">Yes ↓</div></div>
+  </div>
+</div>
+
+<!-- ═════ PHASE 4 ═══════════════════════════════════════════════ -->
+<div class="phase p4">
+  <div class="head"><span>Phase 4 · Pricing + Final Quote</span><span class="right">library → margin → consent → send</span></div>
+
+  <div class="flow">
+    <div></div><div class="cell-main"><div class="step new"><span class="num">18</span><div class="body"><div class="name">Library + AI-Fallback Pricing</div><div class="meta">source column: Library · AI Estimate (cited)</div></div><span class="new-badge">NEW</span></div></div>
+    <div class="cell-callout" style="display:flex;justify-content:flex-start;align-items:center;">
+      <div class="quick-arrow" style="border-top:2.5px dashed #f97316;flex:0 0 50px;"><span class="lbl" style="color:#c2410c;background:#fff7ed;">Quick lands here</span></div>
+    </div>
+  </div>
+  <div class="connector"><div class="line"></div></div>
+
+  <div class="flow">
+    <div></div><div class="cell-main"><div class="step"><span class="num">19</span><div class="body"><div class="name">Apply Margin + VAT · Compute Total</div><div class="meta">margin ≈ 15% (env DEFAULT_MARGIN_PERCENT)</div></div></div></div><div></div>
+  </div>
+  <div class="connector"><div class="line"></div></div>
+
+  <!-- Gate 4 -->
+  <div class="flow">
+    <div class="cell-exit"><div class="exit-box">REVISE · loop to step 18</div><div class="exit-arrow"><span class="lbl">No</span></div></div>
+    <div class="cell-main"><div class="gate"><div class="border"></div><div class="fill"></div><div class="label"><span class="gid">GATE 4 · step 20</span>Confirm Total?</div></div></div>
+    <div class="cell-callout"><div class="yes-marker">Yes ↓</div></div>
+  </div>
+  <div class="connector"><div class="line"></div></div>
+
+  <div class="flow">
+    <div></div><div class="cell-main"><div class="step"><span class="num">21</span><div class="body"><div class="name">Yardstick Check (below / above market)</div></div></div></div><div></div>
+  </div>
+  <div class="connector"><div class="line"></div></div>
+
+  <div class="flow">
+    <div></div><div class="cell-main"><div class="step"><span class="num">22</span><div class="body"><div class="name">Prepare Quotation</div><div class="meta">Power BOQ Excel (12 tabs, internal) + PDF (client)</div></div></div></div><div></div>
+  </div>
+  <div class="connector"><div class="line"></div></div>
+
+  <div class="flow">
+    <div></div><div class="cell-main"><div class="step new"><span class="num">23</span><div class="body"><div class="name">Present Findings for Consent</div><div class="meta">summary to George · yardstick · electrical totals</div></div><span class="new-badge">NEW</span></div></div><div></div>
+  </div>
+  <div class="connector"><div class="line"></div></div>
+
+  <!-- Gate 5 -->
+  <div class="flow">
+    <div class="cell-exit"><div class="exit-box">HOLD · DO NOT SEND</div><div class="exit-arrow"><span class="lbl">No</span></div></div>
+    <div class="cell-main"><div class="gate"><div class="border"></div><div class="fill"></div><div class="label"><span class="gid">GATE 5 · step 24</span>Consent Received?</div></div></div>
+    <div class="cell-callout"><div class="yes-marker">Yes ↓</div></div>
+  </div>
+</div>
+
+<div class="connector arrow"><div class="line"></div></div>
+<div class="hero">
+  <div></div>
+  <div class="cell-main" style="display:flex;justify-content:center;"><div class="pill end">END · SENT</div></div>
+  <div></div>
+</div>
+
+<!-- ═════ Rejection Exits — Quick Reference ════════════════════ -->
+<div class="footer-block">
+  <h3>Rejection Exits · Quick Reference</h3>
+  <div class="cols">
+    <div class="col">
+      <h4 class="term">TERMINAL</h4>
+      <ul>
+        <li>Auto-Filter · spam / non-MEP</li>
+        <li>Gate 2 · No-Bid (9 reasons)</li>
+        <li>— log reason · status = declined</li>
+        <li>— no_bid_reason captured</li>
+      </ul>
+    </div>
+    <div class="col">
+      <h4 class="pause">PAUSE (resumable)</h4>
+      <ul>
+        <li>Step 04 · No attachments</li>
+        <li>Gate 1 · Insufficient docs</li>
+        <li>Gate 5 · Consent held</li>
+        <li>— manual resume</li>
+      </ul>
+    </div>
+    <div class="col">
+      <h4 class="revert">REVERT (loop back)</h4>
+      <ul>
+        <li>Gate 3 · revert to step 14 (take-off)</li>
+        <li>Gate 4 · revert to step 18 (pricing)</li>
+        <li>— estimation cleared</li>
+        <li>— full reason captured</li>
+      </ul>
+    </div>
+    <div class="col">
+      <h4 class="bypass">QUICK BYPASS</h4>
+      <ul>
+        <li>Gate 2 · Quick route</li>
+        <li>skips Phase 3 take-off</li>
+        <li>rate × sqft OR tonnage × price</li>
+        <li>— lands at step 18 (pricing)</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<div class="doc-footer-line">
+  Transcript-aligned · 4 phase containers · 19 steps + 1 auto-filter · 5 gates · 3 terminal + 2 revert + 3 pause exits · bypass to Phase 4
+</div>
+
+</body>
+</html>

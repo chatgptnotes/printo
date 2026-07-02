@@ -1,0 +1,41 @@
+{
+  "_comment": "Fixture for one-click test RFQ seeder. Drives /api/seed-test-rfq.",
+  "template_id": "al_reem",
+  "display_name": "Al Reem Tower (residential+retail, 28 floors)",
+
+  "email_from": "Al Reem Developments <projects@alreem-dev.example>",
+  "email_subject": "RFQ — Al Reem Tower, Dubai Marina | MEP Quotation Required",
+  "email_snippet": "Dear SABI Estimation Team, We are pleased to invite SABI to submit a competitive quotation (RFQ) for the complete MEP package on our upcoming project. Please quote your best price covering supply, installation, testing and commissioning. Project: Al Reem Tower, Dubai Marina. G+4P+28 typical floors, 38,500 sqm total built-up. Scope: HVAC VRF + FAHU, Electrical LV distribution, Plumbing and drainage, Fire fighting, Fire alarm. Submit by 30 April 2026.",
+
+  "fallback_project": {
+    "client_name": "Al Reem Developments LLC",
+    "project_name": "Al Reem Tower",
+    "location": "Dubai Marina, Dubai, UAE",
+    "building_type": "residential",
+    "floors": 28,
+    "parking_floors": 4,
+    "typical_floors": 28,
+    "area_per_floor_sqft": 13455,
+    "total_area_sqft": 414408,
+    "typical_height_m": 3.6,
+    "priority": "priority_gen"
+  },
+
+  "fallback_services": [
+    { "service_type": "hvac", "is_required": true, "system_type": "VRF System", "notes": "Chilled water VRF + FAHU per RFQ scope" },
+    { "service_type": "electrical", "is_required": true, "notes": "LV distribution, lighting, small power, containment" },
+    { "service_type": "plumbing", "is_required": true, "notes": "Domestic water, soil/waste, storm" },
+    { "service_type": "fire_fighting", "is_required": true, "notes": "Sprinklers, wet riser, fire pumps" },
+    { "service_type": "fire_alarm", "is_required": true, "notes": "Addressable system" }
+  ],
+
+  "attachments": [
+    { "filename": "SABI_MEP_Thermal_Load_Report.pdf", "mime_type": "application/pdf", "file_type": "drawing_pdf", "discipline": "hvac" },
+    { "filename": "SABI_BOQ_Al_Reem_Tower.xlsx", "mime_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "file_type": "schedule_excel", "discipline": null },
+    { "filename": "SABI_MEP_Estimation_Al_Reem_Tower.docx", "mime_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "file_type": "specification", "discipline": null },
+    { "filename": "SABI_MEP_Presentation_Al_Reem_Tower.pptx", "mime_type": "application/vnd.openxmlformats-officedocument.presentationml.presentation", "file_type": "other", "discipline": null },
+    { "filename": "SABI_MEP_Specifications.csv", "mime_type": "text/csv", "file_type": "specification", "discipline": null },
+    { "filename": "SABI_Bid_List_2026.csv", "mime_type": "text/csv", "file_type": "other", "discipline": null },
+    { "filename": "SABI_Drawing_Index.txt", "mime_type": "text/plain", "file_type": "other", "discipline": null }
+  ]
+}

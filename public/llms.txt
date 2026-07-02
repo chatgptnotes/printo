@@ -1,0 +1,28 @@
+# ERP Realsoft
+
+> ERP Realsoft is an automated MEP estimation pipeline for contractors and consultants in Dubai and the UAE. It turns RFQ (Request for Quotation) emails and their attached drawings into a priced Excel Bill of Quantities (BOQ) — covering electrical, HVAC, plumbing and fire-fighting works — in hours instead of weeks.
+
+ERP Realsoft is an RFQ-to-BOQ automation platform for MEP estimation teams. The platform runs a 23-step pipeline that monitors an estimation inbox, classifies RFQs, extracts project data, scans drawings, calculates MEP loads and quantities with deterministic engineering formulas, validates results against current UAE market rates, and generates a client-ready Excel BOQ after human approval. Most of the application is private and requires authentication; the public marketing page describes the product.
+
+## Main pages
+- [Landing page](http://localhost:3001/landing): Product overview, how the RFQ-to-BOQ pipeline works, the MEP disciplines covered, before/after comparison, and frequently asked questions.
+- [Sign in](http://localhost:3001/auth/login): Secure login for the ERP Realsoft estimation team (private).
+
+## What ERP Realsoft does
+- Reads incoming RFQ emails and classifies them by bid priority.
+- Extracts the project profile: number of floors, built-up area, ceiling heights and location.
+- Inventories and classifies architectural, structural and MEP drawings.
+- Estimates electrical, HVAC, plumbing, fire-fighting, BMS and ELV works using deterministic engineering formulas (not black-box AI guesses).
+- Benchmarks every estimate against current Dubai and UAE market rates in AED.
+- Generates a formatted Excel Bill of Quantities ready for client submission after human review and approval.
+
+## Key facts
+- Discipline focus: Mechanical, Electrical & Plumbing (MEP), with a primary specialism in Electrical (Power).
+- Market: Dubai and the wider United Arab Emirates.
+- Typical turnaround: hours to a couple of days, versus one to two weeks for manual estimation.
+- Accuracy: approximately 95% against the final issued BOQ on benchmark projects.
+
+## Contact
+- Email: info@realsoft.example
+- Company: ERP Realsoft
+- Website: http://localhost:3001

@@ -1,0 +1,33 @@
+name: CI
+
+# Pre-deploy gate. Runs on every PR and on pushes to main.
+# Keeps the heavy `next build` on Vercel (it has the real env + secrets);
+# here we only run checks that need no secrets: install, lint, typecheck.
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install (clean, from lockfile)
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npx tsc --noEmit
