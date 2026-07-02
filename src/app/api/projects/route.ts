@@ -58,12 +58,12 @@ export async function POST(request: NextRequest) {
     const { data, error } = await supabaseAdmin
       .from('sabi_projects')
       .insert({
-        email_thread_id: body.email_thread_id || null,
-        email_message_id: body.email_message_id || null,
-        email_from: body.email_from || 'manual@entry',
-        email_subject: body.email_subject || body.project_name || 'Manual Project',
-        email_date: body.email_date || null,
-        email_snippet: body.email_snippet || null,
+        email_thread_id: null,
+        email_message_id: null,
+        email_from: null,
+        email_subject: body.project_name || 'Direct Upload Project',
+        email_date: null,
+        email_snippet: body.notes || null,
         client_name: body.client_name || null,
         project_name: body.project_name || null,
         location: body.location || null,
@@ -82,9 +82,9 @@ export async function POST(request: NextRequest) {
     await supabaseAdmin.from('sabi_activity_log').insert({
       project_id: data.id,
       step: 1,
-      step_name: body.email_from ? 'Email Received' : 'Project Created',
+      step_name: 'Project Created',
       status: 'completed',
-      details: { source: body.email_from ? 'manual_add' : 'manual_entry' },
+      details: { source: 'direct_upload' },
     });
 
     return NextResponse.json({ project: data }, { status: 201 });

@@ -62,7 +62,7 @@ manager, or secure share — never commit it) and place it at the repo root. Use
 - **Supabase:** `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`
 - **Auth:** `JWT_SECRET`
 - **AI gateway:** `USE_AI_GATEWAY`, `NEXAPROC_GATEWAY_URL`, `DRAWTOBOQ_AIAS_KEY` (compatibility key name; and/or `ANTHROPIC_API_KEY` for the legacy direct path)
-- **Gmail:** `GMAIL_ACCOUNT`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REFRESH_TOKEN`, `GOOGLE_DRIVE_API_KEY` (optional public Drive link import), `ESTIMATION_EMAIL`
+- **Uploads:** no email credentials are required; users create projects and upload drawings directly.
 
 Verify they're all present:
 

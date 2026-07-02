@@ -265,7 +265,6 @@ export default function ProjectDetailPage() {
     yardstick: 'Yardstick comparison complete',
     boq: 'BOQ generated successfully',
     approve: 'Quotation approved',
-    'send-quote': 'Quotation sent to client successfully',
     reject: 'Rejection recorded',
   };
 
@@ -297,8 +296,6 @@ export default function ProjectDetailPage() {
       }
       await fetchProject();
 
-      // Show success toast (especially important for send-quote so the user
-      // gets confirmation that the email actually went out)
       const successMsg = SUCCESS_MESSAGES[action];
       if (successMsg) {
         toast(successMsg, 'success');
@@ -3839,17 +3836,15 @@ function ApprovalGateCard({
       }
       const data = await res.json().catch(() => ({}));
       if (action === 'approve') {
-        // Surface auto-trigger errors (e.g. send-quote at Gate 33 failing)
-        // so the user isn't left thinking the email went out when it didn't.
         if (data.auto_trigger_error) {
           toast(
             gate === 33
-              ? `Gate approved, but quotation email failed: ${data.auto_trigger_error}`
+              ? `Gate approved, but export step failed: ${data.auto_trigger_error}`
               : `Gate approved, but next pipeline step failed: ${data.auto_trigger_error}`,
             'error'
           );
         } else if (gate === 33) {
-          toast('Quotation sent to client successfully', 'success');
+          toast('Quotation approved for export', 'success');
         }
         setApproved(true);
         onDecision();
@@ -3904,31 +3899,6 @@ function ApprovalGateCard({
       toast(`Bid decision failed: ${message}`, 'error');
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleSendRejectionEmail = async () => {
-    setSendingEmail(true);
-    try {
-      await fetch(`/api/projects/${projectId}/reject-email`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          reason,
-          client_email: clientEmail,
-          client_name: clientName,
-          project_name: projectName,
-          gate,
-        }),
-      });
-      setEmailSent(true);
-      // Now proceed with the actual rejection
-      await handleDecision('reject');
-    } catch {
-      // Still reject even if email fails
-      await handleDecision('reject');
-    } finally {
-      setSendingEmail(false);
     }
   };
 
@@ -4247,27 +4217,9 @@ function ApprovalGateCard({
                         )}
                         Reject Only
                       </button>
-                      <button
-                        onClick={handleSendRejectionEmail}
-                        disabled={sendingEmail || loading}
-                        className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-red-600 to-orange-600 text-white rounded-xl font-semibold text-sm hover:from-red-700 hover:to-orange-700 transition-all shadow-md disabled:opacity-50"
-                      >
-                        {sendingEmail ? (
-                          <div className="animate-spin rounded-full h-3.5 w-3.5 border-2 border-white border-t-transparent" />
-                        ) : (
-                          <Send className="h-3.5 w-3.5" />
-                        )}
-                        Reject & Email Company
-                      </button>
                     </div>
                   </div>
 
-                  {emailSent && (
-                    <div className="px-5 pb-4 flex items-center gap-2 text-green-700 text-xs">
-                      <CheckCircle className="h-3.5 w-3.5" />
-                      Rejection email sent to {clientEmail}
-                    </div>
-                  )}
                 </div>
               </div>
             )}

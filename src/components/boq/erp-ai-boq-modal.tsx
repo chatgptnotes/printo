@@ -65,6 +65,9 @@ export default function ErpAiBoqModal({ open, projects, defaultProjectId, onClos
   const [step, setStep] = useState<Step>(1);
   const [selectedProjectId, setSelectedProjectId] = useState(defaultProjectId || '');
   const [files, setFiles] = useState<File[]>([]);
+  const [newProjectName, setNewProjectName] = useState('');
+  const [newClientName, setNewClientName] = useState('');
+  const [newLocation, setNewLocation] = useState('');
   const [notes, setNotes] = useState('');
   const [busy, setBusy] = useState(false);
   const [project, setProject] = useState<Project | null>(null);
@@ -81,6 +84,11 @@ export default function ErpAiBoqModal({ open, projects, defaultProjectId, onClos
     setStep(1);
     setProgress(0);
     setSelectedProjectId(defaultProjectId || projects[0]?.id || '');
+    setNewProjectName('');
+    setNewClientName('');
+    setNewLocation('');
+    setNotes('');
+    setFiles([]);
   }, [defaultProjectId, open, projects]);
 
   useEffect(() => {
@@ -108,18 +116,40 @@ export default function ErpAiBoqModal({ open, projects, defaultProjectId, onClos
   if (!open) return null;
 
   const uploadAndExtract = async () => {
-    if (!selectedProjectId) {
-      toast('Select a project first', 'error');
-      return;
-    }
+    let activeProjectId = selectedProjectId;
     setBusy(true);
     setStep(2);
     setProgress(8);
     try {
+      if (!activeProjectId) {
+        if (!newProjectName.trim()) {
+          throw new Error('Enter a project name before extraction');
+        }
+        const createRes = await fetch('/api/projects', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            project_name: newProjectName.trim(),
+            client_name: newClientName.trim() || null,
+            location: newLocation.trim() || null,
+            notes: notes.trim() || null,
+            priority: 'new',
+            status: 'new',
+          }),
+        });
+        const createData = await createRes.json().catch(() => ({}));
+        if (!createRes.ok) {
+          throw new Error(createData.details || createData.error || 'Project creation failed');
+        }
+        activeProjectId = createData.project?.id;
+        if (!activeProjectId) throw new Error('Project creation did not return an ID');
+        setSelectedProjectId(activeProjectId);
+      }
+
       if (files.length > 0) {
         const formData = new FormData();
         files.forEach((file) => formData.append('files', file));
-        const uploadRes = await fetch(`/api/projects/${selectedProjectId}/upload`, {
+        const uploadRes = await fetch(`/api/projects/${activeProjectId}/upload`, {
           method: 'POST',
           body: formData,
         });
@@ -127,9 +157,11 @@ export default function ErpAiBoqModal({ open, projects, defaultProjectId, onClos
           const data = await uploadRes.json().catch(() => ({}));
           throw new Error(data.details || data.error || 'Upload failed');
         }
+      } else {
+        throw new Error('Add at least one drawing, schedule, spec, or archive');
       }
 
-      const extractRes = await fetch(`/api/projects/${selectedProjectId}/extract`, { method: 'POST' });
+      const extractRes = await fetch(`/api/projects/${activeProjectId}/extract`, { method: 'POST' });
       if (!extractRes.ok) {
         const data = await extractRes.json().catch(() => ({}));
         throw new Error(data.details || data.error || 'Extraction failed');
@@ -137,12 +169,12 @@ export default function ErpAiBoqModal({ open, projects, defaultProjectId, onClos
 
       setProgress(100);
       await onRefresh?.();
-      const detailRes = await fetch(`/api/projects/${selectedProjectId}`);
+      const detailRes = await fetch(`/api/projects/${activeProjectId}`);
       if (detailRes.ok) {
         const data = await detailRes.json();
         setProject(data.project || data);
       }
-      toast('Extraction started for ERP Realsoft review', 'success');
+      toast('Extraction started from uploaded files', 'success');
       setStep(3);
     } catch (error: any) {
       toast(error.message || 'Extraction failed', 'error');
@@ -195,7 +227,7 @@ export default function ErpAiBoqModal({ open, projects, defaultProjectId, onClos
     }
   };
 
-  const projectName = selectedProject?.project_name || selectedProject?.email_subject || 'Selected project';
+  const projectName = selectedProject?.project_name || selectedProject?.email_subject || newProjectName || 'New upload project';
   const total = selectedProject?.final_quote_aed || 0;
 
   return (
@@ -254,12 +286,12 @@ export default function ErpAiBoqModal({ open, projects, defaultProjectId, onClos
               <div>
                 <h3 className="text-base font-semibold text-[#14233b]">Upload drawings and specifications</h3>
                 <p className="mt-1 max-w-2xl text-sm text-[#5a6b85]">
-                  Select an existing ERP Realsoft project, add any missing files, then start a fresh AI extraction.
+                  Create a project or select an existing one, upload drawings/specifications, then start a fresh AI extraction.
                 </p>
               </div>
               <div className="grid gap-4 lg:grid-cols-[1fr_1.2fr]">
                 <div className="rounded-[9px] border border-[#e3e9f2] bg-white p-4">
-                  <label className="text-xs font-semibold text-[#14233b]">Project record</label>
+                  <label className="text-xs font-semibold text-[#14233b]">Existing project record</label>
                   <select
                     value={selectedProjectId}
                     onChange={(event) => setSelectedProjectId(event.target.value)}
@@ -272,6 +304,32 @@ export default function ErpAiBoqModal({ open, projects, defaultProjectId, onClos
                       </option>
                     ))}
                   </select>
+                  <div className="mt-4 border-t border-[#e3e9f2] pt-4">
+                    <p className="text-xs font-semibold text-[#14233b]">Or create from upload</p>
+                    <div className="mt-2 space-y-2">
+                      <input
+                        value={newProjectName}
+                        onChange={(event) => {
+                          setNewProjectName(event.target.value);
+                          if (event.target.value.trim()) setSelectedProjectId('');
+                        }}
+                        placeholder="Project name"
+                        className="w-full rounded-[9px] border-[#cbd6e6] text-sm"
+                      />
+                      <input
+                        value={newClientName}
+                        onChange={(event) => setNewClientName(event.target.value)}
+                        placeholder="Client name"
+                        className="w-full rounded-[9px] border-[#cbd6e6] text-sm"
+                      />
+                      <input
+                        value={newLocation}
+                        onChange={(event) => setNewLocation(event.target.value)}
+                        placeholder="Location"
+                        className="w-full rounded-[9px] border-[#cbd6e6] text-sm"
+                      />
+                    </div>
+                  </div>
                   <div className="mt-4 rounded-[9px] bg-[#f4f8fe] p-3 text-xs text-[#5a6b85]">
                     <b className="block text-[#14233b]">{projectName}</b>
                     <span>{statusCopy(selectedProject?.status)}</span>
@@ -448,7 +506,7 @@ export default function ErpAiBoqModal({ open, projects, defaultProjectId, onClos
               </button>
             )}
             {step === 1 && (
-              <button type="button" onClick={uploadAndExtract} disabled={busy || !selectedProjectId} className="inline-flex items-center gap-2 rounded-[9px] bg-[#1b5fc4] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#1850a8] disabled:opacity-50">
+              <button type="button" onClick={uploadAndExtract} disabled={busy || (!selectedProjectId && !newProjectName.trim())} className="inline-flex items-center gap-2 rounded-[9px] bg-[#1b5fc4] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#1850a8] disabled:opacity-50">
                 <Sparkles className="h-4 w-4" /> Run extraction
               </button>
             )}

@@ -4,10 +4,9 @@ import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import {
-  ArrowLeft, Mail, FileText, FileBox, Paperclip, Download, Trash2, Loader2, Plus, Folder as FolderIcon,
+  ArrowLeft, FileText, FileBox, Paperclip, Download, Trash2, Folder as FolderIcon,
 } from 'lucide-react';
 import { useToast } from '@/contexts/toast-context';
-import InboxPickerModal from '@/components/master/inbox-picker-modal';
 
 interface Item {
   id: string;
@@ -25,8 +24,7 @@ interface FolderDetail {
 
 const GROUPS: { kind: Item['kind']; title: string; icon: React.ElementType }[] = [
   { kind: 'drawing', title: 'Drawings', icon: FileText },
-  { kind: 'email_attachment', title: 'Email Attachments', icon: Paperclip },
-  { kind: 'email', title: 'Mail', icon: Mail },
+  { kind: 'email_attachment', title: 'Uploaded Attachments', icon: Paperclip },
   { kind: 'boq', title: 'BOQ', icon: FileBox },
 ];
 
@@ -37,7 +35,6 @@ export default function FolderDetailPage() {
   const { toast } = useToast();
   const [folder, setFolder] = useState<FolderDetail | null>(null);
   const [loading, setLoading] = useState(true);
-  const [pickerOpen, setPickerOpen] = useState(false);
 
   const fetchFolder = useCallback(async () => {
     try {
@@ -112,12 +109,6 @@ export default function FolderDetailPage() {
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
           <button
-            onClick={() => setPickerOpen(true)}
-            className="flex items-center gap-2 px-3 py-2 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-          >
-            <Plus className="h-4 w-4" /> Add from Mail
-          </button>
-          <button
             onClick={deleteFolder}
             title="Delete folder"
             className="flex items-center gap-2 px-3 py-2 text-sm text-red-600 border border-red-200 rounded-lg hover:bg-red-50"
@@ -132,7 +123,7 @@ export default function FolderDetailPage() {
         <div className="bg-white rounded-xl border border-gray-200 p-10 text-center text-gray-400">
           <Paperclip className="h-10 w-10 mx-auto mb-2 opacity-50" />
           <p className="text-sm">This folder is empty.</p>
-          <p className="text-xs mt-1">Use <strong>Add from Mail</strong> here, or <strong>Add to folder</strong> from the Bid List or Inbox.</p>
+          <p className="text-xs mt-1">Upload project files directly, then add drawings or BOQs to folders from project screens.</p>
         </div>
       ) : (
         <div className="space-y-4">
@@ -175,13 +166,6 @@ export default function FolderDetailPage() {
           })}
         </div>
       )}
-
-      <InboxPickerModal
-        folderId={folderId}
-        isOpen={pickerOpen}
-        onClose={() => setPickerOpen(false)}
-        onAdded={fetchFolder}
-      />
     </div>
   );
 }

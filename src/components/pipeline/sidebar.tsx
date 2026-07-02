@@ -7,7 +7,6 @@ import { useAuth } from '@/contexts/auth-context';
 import {
   LayoutDashboard,
   FileText,
-  Mail,
   Ruler,
   Settings,
   LogOut,
@@ -35,7 +34,6 @@ interface NavItem {
 const navItems: NavItem[] = [
   { href: '/', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/bids', label: 'Projects', icon: FileText },
-  { href: '/inbox', label: 'Inbox', icon: Mail },
   { href: '/keywords', label: 'RFQ Rules', icon: Tag },
   { href: '/yardstick', label: 'Yardstick Rates', icon: Ruler },
   { href: '/price-library', label: 'Price Library', icon: BookOpen },

@@ -26,7 +26,6 @@ export async function GET() {
     gateway: !!process.env.NEXAPROC_GATEWAY_URL && !!process.env.DRAWTOBOQ_AIAS_KEY,
     supabase: !!process.env.NEXT_PUBLIC_SUPABASE_URL && !!process.env.SUPABASE_SERVICE_ROLE_KEY,
     whatsapp_target: !!process.env.WHATSAPP_NOTIFY_NUMBER,
-    gmail: !!process.env.GMAIL_ACCOUNT && !!process.env.GOOGLE_REFRESH_TOKEN,
     internal_api_secret: !!process.env.INTERNAL_API_SECRET,
     use_ai_gateway: useGateway,
   };
@@ -41,7 +40,6 @@ export async function GET() {
     !useGateway && !checks.anthropic_key && 'Set ANTHROPIC_API_KEY — /estimate and /extract fail without it (Claude Sonnet 4.6 powers all AI calls)',
     !checks.supabase      && 'Set NEXT_PUBLIC_SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY — DB and BOQ PDF storage',
     !checks.whatsapp_target && 'Set WHATSAPP_NOTIFY_NUMBER to receive Claude API disruption alerts (401 / 429 / 529 / 5xx / gateway timeout)',
-    !checks.gmail         && 'Set GMAIL_ACCOUNT + GOOGLE_REFRESH_TOKEN — needed only for inbox auto-sync (not Auto-Run-to-BOQ on existing projects)',
     !checks.internal_api_secret && 'Recommended in production: set INTERNAL_API_SECRET so /bid-decision can call /estimate even after the user JWT expires',
   ].filter(Boolean) as string[];
 

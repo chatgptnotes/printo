@@ -3,7 +3,7 @@
 import React from 'react';
 import {
   Tag, Building2, Wrench, Calculator, Ruler, FileSpreadsheet,
-  Send, CheckCircle, ThumbsUp, ShieldAlert, Trophy, XCircle, Zap,
+  CheckCircle, ShieldAlert, Trophy, XCircle, Zap,
 } from 'lucide-react';
 import { ProjectDetail } from '@/lib/shared/types';
 import { PIPELINE_STEPS, GATE_QUESTIONS } from '@/lib/shared/constants';
@@ -18,7 +18,6 @@ const ACTION_ESTIMATES: Record<string, { label: string; seconds: number }> = {
   yardstick: { label: 'Running yardstick comparison...', seconds: 3 },
   boq: { label: 'Generating Excel BOQ...', seconds: 10 },
   approve: { label: 'Approving quotation...', seconds: 2 },
-  'send-quote': { label: 'Sending quotation email...', seconds: 10 },
   reject: { label: 'Processing rejection...', seconds: 2 },
   // Gate decisions — so the dock's Approve/Reject buttons also trigger
   // the processing banner (not just the in-button spinner).
@@ -86,13 +85,13 @@ export function getNextAction(
     };
   }
 
-  // 4. Approved, ready to send
+  // 4. Approved projects are ready for file export; email sending is removed.
   if (project.estimation?.george_approved && !['sent', 'won', 'lost', 'archived'].includes(project.status)) {
     return {
-      type: 'send',
-      label: 'Send to Client',
-      action: 'send-quote',
-      icon: Send,
+      type: 'next_step',
+      label: 'Export BOQ Files',
+      action: 'boq',
+      icon: FileSpreadsheet,
       variant: 'blue',
     };
   }

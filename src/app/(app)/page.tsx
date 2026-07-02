@@ -4,17 +4,15 @@ import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/contexts/auth-context';
-import { useToast } from '@/contexts/toast-context';
 import { StatusBadge, PriorityBadge } from '@/components/ui/status-badge';
 import StatCard from '@/components/ui/stat-card';
 import ProgressOverviewCard from '@/components/pipeline/progress-overview-card';
-import SyncTimer from '@/app/(app)/bids/components/sync-timer';
 import ErpAiBoqModal from '@/components/boq/erp-ai-boq-modal';
 import { timeAgo, truncate } from '@/lib/shared/utils';
 import { Project } from '@/lib/shared/types';
 import {
   FileText,
-  Mail,
+  Upload,
   TrendingUp,
   AlertTriangle,
   CheckCircle,
@@ -79,13 +77,11 @@ function computeDailyCounts(projects: Project[], filterFn?: (p: Project) => bool
 }
 
 function Dashboard() {
-  const { toast } = useToast();
   const [projects, setProjects] = useState<Project[]>([]);
   const [stats, setStats] = useState<DashboardStats>({
     total: 0, new: 0, in_progress: 0, estimated: 0, sent: 0, won: 0, closed: 0, other: 0, pipeline_value: 0,
   });
   const [loading, setLoading] = useState(true);
-  const [seeding, setSeeding] = useState(false);
   const [boqModalOpen, setBoqModalOpen] = useState(false);
   const [activities, setActivities] = useState<{ id: string; project_id: string; project_name: string; step_name: string; status: string; created_at: string }[]>([]);
 
@@ -124,19 +120,6 @@ function Dashboard() {
     refreshActivities();
   }, [fetchDashboard, refreshActivities]);
 
-  const handleSyncComplete = useCallback((result: { rfqs: number; processed: number; newProjects: Array<{ id: string; name: string }> }) => {
-    if (result.rfqs > 0 || result.processed > 0) {
-      fetchDashboard();
-      refreshActivities();
-    }
-    if (result.newProjects.length > 0) {
-      const first = result.newProjects[0];
-      const name = first.name || 'Untitled RFQ';
-      const extra = result.newProjects.length > 1 ? ` (+${result.newProjects.length - 1} more)` : '';
-      toast(`New RFQ: ${name}${extra}`, 'success', { label: 'View', href: `/bids/${first.id}` });
-    }
-  }, [fetchDashboard, refreshActivities, toast]);
-
   const urgentProjects = projects
     .filter(p => p.priority === 'priority_top' && !['sent', 'won', 'lost', 'declined'].includes(p.status))
     .slice(0, 5);
@@ -153,7 +136,7 @@ function Dashboard() {
 
   const statCards = [
     { label: 'Total Bids', value: stats.total, icon: FileText, iconBg: 'bg-blue-500', borderColor: 'border-l-blue-500', sparklineData: totalSparkline, sparklineColor: '#3b82f6' },
-    { label: 'New RFQs', value: stats.new, icon: Mail, iconBg: 'bg-indigo-500', borderColor: 'border-l-indigo-500' },
+    { label: 'New Uploads', value: stats.new, icon: Upload, iconBg: 'bg-indigo-500', borderColor: 'border-l-indigo-500' },
     { label: 'In Progress', value: stats.in_progress, icon: Clock, iconBg: 'bg-amber-500', borderColor: 'border-l-amber-500', sparklineData: inProgressSparkline, sparklineColor: '#f59e0b' },
     { label: 'Estimated', value: stats.estimated, icon: TrendingUp, iconBg: 'bg-teal-500', borderColor: 'border-l-teal-500' },
     { label: 'Sent', value: stats.sent, icon: CheckCircle, iconBg: 'bg-green-500', borderColor: 'border-l-green-500' },
@@ -191,24 +174,6 @@ function Dashboard() {
             <Sparkles className="h-4 w-4" />
             Generate BOQ with AI
           </button>
-          {stats.total === 0 && (
-            <button
-              onClick={async () => {
-                setSeeding(true);
-                try {
-                  await fetch('/api/seed-demo', { method: 'POST' });
-                  await fetchDashboard();
-                } finally {
-                  setSeeding(false);
-                }
-              }}
-              disabled={seeding}
-              className="flex items-center gap-2 rounded-xl bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white shadow-sm shadow-slate-900/20 transition-all duration-200 hover:bg-sky-600 disabled:opacity-50"
-            >
-              {seeding ? 'Seeding...' : 'Load Demo MEP Projects'}
-            </button>
-          )}
-          <SyncTimer onSyncComplete={handleSyncComplete} />
         </div>
       </div>
       <ErpAiBoqModal
@@ -244,7 +209,7 @@ function Dashboard() {
               ) : undefined
             }
             actionSlot={
-              card.label === 'New RFQs' ? (
+              card.label === 'New Uploads' ? (
                 <button
                   onClick={(e) => { e.stopPropagation(); fetchDashboard(); }}
                   title="Refresh stats"
@@ -315,8 +280,8 @@ function Dashboard() {
         </div>
         {recentProjects.length === 0 ? (
           <div className="p-8 text-center text-gray-400">
-            <Mail className="h-10 w-10 mx-auto mb-2 opacity-50" />
-            <p className="text-sm">No bids yet. RFQ emails will appear here once inbox monitoring is active.</p>
+            <Upload className="h-10 w-10 mx-auto mb-2 opacity-50" />
+            <p className="text-sm">No bids yet. Upload drawings and specifications to start an AI BOQ.</p>
           </div>
         ) : (
           <div className="divide-y divide-slate-100">

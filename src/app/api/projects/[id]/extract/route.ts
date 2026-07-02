@@ -86,39 +86,6 @@ export async function POST(
       .select('*')
       .eq('project_id', id);
 
-    // If no attachments in sabi_attachments, try to backfill from sabi_email_attachments
-    if ((!attachments || attachments.length === 0) && project.email_id) {
-      const { data: emailAtts } = await supabaseAdmin
-        .from('sabi_email_attachments')
-        .select('*')
-        .eq('email_id', project.email_id);
-
-      if (emailAtts && emailAtts.length > 0) {
-        const rows = emailAtts.map((att: any) => ({
-          project_id: id,
-          filename: att.filename || 'unknown',
-          mime_type: att.mime_type || null,
-          size_bytes: att.size_bytes || null,
-          attachment_id: att.gmail_attachment_id || null,
-          message_id: att.gmail_message_id,
-          file_type: classifyFileType(att.filename || ''),
-          storage_path: att.storage_path || null,
-        }));
-        await supabaseAdmin.from('sabi_attachments').insert(rows);
-
-        // Re-fetch
-        const { data: refetched } = await supabaseAdmin
-          .from('sabi_attachments')
-          .select('*')
-          .eq('project_id', id);
-        attachments = refetched;
-
-        // Backfill is informational — not its own step row. Console only to
-        // avoid duplicate step-4 entries in the activity log.
-        console.log(`[extract] Backfilled ${emailAtts.length} attachments from sabi_email_attachments`);
-      }
-    }
-
     // Step 4 ends here — the rest is step 5 (Extract Attachment Archive).
     const zipAttachments = (attachments || []).filter(a =>
       (a.filename || '').toLowerCase().match(/\.(zip|rar|7z)$/)
@@ -358,8 +325,7 @@ export async function POST(
     const attachmentFiles: AttachmentFile[] = [];
 
     for (const att of (attachments || [])) {
-      // Load from Gmail (attachment_id + message_id) OR a direct storage path
-      // (seeded / uploaded files only have the latter).
+      // Load direct uploads from Supabase Storage.
       if (!(att.attachment_id && att.message_id) && !att.storage_path) continue;
       const filename = (att.filename || '').toLowerCase();
 
@@ -476,11 +442,12 @@ export async function POST(
       }
     }
 
-    // Combine email body + PDF text for extraction
-    const fullContent = (project.email_snippet || '') + (pdfText ? `\n\nAttachment Content:\n${pdfText}` : '');
+    const fullContent = [project.notes, pdfText ? `Attachment Content:\n${pdfText}` : '']
+      .filter(Boolean)
+      .join('\n\n');
 
     const result = await extractProjectInfo(
-      project.email_subject || '',
+      project.project_name || project.email_subject || '',
       fullContent,
       attachmentNames,
       attachmentFiles

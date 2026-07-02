@@ -26,55 +26,8 @@ export async function GET(
 
     if (projectRes.error) throw projectRes.error;
 
-    // Auto-backfill: if project has 0 attachments, pull from ALL emails in the same thread
     let attachments = attachRes.data || [];
     const project = projectRes.data;
-    if (attachments.length === 0 && project.email_thread_id) {
-      // Find all emails in this thread
-      const { data: threadEmails } = await supabaseAdmin
-        .from('sabi_emails')
-        .select('id')
-        .eq('thread_id', project.email_thread_id);
-
-      if (threadEmails && threadEmails.length > 0) {
-        const emailIds = threadEmails.map((e: any) => e.id);
-        const { data: emailAtts } = await supabaseAdmin
-          .from('sabi_email_attachments')
-          .select('*')
-          .in('email_id', emailIds);
-
-        if (emailAtts && emailAtts.length > 0) {
-          const classifyFileType = (filename: string) => {
-            const ext = filename.split('.').pop()?.toLowerCase() || '';
-            const map: Record<string, string> = {
-              dwg: 'drawing_autocad', dxf: 'drawing_autocad', pdf: 'drawing_pdf',
-              doc: 'specification', docx: 'specification', xls: 'schedule_excel',
-              xlsx: 'schedule_excel', csv: 'schedule_excel', zip: 'archive_zip',
-              rar: 'archive_zip', jpg: 'image', jpeg: 'image', png: 'image',
-              ppt: 'presentation', pptx: 'presentation', json: 'other', txt: 'specification',
-            };
-            return map[ext] || 'other';
-          };
-          const rows = emailAtts.map((att: any) => ({
-            project_id: id,
-            filename: att.filename || 'unknown',
-            mime_type: att.mime_type || null,
-            size_bytes: att.size_bytes || null,
-            attachment_id: att.gmail_attachment_id || null,
-            message_id: att.gmail_message_id,
-            file_type: classifyFileType(att.filename || ''),
-            storage_path: att.storage_path || null,
-          }));
-          // Insert one at a time to handle any individual failures
-          for (const row of rows) {
-            await supabaseAdmin.from('sabi_attachments').insert(row);
-          }
-          const { data: refreshed } = await supabaseAdmin
-            .from('sabi_attachments').select('*').eq('project_id', id).order('created_at');
-          attachments = refreshed || [];
-        }
-      }
-    }
 
     return NextResponse.json({
       project: {

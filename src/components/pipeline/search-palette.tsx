@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { Search, FileText, Mail, Settings, Ruler, BookOpen, Users, ArrowRight } from 'lucide-react';
+import { Search, FileText, ArrowRight } from 'lucide-react';
 
 interface SearchResult {
   id: string;
@@ -15,7 +15,6 @@ interface SearchResult {
 const PAGES: SearchResult[] = [
   { id: 'dashboard', label: 'Dashboard', sublabel: 'Overview & stats', href: '/', type: 'page' },
   { id: 'bids', label: 'Bid List', sublabel: 'All projects', href: '/bids', type: 'page' },
-  { id: 'inbox', label: 'Inbox', sublabel: 'Email management', href: '/inbox', type: 'page' },
   { id: 'clients', label: 'Clients', sublabel: 'Client database', href: '/clients', type: 'page' },
   { id: 'yardstick', label: 'Yardstick Rates', sublabel: 'Market benchmarks', href: '/yardstick', type: 'page' },
   { id: 'price-library', label: 'Price Library', sublabel: 'MEP pricing', href: '/price-library', type: 'page' },
